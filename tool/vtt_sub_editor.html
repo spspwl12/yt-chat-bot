@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTT 자막 편집기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px
+        }
+
+        h1 {
+            text-align: center;
+            padding: 20px;
+            color: #00d4ff;
+            font-size: 24px
+        }
+
+        .top-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .top-controls label {
+            background: #16213e;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px dashed #00d4ff;
+            color: #00d4ff;
+            font-weight: bold;
+            transition: all .3s
+        }
+
+        .top-controls label:hover {
+            background: #0f3460
+        }
+
+        .top-controls input[type=file] {
+            display: none
+        }
+
+        .top-controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all .3s
+        }
+
+        .btn-export {
+            background: #00d4ff;
+            color: #1a1a2e
+        }
+
+        .btn-export:hover {
+            background: #00b4d8
+        }
+
+        .btn-new {
+            background: #e94560;
+            color: #fff
+        }
+
+        .btn-new:hover {
+            background: #c81e45
+        }
+
+        .btn-add {
+            background: #0cca4a;
+            color: #fff
+        }
+
+        .btn-add:hover {
+            background: #0a9e3a
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px
+        }
+
+        .video-section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 15px;
+            position: relative
+        }
+
+        .video-section video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+            max-height: 450px
+        }
+
+        .custom-controls {
+            background: #0a1628;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .custom-seekbar {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #1a2a4a;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            transition: height .15s
+        }
+
+        .custom-seekbar:hover {
+            height: 10px
+        }
+
+        .custom-seekbar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(0, 212, 255, .5);
+            transition: transform .15s
+        }
+
+        .custom-seekbar:hover::-webkit-slider-thumb {
+            transform: scale(1.3)
+        }
+
+        .custom-seekbar::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 6px rgba(0, 212, 255, .5)
+        }
+
+        .custom-seekbar::-moz-range-track {
+            background: #1a2a4a;
+            border-radius: 3px;
+            height: 6px
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .ctrl-btn {
+            background: #0f3460;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all .2s;
+            display: flex;
+            align-items: center;
+            gap: 4px
+        }
+
+        .ctrl-btn:hover {
+            background: #00d4ff;
+            color: #1a1a2e
+        }
+
+        .ctrl-btn.active {
+            background: #00d4ff;
+            color: #1a1a2e
+        }
+
+        .time-display {
+            color: #00d4ff;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            margin-left: auto;
+            letter-spacing: 0.5px
+        }
+
+        .video-info {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #aaa
+        }
+
+        .subtitle-section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 15px;
+            max-height: 600px;
+            display: flex;
+            flex-direction: column
+        }
+
+        .subtitle-section h2 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .subtitle-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px
+        }
+
+        .subtitle-list::-webkit-scrollbar {
+            width: 6px
+        }
+
+        .subtitle-list::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 3px
+        }
+
+        .cue-item {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid #00d4ff;
+            transition: all .3s;
+            position: relative
+        }
+
+        .cue-item.active {
+            border-left-color: #e94560;
+            background: #1a1a4e;
+            box-shadow: 0 0 15px rgba(233, 69, 96, .3)
+        }
+
+        .cue-item .cue-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        .cue-item input[type=text] {
+            background: #16213e;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 110px
+        }
+
+        .cue-item input[type=text]:focus {
+            border-color: #00d4ff;
+            outline: none
+        }
+
+        .cue-item textarea {
+            width: 100%;
+            background: #16213e;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            resize: vertical;
+            min-height: 40px
+        }
+
+        .cue-item textarea:focus {
+            border-color: #00d4ff;
+            outline: none
+        }
+
+        .cue-item .btn-del {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #e94560;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 24px;
+            text-align: center
+        }
+
+        .cue-item .btn-del:hover {
+            background: #ff2e4d
+        }
+
+        .cue-item .btn-goto {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold
+        }
+
+        .cue-item .btn-goto:hover {
+            background: #00b4d8
+        }
+
+        .time-label {
+            font-size: 11px;
+            color: #aaa
+        }
+
+        .preview-bar {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 20px;
+            color: #fff;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.5
+        }
+
+        .video-nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        .video-nav button {
+            background: #0f3460;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all .2s;
+            min-width: 50px
+        }
+
+        .video-nav button:hover {
+            background: #00d4ff;
+            color: #1a1a2e
+        }
+
+        .btn-current {
+            background: #e94560;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold
+        }
+
+        .btn-current:hover {
+            background: #ff2e4d
+        }
+
+        @keyframes cueHighlight {
+            0% {
+                background: #00d4ff33;
+                border-left-color: #0cca4a;
+                box-shadow: 0 0 20px rgba(12, 202, 74, .4);
+            }
+
+            100% {
+                background: #0f3460;
+                border-left-color: #00d4ff;
+                box-shadow: none;
+            }
+        }
+
+        .cue-item.highlight {
+            animation: cueHighlight 1s ease-out forwards
+        }
+
+        .btn-add-bottom {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: #0cca4a;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all .3s
+        }
+
+        .btn-add-bottom:hover {
+            background: #0a9e3a
+        }
+
+        .sync-controls {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .sync-controls label {
+            color: #aaa;
+            font-size: 12px;
+            font-weight: bold
+        }
+
+        .sync-controls select {
+            background: #16213e;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 12px;
+            cursor: pointer
+        }
+
+        .sync-controls select:focus {
+            border-color: #00d4ff;
+            outline: none
+        }
+
+        .sync-btn {
+            background: #16213e;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all .2s
+        }
+
+        .sync-btn:hover {
+            background: #00d4ff;
+            color: #1a1a2e
+        }
+
+        .cue-item.selected {
+            border-left-color: #f0c040;
+            background: #1a1a3e;
+            box-shadow: 0 0 10px rgba(240, 192, 64, .2)
+        }
+
+        .no-sub {
+            color: #555;
+            font-style: italic;
+            font-size: 14px
+        }
+
+        @media(max-width:900px) {
+            .main-layout {
+                grid-template-columns: 1fr
+            }
+
+            .video-section video {
+                max-height: 300px
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>VTT 자막 편집기</h1>
+        <div class="top-controls"><label for="videoInput">동영상 불러오기<input type="file" id="videoInput"
+                    accept="video/*,.ts,.mp4,.mkv,.avi,.webm,.mov,.flv,.wmv,.m4v,.3gp"></label><label for="vttInput">VTT
+                자막 불러오기<input type="file" id="vttInput" accept=".vtt"></label><button class="btn-new"
+                onclick="clearAll()">초기화</button><button class="btn-export" onclick="exportVTT()">VTT 내보내기</button>
+        </div>
+        <div class="main-layout">
+            <div class="video-section"><video id="videoPlayer" crossorigin="anonymous">
+                    <track id="subtitleTrack" kind="subtitles" srclang="ko" label="Korean" default>
+                </video>
+                <div class="custom-controls">
+                    <input type="range" class="custom-seekbar" id="seekBar" min="0" max="100" step="0.001" value="0">
+                    <div class="controls-row">
+                        <button class="ctrl-btn" id="btnPlay" onclick="togglePlay()" title="재생/일시정지">&#9654; 재생</button>
+                        <button class="ctrl-btn" id="btnStop" onclick="stopVideo()" title="정지">&#9632; 정지</button>
+                        <span class="time-display" id="timeDisplay">00:00:00.000 / 00:00:00.000</span>
+                    </div>
+                </div>
+                <div class="video-nav">
+                    <button onclick="seekVideo(-1)" title="1초 뒤로">&lt;&lt;</button>
+                    <button onclick="seekVideo(-0.1)" title="0.1초 뒤로">&lt;</button>
+                    <button onclick="seekVideo(0.1)" title="0.1초 앞으로">&gt;</button>
+                    <button onclick="seekVideo(1)" title="1초 앞으로">&gt;&gt;</button>
+                </div>
+                <div class="video-info" id="videoInfo">동영상을 불러와주세요</div>
+                <div class="preview-bar" id="previewBar"><span class="no-sub">자막 미리보기 영역</span></div>
+            </div>
+            <div class="subtitle-section">
+                <h2>자막 목록 <span id="cueCount" style="font-size:13px;color:#aaa"></span></h2>
+                <div class="sync-controls">
+                    <label>싱크 조절</label>
+                    <select id="syncMode">
+                        <option value="all">전체 자막</option>
+                        <option value="fromSelected">선택 자막부터 끝까지</option>
+                        <option value="selectedOnly">선택된 자막만</option>
+                    </select>
+                    <button class="sync-btn" onclick="adjustSync(-0.5)">-0.5초</button>
+                    <button class="sync-btn" onclick="adjustSync(-0.1)">-0.1초</button>
+                    <button class="sync-btn" onclick="adjustSync(0.1)">+0.1초</button>
+                    <button class="sync-btn" onclick="adjustSync(0.5)">+0.5초</button>
+                </div>
+                <div class="subtitle-list" id="subtitleList">
+                    <p class="no-sub">VTT 파일을 불러오거나 자막을 추가하세요</p>
+                </div>
+                <button class="btn-add-bottom" onclick="addCue()">+ 자막 추가</button>
+            </div>
+        </div>
+    </div>
+    <script>let cues = [];
+        let currentBlobUrl = null;
+        let loadedVttFileName = '';
+        let selectedCueIdx = -1;
+        const video = document.getElementById('videoPlayer');
+        const subtitleList = document.getElementById('subtitleList');
+        const previewBar = document.getElementById('previewBar');
+        const cueCount = document.getElementById('cueCount');
+        const videoInfo = document.getElementById('videoInfo');
+        const seekBar = document.getElementById('seekBar');
+        const btnPlay = document.getElementById('btnPlay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        document.getElementById('videoInput').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (currentBlobUrl) {
+                URL.revokeObjectURL(currentBlobUrl)
+            }
+            currentBlobUrl = URL.createObjectURL(file);
+            video.src = currentBlobUrl;
+            video.load();
+            videoInfo.textContent = '파일: ' + file.name + ' (' + formatBytes(file.size) + ')';
+            applyTrack()
+        });
+        document.getElementById('vttInput').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            loadedVttFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                parseVTT(ev.target.result);
+                renderCues();
+                applyTrack()
+            };
+            reader.readAsText(file)
+        });
+
+        function parseVTT(text) {
+            cues = [];
+            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            let i = 0;
+            if (lines[0] && lines[0].trim().startsWith('WEBVTT')) {
+                i = 1
+            }
+            while (i < lines.length && lines[i].trim() === '') i++;
+            while (i < lines.length) {
+                while (i < lines.length && lines[i].trim() === '') i++;
+                if (i >= lines.length) break;
+                let id = '';
+                if (i < lines.length && lines[i].indexOf('-->') === -1) {
+                    id = lines[i].trim();
+                    i++
+                }
+                if (i < lines.length && lines[i].indexOf('-->') !== -1) {
+                    const timeParts = lines[i].split('-->');
+                    const startTime = timeParts[0].trim();
+                    const endTime = timeParts[1].trim();
+                    i++;
+                    let textLines = [];
+                    while (i < lines.length && lines[i].trim() !== '') {
+                        textLines.push(lines[i]);
+                        i++
+                    }
+                    cues.push({
+                        id: id || ('cue-' + cues.length),
+                        start: startTime,
+                        end: endTime,
+                        text: textLines.join('\n')
+                    })
+                } else {
+                    i++
+                }
+            }
+        }
+
+        function renderCues() {
+            if (cues.length === 0) {
+                subtitleList.innerHTML = '<p class="no-sub">VTT 파일을 불러오거나 자막을 추가하세요</p>';
+                cueCount.textContent = '';
+                return
+            }
+            cueCount.textContent = '(' + cues.length + '개)';
+            let html = '';
+            cues.forEach(function (c, idx) {
+                const selClass = idx === selectedCueIdx ? ' selected' : '';
+                html += '<div class="cue-item' + selClass + '" id="cueItem' + idx + '" data-idx="' + idx + '" onclick="selectCue(' + idx + ', event)">' + '<button class="btn-del" onclick="deleteCue(' + idx + ')" title="삭제">&times;</button>' + '<div class="cue-header">' + '<span class="time-label">시작</span>' + '<input type="text" id="startTime' + idx + '" value="' + escapeHtml(c.start) + '" onchange="updateCue(' + idx + ',\'start\',this.value)" placeholder="00:00:00.000">' + '<button class="btn-current" onclick="setCurrentTime(' + idx + ',\'start\')">현재</button>' + '<span class="time-label">종료</span>' + '<input type="text" id="endTime' + idx + '" value="' + escapeHtml(c.end) + '" onchange="updateCue(' + idx + ',\'end\',this.value)" placeholder="00:00:00.000">' + '<button class="btn-current" onclick="setCurrentTime(' + idx + ',\'end\')">현재</button>' + '<button class="btn-goto" onclick="goToCue(' + idx + ')">이동</button>' + '</div>' + '<textarea rows="2" onchange="updateCue(' + idx + ',\'text\',this.value)" placeholder="자막 텍스트 입력...">' + escapeHtml(c.text) + '</textarea>' + '</div>'
+            });
+            subtitleList.innerHTML = html
+        }
+
+        function updateCue(idx, field, value) {
+            if (cues[idx]) {
+                cues[idx][field] = value;
+                applyTrack()
+            }
+        }
+
+        function deleteCue(idx) {
+            cues.splice(idx, 1);
+            renderCues();
+            applyTrack()
+        }
+
+        function addCue() {
+            const currentTime = video.currentTime || 0;
+            const startStr = secondsToVTTTime(currentTime);
+            const endStr = secondsToVTTTime(currentTime + 3);
+            const newCue = {
+                id: 'cue-' + Date.now(),
+                start: startStr,
+                end: endStr,
+                text: '새 자막'
+            };
+            const currentMs = currentTime * 1000;
+            let insertIdx = cues.length;
+            for (let i = 0; i < cues.length; i++) {
+                if (vttTimeToSeconds(cues[i].start) * 1000 > currentMs) {
+                    insertIdx = i;
+                    break;
+                }
+            }
+            cues.splice(insertIdx, 0, newCue);
+            renderCues();
+            applyTrack();
+            const newEl = document.getElementById('cueItem' + insertIdx);
+            if (newEl) {
+                newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                newEl.classList.add('highlight');
+                const textarea = newEl.querySelector('textarea');
+                if (textarea) textarea.focus();
+                setTimeout(function () { newEl.classList.remove('highlight'); }, 1000);
+            }
+        }
+
+        function clearAll() {
+            cues = [];
+            renderCues();
+            applyTrack();
+            previewBar.innerHTML = '<span class="no-sub">자막 미리보기 영역</span>'
+        }
+
+        function timeToMs(timeStr) {
+            const [h, m, s] = timeStr.split(":");
+            const [sec, ms = "0"] = s.split(".");
+            return (
+                parseInt(h) * 3600000 +
+                parseInt(m) * 60000 +
+                parseInt(sec) * 1000 +
+                parseInt(ms)
+            );
+        }
+
+        function exportVTT() {
+            if (cues.length === 0) {
+                alert('내보낼 자막이 없습니다.');
+                return
+            }
+            let vtt = 'WEBVTT\n\n';
+            cues.sort((a, b) => timeToMs(a.start) - timeToMs(b.start));
+            cues.forEach(function (c, idx) {
+                vtt += (idx + 1) + '\n';
+                vtt += c.start + ' --> ' + c.end + '\n';
+                vtt += c.text + '\n\n'
+            });
+            const blob = new Blob([vtt], {
+                type: 'text/vtt;charset=utf-8'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = loadedVttFileName || 'subtitles.vtt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url)
+        }
+
+        function applyTrack() {
+            const track = document.getElementById('subtitleTrack');
+            if (track) {
+                track.parentNode.removeChild(track)
+            }
+            if (cues.length === 0) return;
+            let vtt = 'WEBVTT\n\n';
+            cues.forEach(function (c, idx) {
+                vtt += (idx + 1) + '\n';
+                vtt += c.start + ' --> ' + c.end + '\n';
+                vtt += c.text + '\n\n'
+            });
+            const blob = new Blob([vtt], {
+                type: 'text/vtt'
+            });
+            const url = URL.createObjectURL(blob);
+            const newTrack = document.createElement('track');
+            newTrack.id = 'subtitleTrack';
+            newTrack.kind = 'subtitles';
+            newTrack.srclang = 'ko';
+            newTrack.label = 'Korean';
+            newTrack.default = true;
+            newTrack.src = url;
+            video.appendChild(newTrack);
+            setTimeout(function () {
+                if (video.textTracks.length > 0) {
+                    for (let i = 0; i < video.textTracks.length; i++) {
+                        video.textTracks[i].mode = 'showing'
+                    }
+                }
+            }, 100)
+        }
+
+        function goToCue(idx) {
+            const c = cues[idx];
+            if (c) {
+                const seconds = vttTimeToSeconds(c.start);
+                if (!isNaN(seconds)) {
+                    video.currentTime = seconds;
+                    video.play()
+                }
+            }
+        }
+
+        function seekVideo(offset) {
+            if (video.readyState > 0) {
+                video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + offset))
+            }
+        }
+
+        function selectCue(idx, event) {
+            if (event && (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA')) return;
+            if (selectedCueIdx === idx) {
+                selectedCueIdx = -1;
+            } else {
+                selectedCueIdx = idx;
+            }
+            document.querySelectorAll('.cue-item').forEach(function (el, i) {
+                el.classList.toggle('selected', i === selectedCueIdx);
+            });
+        }
+
+        function adjustSync(offset) {
+            const mode = document.getElementById('syncMode').value;
+            let startIdx = 0, endIdx = cues.length;
+            if (mode === 'selectedOnly') {
+                if (selectedCueIdx < 0 || selectedCueIdx >= cues.length) { alert('자막을 먼저 선택하세요.'); return; }
+                startIdx = selectedCueIdx;
+                endIdx = selectedCueIdx + 1;
+            } else if (mode === 'fromSelected') {
+                if (selectedCueIdx < 0 || selectedCueIdx >= cues.length) { alert('자막을 먼저 선택하세요.'); return; }
+                startIdx = selectedCueIdx;
+            }
+            for (let i = startIdx; i < endIdx; i++) {
+                const newStart = Math.max(0, vttTimeToSeconds(cues[i].start) + offset);
+                const newEnd = Math.max(0, vttTimeToSeconds(cues[i].end) + offset);
+                cues[i].start = secondsToVTTTime(newStart);
+                cues[i].end = secondsToVTTTime(newEnd);
+            }
+            renderCues();
+            applyTrack();
+        }
+
+        function setCurrentTime(idx, field) {
+            const timeStr = secondsToVTTTime(video.currentTime);
+            cues[idx][field] = timeStr;
+            const inputId = field === 'start' ? 'startTime' + idx : 'endTime' + idx;
+            const inputEl = document.getElementById(inputId);
+            if (inputEl) inputEl.value = timeStr;
+            applyTrack()
+        }
+        video.addEventListener('timeupdate', function () {
+            const t = video.currentTime;
+            const d = video.duration || 0;
+            seekBar.value = d > 0 ? (t / d) * 100 : 0;
+            timeDisplay.textContent = secondsToVTTTime(t) + ' / ' + secondsToVTTTime(d);
+            let found = false;
+            cues.forEach(function (c, idx) {
+                const s = vttTimeToSeconds(c.start);
+                const e = vttTimeToSeconds(c.end);
+                const el = document.getElementById('cueItem' + idx);
+                if (t >= s && t <= e) {
+                    if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+                    previewBar.innerHTML = '<span>' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</span>';
+                    found = true
+                } else {
+                    if (el) el.classList.remove('active')
+                }
+            });
+            if (!found) {
+                previewBar.innerHTML = '<span class="no-sub">—</span>'
+            }
+        });
+
+        video.addEventListener('play', function () {
+            btnPlay.innerHTML = '&#9646;&#9646; 일시정지';
+            btnPlay.classList.add('active');
+        });
+        video.addEventListener('pause', function () {
+            btnPlay.innerHTML = '&#9654; 재생';
+            btnPlay.classList.remove('active');
+        });
+        video.addEventListener('loadedmetadata', function () {
+            seekBar.value = 0;
+            timeDisplay.textContent = '00:00:00.000 / ' + secondsToVTTTime(video.duration);
+        });
+
+        seekBar.addEventListener('input', function () {
+            if (video.duration) {
+                video.currentTime = (seekBar.value / 100) * video.duration;
+            }
+        });
+
+        function togglePlay() {
+            if (video.paused || video.ended) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+
+        function stopVideo() {
+            video.pause();
+            video.currentTime = 0;
+        }
+
+        function vttTimeToSeconds(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.trim().split(':');
+            let h = 0,
+                m = 0,
+                s = 0;
+            if (parts.length === 3) {
+                h = parseFloat(parts[0]);
+                m = parseFloat(parts[1]);
+                s = parseFloat(parts[2])
+            } else if (parts.length === 2) {
+                m = parseFloat(parts[0]);
+                s = parseFloat(parts[1])
+            }
+            return h * 3600 + m * 60 + s
+        }
+
+        function secondsToVTTTime(totalSec) {
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = (totalSec % 60).toFixed(3);
+            return pad2(h) + ':' + pad2(m) + ':' + padSec(s)
+        }
+
+        function pad2(n) {
+            return n < 10 ? '0' + n : '' + n
+        }
+
+        function padSec(s) {
+            const parts = ('' + s).split('.');
+            const intPart = parts[0].length < 2 ? '0' + parts[0] : parts[0];
+            const decPart = parts[1] ? (parts[1] + '000').substring(0, 3) : '000';
+            return intPart + '.' + decPart
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+        }
+    </script>
+</body>
+
+</html>
