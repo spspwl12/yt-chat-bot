@@ -264,16 +264,29 @@ async function getTimeAsync(youtube_url) {
     loading = true;
 
     try {
+        const deleteMP4 = async function () {
+            await fs.promises.unlink(config.searcher.livemp4_path).catch(console.error);
+            if (targetConfigPath) {
+                await fs.promises.unlink(targetConfigPath).catch(console.error);
+            }
+        };
+
         const streamTime = await downloadVideo(
             youtube_url,
             config.searcher.livemp4_path,
             20
         );
 
-        if (streamTime.size < 1024) return null;
+        if (streamTime.size < 1024) {
+            await deleteMP4();
+            return null;
+        }
 
         const downloadTime = floorToDecimal((streamTime.ed - streamTime.st) / 1000, 5);
-        if (downloadTime < 1) return null;
+        if (downloadTime < 1) {
+            await deleteMP4();
+            return null;
+        }
 
         console.log("비디오 다운로드 완료.");
 
@@ -283,12 +296,14 @@ async function getTimeAsync(youtube_url) {
         );
 
         if (videoTime < downloadTime) {
+            await deleteMP4();
             console.error("다운로드타임이 비디오타임보다 깁니다.");
             return null;
         }
 
         // C++ 검색기가 config.json을 필요로 하므로, config 객체를 json으로 변환하여 저장
-        const targetConfigPath = config.searcher.commandLine.find(arg => arg.endsWith('.json') && arg.includes('config'));
+        const targetConfigPath = config.searcher.commandLine
+            .find(arg => arg.endsWith('.json') && arg.includes('config'));
         if (targetConfigPath) {
             await fs.promises.writeFile(targetConfigPath, JSON.stringify(config), 'utf8');
         }
@@ -299,10 +314,7 @@ async function getTimeAsync(youtube_url) {
             { encoding: "utf8" }
         );
 
-        await fs.promises.unlink(config.searcher.livemp4_path).catch(console.error);
-        if (targetConfigPath) {
-            await fs.promises.unlink(targetConfigPath).catch(console.error);
-        }
+        await deleteMP4();
 
         if (!out.stdout) return null;
 
