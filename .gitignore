@@ -4,3 +4,4 @@ banned.json
 src/data/session.json
 node_modules
 src/data/config-youtube.js
+/misc/
