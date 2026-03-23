@@ -51,8 +51,7 @@ for (let i = 0; i < videoInfo.length; i++) {
         e._durationSec = e._endSec - e._editSec;
         // _streamDurationSec: _effectiveEndSec 범위 내에서 편집 구간을 제외한 실제 스트리밍 재생 시간
         e._streamDurationSec = e._effectiveEndSec - getEditOffset(e._editParsed, e._effectiveEndSec);
-        // totalVideoDurationSec: findLandingIndex에서 사용 (파일 위치 기반)
-        totalVideoDurationSec += e._effectiveEndSec;
+        totalVideoDurationSec += e._streamDurationSec;
     } else {
         e._startSec = 0;
         e._endSec = 0;
@@ -105,13 +104,16 @@ async function downloadVideo(url, outputPath, durationSeconds = 20) {
     }
 }
 
+/**
+ * 스트림 시간 기준으로 에피소드 인덱스와 스트림 remaining 반환
+ * _streamDurationSec 사용 → 편집 구간에 시간 할당 안 함
+ */
 function findLandingIndex(index, targetSec) {
     if (index === -1)
         return videoInfo.length - 1;
 
     const n = videoInfo.length;
 
-    // 전체 사이클(재생목록 총합)보다 큰 미래 시간일 경우 O(1) 모듈러 연산으로 회전 수 제거
     if (totalVideoDurationSec > 0 && targetSec >= totalVideoDurationSec) {
         targetSec = targetSec % totalVideoDurationSec;
     }
@@ -122,7 +124,7 @@ function findLandingIndex(index, targetSec) {
             index = 0;
         const e = videoInfo[index];
         if (!e.disable) {
-            const duration = e._effectiveEndSec;
+            const duration = e._streamDurationSec;
             if (targetSec <= sum + duration) {
                 return { index, remaining: targetSec - sum };
             }
@@ -133,8 +135,7 @@ function findLandingIndex(index, targetSec) {
 }
 
 /**
- * 에피소드 간 실제 스트리밍 재생 시간 합산 (edit_time 제외된 실제 소요 시간)
- * getFutureDate에서 미래 시간 계산에 사용
+ * 에피소드 간 실제 스트리밍 재생 시간 합산
  */
 function calcDuration(currentIdx, targetIdx) {
     const n = videoInfo.length;
@@ -162,11 +163,7 @@ function getRemainingTime(name, currentIdx) {
 }
 
 /**
- * 로컬 파일 기준 시간을 스트리밍 기준 시간으로 변환하기 위해,
- * 주어진 로컬 위치(localPos) 이전에 편집(컷)된 총 시간(초)을 반환
- * @param {Array} editTime - edit_time 배열 [{s, e}, ...]
- * @param {number} localPos - 로컬 파일 내 현재 위치(초)
- * @returns {number} 편집된 총 초
+ * 파일 위치 → 그 위치까지 편집(컷)된 총 시간(초) 반환
  */
 function getEditOffset(editParsed, localPos) {
     if (!editParsed) return 0;
@@ -181,12 +178,29 @@ function getEditOffset(editParsed, localPos) {
     return offset;
 }
 
+/**
+ * 스트림 시간 → 파일 위치 변환 (getEditOffset의 역함수)
+ * 예: edit [0,41] → streamPos 0 → filePos 41, streamPos 1 → filePos 42
+ */
+function streamToFilePos(editParsed, streamPos) {
+    if (!editParsed) return streamPos;
+    let filePos = streamPos;
+    for (const et of editParsed) {
+        if (filePos >= et.s) {
+            filePos += (et.e - et.s);
+        }
+    }
+    return filePos;
+}
+
 function getFutureDate(info, rtn, time) {
     const addTime = getRemainingTime(info.name, rtn.index);
-    // time은 대상 에피소드의 로컬 파일 위치이므로, 편집 구간을 제외한 스트림 위치로 보정
+    // time은 대상 에피소드의 로컬 파일 위치 → 스트림 위치로 보정
     const adjustedTime = time - getEditOffset(info._editParsed, time);
-    // rtn.now는 스트림 시간 (getAdjustedVideoTime에서 변환됨)
-    const constTime = parseInt(Date.now() / 1000) - rtn.now;
+    // rtn.now는 파일 위치이므로 constTime 계산 시 스트림 시간으로 변환
+    const ep = videoInfo[rtn.index];
+    const streamNow = rtn.now - getEditOffset(ep._editParsed, rtn.now);
+    const constTime = parseInt(Date.now() / 1000) - streamNow;
     const futureDate = new Date((constTime + addTime + adjustedTime) * 1000);
     return futureDate;
 }
@@ -219,15 +233,15 @@ async function getVideoDuration(filePath) {
 }
 
 /**
- * 파일 기반 시간 계산 (내부용, lastQuery 저장/재사용 호환)
- * now, end는 로컬 파일 위치 기준
+ * 내부적으로 스트림 시간 기반으로 동작.
+ * phashTime은 스트림 시간 (getTimeAsync에서 변환, 또는 lastQuery에서 재사용)
+ * 반환값의 now도 스트림 시간 (lastQuery 저장용)
  */
 function getLiveVideoTime(requestTime, phashTime, nowIdx) {
     const oIdx = typeof nowIdx === "string" ? (indexMap[nowIdx] !== undefined ? indexMap[nowIdx] : -1) : nowIdx;
     if (oIdx === -1)
         return null;
 
-    // phashTime은 로컬 파일 기준 경과 초, plus는 서버 대기/요청 시간 지연 
     const plus = parseInt((Date.now() - requestTime) / 1000);
     let calcTime = phashTime + plus;
 
@@ -236,18 +250,17 @@ function getLiveVideoTime(requestTime, phashTime, nowIdx) {
     else if (calcTime < -10)
         calcTime = 0;
 
-    // O(1) 타겟 축소 후 정밀 탐색 (파일 위치 기준)
+    // 스트림 시간 기준 탐색
     const { index, remaining } = findLandingIndex(oIdx, calcTime);
     const spent = videoInfo[index];
 
-    // 해당 에피소드가 방영 중이라면 진행(now), 끝났거나 다음화로 분기했다면 remaining
     const now = oIdx == index ? calcTime : remaining;
 
     return {
         index: index,
         now: now,
         start: spent._startSec,
-        end: spent._effectiveEndSec,
+        end: spent._streamDurationSec,
         requestTime: requestTime
     };
 }
@@ -266,9 +279,6 @@ async function getTimeAsync(youtube_url) {
     try {
         const deleteMP4 = async function () {
             await fs.promises.unlink(config.searcher.livemp4_path).catch(console.error);
-            if (targetConfigPath) {
-                await fs.promises.unlink(targetConfigPath).catch(console.error);
-            }
         };
 
         const streamTime = await downloadVideo(
@@ -304,15 +314,18 @@ async function getTimeAsync(youtube_url) {
         // C++ 검색기가 config.json을 필요로 하므로, config 객체를 json으로 변환하여 저장
         const targetConfigPath = config.searcher.commandLine
             .find(arg => arg.endsWith('.json') && arg.includes('config'));
-        if (targetConfigPath) {
+
+        if (targetConfigPath)
             await fs.promises.writeFile(targetConfigPath, JSON.stringify(config), 'utf8');
-        }
 
         const out = await execFilePromise(
             config.searcher.path,
             config.searcher.commandLine,
             { encoding: "utf8" }
         );
+
+        if (targetConfigPath)
+            await fs.promises.unlink(targetConfigPath).catch(console.error);
 
         await deleteMP4();
 
@@ -335,7 +348,14 @@ async function getTimeAsync(youtube_url) {
 
         console.log(JSON.stringify({ ...mJson, videoTime, downloadTime, realTimestamp }));
 
-        return getLiveVideoTime(realTimestamp, mJson.dbTimestamp, mJson.filename);
+        // C++ 검색기의 dbTimestamp(파일 위치) → 스트림 시간으로 변환
+        const matchIdx = indexMap[mJson.filename];
+        const matchedEp = matchIdx !== undefined ? videoInfo[matchIdx] : null;
+        const streamPhash = matchedEp
+            ? mJson.dbTimestamp - getEditOffset(matchedEp._editParsed, mJson.dbTimestamp)
+            : mJson.dbTimestamp;
+
+        return getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
     } catch (err) {
         console.error(err);
         return null;
@@ -345,17 +365,13 @@ async function getTimeAsync(youtube_url) {
 }
 
 /**
- * 현재 파일 위치가 유효 콘텐츠 끝에 도달한 경우
- * 다음 활성 에피소드의 인덱스를 반환. 그 외에는 rtn.index를 그대로 반환.
- * rtn.now, rtn.end는 파일 기반 (getLiveVideoTime 반환값)
- * @param {object} rtn - getLiveVideoTime의 반환값
- * @returns {number} 유효 에피소드 인덱스
+ * 스트림 위치가 에피소드 끝에 도달하면 다음 활성 에피소드 인덱스 반환
  */
 function getEffectiveIndex(rtn) {
     if (!rtn) return -1;
 
     const ep = videoInfo[rtn.index];
-    if (rtn.now >= ep._effectiveEndSec) {
+    if (rtn.now >= ep._streamDurationSec) {
         const n = videoInfo.length;
         let nextIdx = (rtn.index + 1) % n;
         for (let i = 0; i < n; i++) {
@@ -368,14 +384,10 @@ function getEffectiveIndex(rtn) {
 }
 
 /**
- * getLiveVideoTime(파일 기반)에 edit_time 보정을 적용하여 
- * 스트림 기반 now/end 값으로 변환하여 반환.
- * - commands.js에서 rtn.end - rtn.now = 남은 스트림 시간
- * - getFutureDate에서 rtn.now를 스트림 기준으로 사용
- * @param {number} requestTime - 요청 시각 (ms)
- * @param {number} phashTime - 로컬 파일 기준 경과 초
- * @param {string|number} nowIdx - 현재 영상 인덱스
- * @returns {object|null} 스트림 시간 보정된 에피소드 정보
+ * commands.js용 최종 출력.
+ * 내부 스트림 시간 → 파일 위치(now)와 _effectiveEndSec(end)로 변환하여 반환.
+ * now는 streamToFilePos로 변환 → edit [0,41]이면 now는 41, 42, 43... 으로 흐름
+ * end - now = 실제 남은 파일 시간 (편집 구간 제외)
  */
 function getAdjustedVideoTime(requestTime, phashTime, nowIdx) {
     const rtn = getLiveVideoTime(requestTime, phashTime, nowIdx);
@@ -383,17 +395,15 @@ function getAdjustedVideoTime(requestTime, phashTime, nowIdx) {
 
     const eIdx = getEffectiveIndex(rtn);
     if (eIdx !== rtn.index) {
-        // 에피소드 전환: 다음 에피소드의 시작
         const ep = videoInfo[eIdx];
         rtn.index = eIdx;
-        rtn.now = 0;
+        rtn.now = streamToFilePos(ep._editParsed, 0);
         rtn.start = ep._startSec;
-        rtn.end = ep._streamDurationSec;
+        rtn.end = ep._effectiveEndSec;
     } else {
-        // 현재 에피소드: 파일 위치를 스트림 시간으로 변환
         const ep = videoInfo[rtn.index];
-        rtn.now = rtn.now - getEditOffset(ep._editParsed, rtn.now);
-        rtn.end = ep._streamDurationSec;
+        rtn.now = streamToFilePos(ep._editParsed, rtn.now);
+        rtn.end = ep._effectiveEndSec;
     }
 
     return rtn;
