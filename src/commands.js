@@ -438,6 +438,7 @@ function updateEpisodeInfo() {
                 copyQuery(rtn);
                 return;
             } else {
+                console.log(JSON.stringify({ gapidx: rtn.index - cmp.index, gapnow: Math.abs(rtn.now - cmp.now) }));
                 console.log("현재 영상 정보와 싱크가 맞지 않습니다.");
             }
         });
