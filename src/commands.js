@@ -403,30 +403,34 @@ function updateEpisodeInfo() {
             if (tempQuery.length > 1) {
                 console.log("현재 영상 정보를 불러왔습니다. 객체: ");
                 console.log(tempQuery);
-                const freqMap = new Map();
+                const cmp = getEpisodeInfo() || { index: -1, now: 0 };
+                let adopted = null;
 
-                // 4-1. 각 샘플마다 영상 인덱스 번호(index)별로 등장 빈도와 경과 시간 기록
-                for (const item of tempQuery) {
-                    if (!freqMap.has(item.index)) {
-                        freqMap.set(item.index, { count: 0, past: 0, obj: { ...item } });
+                // 4-1. 집중 비교 구간:
+                // 이전(cmp 혹은 직전 수집값)과 비교해 에피소드가 동일하며,
+                // now 진행이 정상적(약 60초 간격)인 시간대 패턴을 찾으면 기존 로직 없이 즉시 채택
+                for (let i = 0; i < tempQuery.length; i++) {
+                    const prev = (i === 0) ? cmp : tempQuery[i - 1];
+                    const curr = tempQuery[i];
+
+                    // 같은 에피소드인가? 이전 now(getEpisodeInfo의 now 포함) 랑도 비교
+                    if (curr.index === prev.index) {
+                        const diff = Math.abs(curr.now - prev.now);
+                        if (diff <= cfg.sync.tolerance_sec) {
+                            adopted = curr; // 조건을 만족하면 즉시 채택 후보로 갱신
+                        } else {
+                            adopted = null; // 오차가 크면 연속성 무효
+                        }
+                    } else {
+                        adopted = null; // 에피소드가 다르면 연속성 무효
                     }
-                    const entry = freqMap.get(item.index);
-                    entry.count++;
-                    entry.past = entry.obj.now || 0;
-                    entry.obj.now = item.now; // 가장 나중 최신 시간 보존
-                    entry.obj.requestTime = item.requestTime;
                 }
 
-                // 4-2. 등장 빈도(count) 내림차순 정렬, 빈도가 같으면 진행 시간(now) 내림차순 정렬
-                const sorted = [...freqMap.values()].sort((a, b) =>
-                    b.count !== a.count ? b.count - a.count : b.obj.now - a.obj.now
-                );
-
-                // 4-3. 압도적 다수결이거나 1위와 2위의 득표 빈도 격차가 크다면(1 초과), 1위를 올바른 싱크로 확정
-                if (!sorted[1] || Math.abs(sorted[0].count - sorted[1].count) > 1) {
-                    console.log("이 객체의 정보가 정확한거 같습니다:");
-                    console.log(sorted[0].obj);
-                    copyQuery(sorted[0].obj); // 최종 확정된 객체를 파일 및 lastQuery 메모리에 갱신
+                // 4-2. 60초 단위(정상 진행) 연속성이 확인된 시간대일 경우에만 확정
+                if (adopted) {
+                    console.log("이 객체의 정보가 정확한것 같습니다:");
+                    console.log(adopted);
+                    copyQuery(adopted); // 최종 확정된 객체를 파일 및 lastQuery 메모리에 갱신
                     return;
                 }
             }
@@ -434,11 +438,19 @@ function updateEpisodeInfo() {
             // 5. 샘플이 1개이거나, 다수결 판별이 안 난 경우 현재 확정 기록된 getEpisodeInfo와 대조
             const cmp = getEpisodeInfo();
             // 싱크 오차 허용 범위(tolerance_sec) 안에서 기존 기록과 연속성이 있다면 갱신 허용
-            if (cmp && tempQuery.length <= 1 && rtn.index === cmp.index && Math.abs(rtn.now - cmp.now) <= cfg.sync.tolerance_sec) {
+            if (cmp &&
+                tempQuery.length <= 1 &&
+                rtn.index === cmp.index &&
+                Math.abs(rtn.now - cmp.now) <= cfg.sync.tolerance_sec) {
                 copyQuery(rtn);
                 return;
             } else {
-                console.log(JSON.stringify({ gapidx: rtn.index - cmp.index, gapnow: Math.abs(rtn.now - cmp.now) }));
+                if (cmp) {
+                    console.log(JSON.stringify({
+                        gapidx: rtn.index - cmp.index,
+                        gapnow: Math.abs(rtn.now - cmp.now)
+                    }));
+                }
                 console.log("현재 영상 정보와 싱크가 맞지 않습니다.");
             }
         });
