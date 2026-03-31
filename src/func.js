@@ -46,28 +46,29 @@ function fromHHMMSS(timeStr) {
 
 function getClockEmoji(time) {
     const hm = time.match(/\d{2}:\d{2}/);
+    if (!hm || hm.length <= 0) return "🕐";
 
-    if (!hm || hm.length <= 0)
-        return "🕐";
-
-    const clockEmojis = ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"];
+    const clockEmojis = {
+        full: ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"],
+        half: ["🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦", "🕧"]
+    };
 
     try {
-        const parts = hm[0].split(":");
-        if (parts.length !== 2)
-            return "🕐";
+        const [h, m] = hm[0].split(":").map(x => parseInt(x, 10));
+        if (isNaN(h) || isNaN(m) || h < 0 || h > 24)
+            return "🕒";
 
-        const hour = parseInt(parts[0], 10);
-        const minute = parseInt(parts[1], 10);
-
-        if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 24) {
-            return "🕐";
-        }
-        const normalizedHour = hour === 24 ? 0 : hour;
+        const normalizedHour = h === 24 ? 0 : h;
         const index = normalizedHour === 0 ? 11 : (normalizedHour - 1) % 12;
-        return clockEmojis[index];
+
+        if (m < 15)
+            return clockEmojis.full[index]; // 정각 근사
+        else if (m < 45)
+            return clockEmojis.half[index]; // 30분 근사
+        else
+            return clockEmojis.full[(index + 1) % 12]; // 다음 정각 근사
     } catch {
-        return "🕐";
+        return "🕒";
     }
 }
 
