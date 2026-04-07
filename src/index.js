@@ -14,6 +14,8 @@ const { initSession, fetchChat, sendChat, getSendParams } = require('./innertube
 const { initCommand, handleCommand } = require('./commands.js');
 const { SpamGuard } = require('./spam-guard.js');
 const cfg = require('./data/config-youtube.js');
+const { startServer, broadcastChat, broadcastSpam } = require('./web-server.js');
+const chatHistory = require('./chat-history.js');
 
 const spamGuard = new SpamGuard({
     windowSec: cfg.spam.spam_window_sec || 10,
@@ -46,6 +48,10 @@ async function main() {
     initCommand();
     let isFirstFetch = true;
 
+    // 대시보드 웹 서버 백그라운드 시작 (getEpisodeInfo 전달)
+    const { getEpisodeInfo } = require('./commands.js');
+    startServer(8080, spamGuard, getEpisodeInfo);
+
     while (running) {
         try {
             const result = await fetchChat(continuation);
@@ -71,6 +77,10 @@ async function main() {
             }
 
             const messages = result.messages || [];
+            
+            // 실시간 채팅을 대시보드 버퍼로 전송
+            chatHistory.addMessages(messages);
+            if (messages.length > 0) broadcastChat(messages);
 
             for (let i = 0; i < messages.length; i++) {
                 const msg = messages[i];
@@ -84,14 +94,17 @@ async function main() {
                 if (resp) {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
                     if (banned) {
+                        broadcastSpam();
                         handleCommand(0);
                         continue;
                     }
                     typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
                     console.log('💬 [' + msg.displayName + '] ' + msg.text);
                 }
-                if (chkInput.warn > 0)
+                if (chkInput.warn > 0) {
                     spamGuard.addPenalty(msg.channelId, msg.displayName, chkInput.warn);
+                    broadcastSpam();
+                }
             }
 
             await sleep(4000);

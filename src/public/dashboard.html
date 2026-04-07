@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Chat Bot Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: rgba(30, 41, 59, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.1);
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --secondary: #10b981;
+            --error: #ef4444;
+            --error-hover: #dc2626;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            margin: 0; 
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: var(--surface-color);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--surface-border);
+            z-index: 10;
+        }
+
+        .sidebar h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 24px;
+            margin: 0;
+            border-bottom: 1px solid var(--surface-border);
+            background: linear-gradient(90deg, #c084fc, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 16px 24px;
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 1px solid var(--surface-border);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-btn:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .nav-btn.active {
+            color: var(--text-main);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .nav-btn.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
+
+        /* Connection Status Indicator */
+        .conn-status {
+            margin-top: auto;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            border-top: 1px solid var(--surface-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--error);
+            box-shadow: 0 0 8px var(--error);
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .status-dot.connected {
+            background-color: var(--secondary);
+            box-shadow: 0 0 8px var(--secondary);
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .panel {
+            display: none;
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 24px;
+            color: var(--text-main);
+        }
+
+        /* Widgets */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+
+        .status-card h3 { 
+            margin: 0 0 12px 0; 
+            font-size: 0.95rem; 
+            font-weight: 500;
+            color: var(--text-dim); 
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .status-card p { 
+            margin: 0; 
+            font-size: 2.5rem; 
+            font-weight: 700; 
+            background: linear-gradient(90deg, #34d399, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Buttons Arrays */
+        .btn {
+            background-color: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-ban {
+            background-color: var(--error);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            font-size: 0.85rem;
+            padding: 8px 16px;
+        }
+        
+        .btn-ban:hover {
+            background-color: var(--error-hover);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-ban:disabled {
+            background-color: #3f3f46;
+            box-shadow: none;
+            cursor: not-allowed;
+            color: var(--text-dim);
+            transform: none;
+        }
+
+        /* Chat UI */
+        .chat-list {
+            border-radius: 16px;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+
+        .chat-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-list::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+
+        .chat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--surface-border);
+            animation: slideUp 0.3s ease;
+        }
+
+        .chat-item:last-child { border-bottom: none; }
+        
+        .chat-author { font-weight: 600; color: #fcd34d; margin-right: 12px; }
+        .chat-text { color: var(--text-main); font-weight: 400; flex: 1; word-break: break-all; }
+        
+        /* Table / Spams */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 16px 24px; text-align: left; border-bottom: 1px solid var(--surface-border); }
+        th { color: var(--text-dim); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        .add-spam-form {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .form-input {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--surface-border);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 200px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Config */
+        .config-block {
+            margin-bottom: 24px;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        
+        .config-block-header {
+            background: rgba(0,0,0,0.2);
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--surface-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .config-block-header h3 { margin:0; font-size: 1.1rem; }
+
+        textarea.code-editor {
+            width: 100%;
+            height: 300px;
+            background: transparent;
+            color: #e2e8f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            border: none;
+            padding: 24px;
+            box-sizing: border-box;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        
+        textarea.code-editor:focus {
+            outline: none;
+        }
+        
+        /* Toast Notifications */
+        #toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background: var(--surface-color);
+            backdrop-filter: blur(8px);
+            border-left: 4px solid var(--primary);
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
+        }
+        
+        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar glass">
+        <h1>Bot Admin</h1>
+        <button class="nav-btn active" data-target="tab-live">Live Monitor</button>
+        <button class="nav-btn" data-target="tab-chat">Chat & Ban</button>
+        <button class="nav-btn" data-target="tab-spam">Spam Users</button>
+        <button class="nav-btn" data-target="tab-config">Configuration</button>
+        
+        <div class="conn-status">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Live Monitor -->
+        <div id="tab-live" class="panel active">
+            <h2>Live Status Monitor</h2>
+            <div class="status-grid">
+                <div class="status-card glass">
+                    <h3>Current Episode</h3>
+                    <p id="stat-episode">--</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>Video Time (Sec)</h3>
+                    <p id="stat-sec" style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">--</p>
+                </div>
+            </div>
+            <button class="btn" id="btn-refresh-state">Force Refresh</button>
+        </div>
+
+        <!-- Chat & Ban -->
+        <div id="tab-chat" class="panel">
+            <h2>Real-time Chat & Moderation</h2>
+            <div class="chat-list glass" id="chat-container" style="height: 550px;">
+                <!-- Chat populated via WS -->
+            </div>
+        </div>
+
+        <!-- Spam Users -->
+        <div id="tab-spam" class="panel">
+            <h2>Spam Warning List</h2>
+            
+            <div class="glass" style="border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+                <h3 style="margin-top:0; margin-bottom: 16px; font-size:1.1rem;">Manual Add Block</h3>
+                <div class="add-spam-form">
+                    <input type="text" id="spam-name" class="form-input" placeholder="Display Name (Optional)">
+                    <input type="text" id="spam-channel" class="form-input" placeholder="Channel ID (Required)">
+                    <input type="text" id="spam-reason" class="form-input" placeholder="Reason">
+                    <button class="btn" id="btn-add-spam">Add to Spammers</button>
+                </div>
+            </div>
+
+            <div class="glass" style="border-radius: 16px; overflow: hidden;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Channel ID</th>
+                            <th>Warns</th>
+                            <th>Reason</th>
+                            <th>Status/Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spam-tbody">
+                        <!-- Spams populated via WS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div id="tab-config" class="panel">
+            <h2>Configuration Control</h2>
+            
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>youtube-config.js</h3>
+                    <button class="btn" onclick="saveConfig('youtube')">Save Changes</button>
+                </div>
+                <textarea id="val-youtube" class="code-editor" spellcheck="false"></textarea>
+            </div>
+            
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>search-config.js</h3>
+                    <button class="btn" onclick="saveConfig('search')">Save Changes</button>
+                </div>
+                <textarea id="val-search" class="code-editor" spellcheck="false"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast-container"></div>
+
+    <script>
+        let ws;
+        let pinger;
+        
+        // --- UI Interactions ---
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                
+                const targetId = e.target.getAttribute('data-target');
+                document.getElementById(targetId).classList.add('active');
+                e.target.classList.add('active');
+                
+                // Fetch relevant data on tab switch
+                if(ws && ws.readyState === WebSocket.OPEN) {
+                    if (targetId === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
+                    if (targetId === 'tab-chat') ws.send(JSON.stringify({action: 'getChat'}));
+                    if (targetId === 'tab-spam') ws.send(JSON.stringify({action: 'getSpam'}));
+                    if (targetId === 'tab-config') ws.send(JSON.stringify({action: 'getConfig'}));
+                }
+            });
+        });
+
+        function showToast(message, isError = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            if(isError) toast.style.borderLeftColor = 'var(--error)';
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 3500);
+        }
+
+        // --- WebSocket Logic ---
+        function connectWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                document.getElementById('status-dot').classList.add('connected');
+                document.getElementById('status-text').innerText = 'Connected';
+                
+                // Fetch initial data
+                ws.send(JSON.stringify({action: 'getState'}));
+                
+                // Start state polling every 5s if in live tab
+                pinger = setInterval(() => {
+                    const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
+                    if (activeTab === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
+                }, 5000);
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('status-dot').classList.remove('connected');
+                document.getElementById('status-text').innerText = 'Reconnecting...';
+                clearInterval(pinger);
+                setTimeout(connectWS, 3000); // Reconnect loop
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleWSMessage(msg);
+                } catch(e) { console.error("Message parse error", e); }
+            };
+        }
+
+        function handleWSMessage(msg) {
+            const { action, payload } = msg;
+
+            switch(action) {
+                case 'state':
+                    if (payload.episodeInfo) {
+                        const totalEp = payload.totalEpisodes ? payload.totalEpisodes : '--';
+                        const secText = (sec) => {
+                            if (!sec || isNaN(sec)) return '--:--';
+                            const m = Math.floor(sec / 60);
+                            const s = Math.floor(sec % 60).toString().padStart(2, '0');
+                            return `${m}:${s}`;
+                        };
+                        
+                        document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}`;
+                        document.getElementById('stat-sec').innerText = `${secText(payload.episodeInfo.now)} / ${secText(payload.totalTime)}`;
+                    }
+                    else {
+                        document.getElementById('stat-episode').innerText = '-- / --';
+                        document.getElementById('stat-sec').innerText = '-- / --';
+                    }
+                    
+                    if (payload.videoId) {
+                        // Backend provided videoId. Iframe removed by user request.
+                    }
+                    break;
+                case 'chat_history':
+                    renderChats(payload);
+                    break;
+                case 'chat_push':
+                    appendChats(payload);
+                    break;
+                case 'spam_list':
+                    renderSpam(payload);
+                    break;
+                case 'config_data':
+                    document.getElementById('val-youtube').value = payload.youtube;
+                    document.getElementById('val-search').value = payload.search;
+                    break;
+                case 'ban_result':
+                    if (payload.success) showToast('User banned successfully.');
+                    else showToast('Failed to ban user.', true);
+                    break;
+                case 'spamAdd_result':
+                    showToast('Spammer manually added.');
+                    break;
+                case 'spamDelete_result':
+                    showToast('Spammer removed.');
+                    break;
+                case 'saveConfig_result':
+                    if (payload.success) showToast('Configuration saved successfully! Changes apply on next restart.');
+                    else showToast('Failed to save config: ' + payload.error, true);
+                    break;
+            }
+        }
+
+        // --- Render Helpers ---
+        function createChatElement(c) {
+            const div = document.createElement('div');
+            div.className = 'chat-item';
+            const canBan = !!c.contextMenu;
+            const ctxMenuEscaped = c.contextMenu ? escape(JSON.stringify(c.contextMenu)) : '';
+            div.innerHTML = `
+                <div>
+                    <span class="chat-author">${c.displayName}</span>
+                    <span class="chat-text">${c.text}</span>
+                </div>
+                <button class="btn btn-ban" ${!canBan ? 'disabled title="Missing Context Menu API"' : ''}
+                        onclick="execBan('${c.displayName}', '${c.channelId}', '${ctxMenuEscaped}')">
+                    유저 차단
+                </button>
+            `;
+            return div;
+        }
+
+        function renderChats(chats) {
+            const container = document.getElementById('chat-container');
+            container.innerHTML = '';
+            chats.sort((a,b) => b.timestamp - a.timestamp); // latest first
+            chats.forEach(c => container.appendChild(createChatElement(c)));
+        }
+
+        function appendChats(chatsArr) {
+            const container = document.getElementById('chat-container');
+            // For prepend
+            chatsArr.forEach(c => {
+                container.insertBefore(createChatElement(c), container.firstChild);
+            });
+        }
+
+        function renderSpam(spammers) {
+            const tbody = document.getElementById('spam-tbody');
+            tbody.innerHTML = '';
+            spammers.forEach(u => {
+                const tr = document.createElement('tr');
+                const actionBtn = u.block ? 
+                    `<button class="btn btn-ban" style="padding: 4px 10px;" onclick="execDeleteSpam('${u.channelId}')">Remove Block</button>` : 
+                    `<span style="color:var(--secondary); font-weight:600;">Monitoring</span>`;
+
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${u.name}</td>
+                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.8rem;">${u.channelId}</td>
+                    <td><span style="background:rgba(255,255,255,0.1); padding: 4px 8px; border-radius:4px;">${u.count}</span></td>
+                    <td style="color:#fcd34d;">${u.reason}</td>
+                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- Actions ---
+        function execBan(name, channelId, contextMenuStr) {
+            if (!confirm(`[${name}] 님을 채널에서 차단하시겠습니까? (유튜브 및 내부 스팸가드 동시 차단)`)) return;
+            const contextMenuParams = contextMenuStr ? JSON.parse(unescape(contextMenuStr)) : null;
+            ws.send(JSON.stringify({
+                action: 'ban',
+                payload: { channelId, displayName: name, contextMenuParams }
+            }));
+        }
+
+        function execDeleteSpam(channelId) {
+            if(!confirm(`Remove this user from the ban list?`)) return;
+            ws.send(JSON.stringify({ action: 'spamDelete', payload: { channelId } }));
+        }
+
+        document.getElementById('btn-refresh-state').addEventListener('click', () => {
+            if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action: 'getState'}));
+        });
+
+        document.getElementById('btn-add-spam').addEventListener('click', () => {
+            const channelId = document.getElementById('spam-channel').value.trim();
+            const displayName = document.getElementById('spam-name').value.trim() || 'Unknown';
+            const reason = document.getElementById('spam-reason').value.trim() || 'Manual Add';
+
+            if (!channelId) return showToast('Channel ID is strictly required.', true);
+            
+            ws.send(JSON.stringify({
+                action: 'spamAdd',
+                payload: { channelId, displayName, reason }
+            }));
+            
+            document.getElementById('spam-channel').value = '';
+            document.getElementById('spam-name').value = '';
+            document.getElementById('spam-reason').value = '';
+        });
+
+        window.saveConfig = function(target) {
+            const content = document.getElementById(`val-${target}`).value;
+            ws.send(JSON.stringify({ action: 'saveConfig', payload: { target, content } }));
+        };
+
+        // Bootstrap
+        connectWS();
+    </script>
+</body>
+</html>

@@ -110,6 +110,27 @@ class SpamGuard {
         return true;
     }
 
+    async manualBan(channelId, displayName, reason) {
+        if (!this.banned.has(channelId)) {
+            this.banned.set(channelId, {
+                displayName: displayName,
+                reason: reason || '수동 밴',
+                bannedAt: new Date().toISOString()
+            });
+            this._saveBanned();
+        }
+        return true;
+    }
+
+    removeBan(channelId) {
+        if (this.banned.has(channelId)) {
+            this.banned.delete(channelId);
+            this._saveBanned();
+            return true;
+        }
+        return false;
+    }
+
     _loadBanned() {
         try {
             if (fs.existsSync(BANNED_PATH)) {

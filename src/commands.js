@@ -825,4 +825,4 @@ function initCommand() {
     process.on('exit', cleanup);
 }
 
-module.exports = { initCommand, handleCommand };
+module.exports = { initCommand, handleCommand, getEpisodeInfo };

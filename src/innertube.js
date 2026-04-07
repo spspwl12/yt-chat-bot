@@ -519,17 +519,15 @@ function _waitForVerify(messageId) {
  *   null 반환 시 재시도 중단. 생략 시 동일 메시지로 재시도.
  */
 function sendChat(message, retryProc) {
-    console.log(message);
-    return;
-    // return new Promise(function (resolve) {
-    //     sendQueue.push({
-    //         message: message,
-    //         retryProc: retryProc || null,
-    //         resolve: resolve
-    //     });
-    //     if (!queueRunning)
-    //         _processQueue();
-    // });
+    return new Promise(function (resolve) {
+        sendQueue.push({
+            message: message,
+            retryProc: retryProc || null,
+            resolve: resolve
+        });
+        if (!queueRunning)
+            _processQueue();
+    });
 }
 
 async function _processQueue() {
@@ -683,6 +681,10 @@ async function _deleteMessage(contextMenuParams) {
 }
 
 async function banUser(contextMenuParams) {
+    return blockUser(contextMenuParams);
+}
+
+async function blockUser(contextMenuParams) {
     if (!contextMenuParams) return false;
 
     try {
@@ -696,33 +698,68 @@ async function banUser(contextMenuParams) {
             && menuData.liveChatItemContextMenuSupportedRenderers.menuRenderer;
         var menuItems = (menuRenderer && menuRenderer.items) || [];
 
-        var banParams = null;
+        var blockParams = null;
+        var blockEndpointUrl = null;
+
         for (var i = 0; i < menuItems.length; i++) {
-            var ep = menuItems[i].menuServiceItemRenderer
-                && menuItems[i].menuServiceItemRenderer.serviceEndpoint;
-            if (ep && ep.moderateLiveChatEndpoint) {
-                banParams = ep.moderateLiveChatEndpoint.params;
-                break;
+            // ── 1) 관리자용: menuServiceItemRenderer → moderateLiveChatEndpoint
+            var svcItem = menuItems[i].menuServiceItemRenderer;
+            if (svcItem && svcItem.serviceEndpoint && svcItem.serviceEndpoint.moderateLiveChatEndpoint) {
+                blockParams = svcItem.serviceEndpoint.moderateLiveChatEndpoint.params;
+                blockEndpointUrl = '/youtubei/v1/live_chat/moderate';
+                if (svcItem.icon && svcItem.icon.iconType === 'BLOCK_USER') break;
+            }
+
+            // ── 2) 비관리자용: menuNavigationItemRenderer → confirmDialogEndpoint
+            //    유저 숨기기(Block) 버튼이 확인 다이얼로그 안에 들어있음
+            var navItem = menuItems[i].menuNavigationItemRenderer;
+            if (navItem && navItem.navigationEndpoint && navItem.navigationEndpoint.confirmDialogEndpoint) {
+                var dialogRenderer = navItem.navigationEndpoint.confirmDialogEndpoint.content
+                    && navItem.navigationEndpoint.confirmDialogEndpoint.content.confirmDialogRenderer;
+                if (!dialogRenderer) continue;
+
+                // confirmButton 안의 serviceEndpoint 추출
+                var confirmBtn = dialogRenderer.confirmButton && dialogRenderer.confirmButton.buttonRenderer;
+                if (!confirmBtn || !confirmBtn.serviceEndpoint) continue;
+
+                var ep = confirmBtn.serviceEndpoint;
+
+                // moderateLiveChatEndpoint (숨기기/차단)
+                if (ep.moderateLiveChatEndpoint) {
+                    blockParams = ep.moderateLiveChatEndpoint.params;
+                    blockEndpointUrl = '/youtubei/v1/live_chat/moderate';
+                    break;
+                }
+
+                // 혹시 다른 endpoint 형태일 경우 대비
+                if (ep.liveChatActionEndpoint) {
+                    blockParams = ep.liveChatActionEndpoint.params;
+                    blockEndpointUrl = '/youtubei/v1/live_chat/action';
+                    break;
+                }
             }
         }
 
-        if (!banParams) {
-            console.error('❌ 차단 메뉴 없음');
+        if (!blockParams) {
+            console.error('❌ 유저 숨기기 메뉴 없음. 감지된 메뉴 항목:');
+            for (var i = 0; i < menuItems.length; i++) {
+                console.error('  [' + i + '] ' + JSON.stringify(menuItems[i]).slice(0, 300));
+            }
             return false;
         }
 
         await h2Post(
-            '/youtubei/v1/live_chat/moderate?key=' + innertubeApiKey + '&prettyPrint=false',
+            blockEndpointUrl + '?key=' + innertubeApiKey + '&prettyPrint=false',
             authHeaders(),
-            { context: makeContext(), params: banParams }
+            { context: makeContext(), params: blockParams }
         );
 
-        console.log('🔨 차단 완료');
+        console.log('🔨 유저 숨기기 완료');
         return true;
     } catch (err) {
-        console.error('❌ 차단 실패: ' + err.message);
+        console.error('❌ 유저 숨기기 실패: ' + err.message);
         return false;
     }
 }
 
-module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser };
+module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser };
