@@ -5,16 +5,14 @@ module.exports = {
         inputOptions: []                   // 추가 입력 옵션
     },
     ytdlp: {
-        path: "./data/yt-dlp.exe",                  // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
-        output: "./data/__livefe20e28dced625646.mp4" // 다운로드할 영상의 임시 저장 경로
+        path: "./data/yt-dlp.exe"                    // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
     },
     searcher: {
         path: "./data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로
-        livemp4_path: "./data/__livefe20e28dced625646.mp4",         // 현재 라이브 영상 조각의 경로
-        lastquery_path: "./data/lastquery.json",                    // 가장 최근의 영상/에피소드 정보를 저장하는 파일
-        youtube_url: "https://www.youtube.com/watch?v=SnVhT306gAg", // 트래킹할 유튜브 라이브 채널 주소
+        segmentDir: "./data/seg",                                   // 세그먼트 파일 저장 디렉토리
+        lastquery_path: "./data/lastquery.json",                   // 가장 최근의 영상/에피소드 정보를 저장하는 파일
+        youtube_url: "https://www.youtube.com/watch?v=4fa2e2bF0nI", // 트래킹할 유튜브 라이브 채널 주소
         commandLine: [                                              // 검색 엔진(searcher.exe)에 전달할 인자 배열
-            "./data/__livefe20e28dced625646.mp4",                     // 입력영상 경로
             "./data/video-fingerprints.json",                         // DB파일 경로
             "30",                                                     // 처리시간(초) 등
             "./data/config.json",                                     // 설정파일 경로 (※주의: C++ searcher가 만약 json만 읽는다면 이 부분 변경이 필요할 수 있습니다)

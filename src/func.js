@@ -150,6 +150,98 @@ function shortenTextByRatio(str, ratio) {
     return start + "..." + end;
 }
 
+function parseKoreanDate(input) {
+    if (!input) return null;
+    input = input.trim();
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth() + 1;
+    let date = now.getDate();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+
+    let hasDate = false;
+    let hasTime = false;
+
+    // YYYY년 MM월 DD일 or YYYY-MM-DD or YYYY.MM.DD
+    const dateRegex1 = /(\d{4})[\s년\-\.]+(\d{1,2})[\s월\-\.]+(\d{1,2})[일]?/;
+    // MM월 DD일 or MM/DD or MM.DD (lookbehind avoided for compatibility)
+    const dateRegex2 = /(?:^|[^\d])(\d{1,2})[\s월/\.]+(\d{1,2})[일]?/;
+
+    let pmamMatch = input.match(/(오전|오후|am|pm|낮|밤|저녁|새벽|아침)/i);
+    let isPM = null;
+    if (pmamMatch) {
+        isPM = /오후|pm|낮|저녁|밤/i.test(pmamMatch[1]);
+    }
+
+    const timeRegex1 = /(?:^|[^\d])(\d{1,2}):(\d{1,2})/;
+    const timeRegex2 = /(?:^|[^\d])(\d{1,2})시\s*(?:(\d{1,2})분)?/;
+
+    let m = input.match(dateRegex1);
+    if (m) {
+        year = parseInt(m[1], 10); month = parseInt(m[2], 10); date = parseInt(m[3], 10);
+        hasDate = true;
+        input = input.replace(m[0], '');
+    } else {
+        m = input.match(dateRegex2);
+        if (m) {
+            month = parseInt(m[1], 10); date = parseInt(m[2], 10);
+            hasDate = true;
+            input = input.replace(m[0], '');
+        }
+    }
+
+    let t = input.match(timeRegex1);
+    if (t) {
+        hours = parseInt(t[1], 10); minutes = parseInt(t[2], 10);
+        hasTime = true;
+    } else {
+        t = input.match(timeRegex2);
+        if (t) {
+            hours = parseInt(t[1], 10);
+            minutes = t[2] ? parseInt(t[2], 10) : 0;
+            hasTime = true;
+        }
+    }
+
+    if (!hasDate && !hasTime) {
+        return null;
+    }
+
+    if (isPM !== null && hasTime) {
+        if (isPM && hours < 12) hours += 12;
+        if (!isPM && hours === 12) hours = 0;
+        if (pmamMatch && pmamMatch[1] === '밤' && hours === 12) {
+            hours = 0; // '밤 12시'는 예외적으로 0시(자정)로 처리
+        }
+    }
+
+    if (!hasDate && hasTime) {
+        let targetDate = new Date(year, month - 1, date, hours, minutes, 0);
+        if (targetDate.getTime() < now.getTime() - 60000) {
+            targetDate.setDate(targetDate.getDate() + 1);
+        }
+        return { startDate: targetDate, endDate: targetDate, hasTime: true, hasDate: false };
+    }
+
+    if (hasDate && !hasTime) {
+        let startDate = new Date(year, month - 1, date, 0, 0, 0);
+        let endDate = new Date(year, month - 1, date, 23, 59, 59);
+
+        // 연도 표기 없이 날짜만 있는데 31일 이상 과거인 경우, 다음 연도로 추정 (선택적)
+        if (!m || (m.length < 4 && !m[0].match(/\d{4}/))) {
+            if (startDate.getTime() < now.getTime() - 86400000 * 31) {
+                startDate.setFullYear(year + 1);
+                endDate.setFullYear(year + 1);
+            }
+        }
+        return { startDate, endDate, hasTime: false, hasDate: true };
+    }
+
+    let targetDate = new Date(year, month - 1, date, hours, minutes, 0);
+    return { startDate: targetDate, endDate: targetDate, hasTime: true, hasDate: true };
+}
+
 module.exports = {
     runWithoutLogs,
     removeDummy,
@@ -161,5 +253,6 @@ module.exports = {
     toUnicodeNumber2,
     insertSpaces,
     filterText,
-    shortenTextByRatio
+    shortenTextByRatio,
+    parseKoreanDate
 };

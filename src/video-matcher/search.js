@@ -1,11 +1,6 @@
-const util = require('util');
-const fs = require('fs');
 const { fromHHMMSS } = require('../func.js');
-const { execFile } = require('child_process');
-const execFilePromise = util.promisify(execFile);
 const videoInfo = require('../data/video-info.json');
 const config = require('../data/config-search.js');
-const path = require("path");
 
 // --- 초기 메타데이터 전처리 및 시간 캐싱 ---
 const indexMap = Object.create(null);
@@ -65,44 +60,6 @@ for (let i = 0; i < videoInfo.length; i++) {
 }
 // ---------------------------------------------
 
-async function downloadVideo(url, outputPath, durationSeconds = 20) {
-    const da = { st: null, ed: null, size: 0 };
-
-    try {
-        const folderPath = path.dirname(outputPath);
-        const outputFilename = path.basename(outputPath);
-
-        const watcher = fs.watch(folderPath, (eventType, filename) => {
-            if (filename.includes(outputFilename)) {
-                da.st = Date.now();
-                watcher.close();
-            }
-        });
-
-        const { stdout } = await execFilePromise(config.ytdlp.path, [
-            "-f", "best[height<=1080]",
-            "--merge-output-format", "mp4",
-            "-o", outputPath,
-            "--external-downloader", config.ffmpeg.ffmpegPath,
-            "--external-downloader-args", `ffmpeg:-t ${durationSeconds}`,
-            url
-        ]);
-
-        da.ed = Date.now();
-        watcher.close();
-
-        if (!stdout)
-            return null;
-
-        const stats = fs.statSync(outputPath);
-        da.size = stats;
-
-        return da;
-    } catch (e) {
-        console.error(e)
-        return da;
-    }
-}
 
 /**
  * 스트림 시간 기준으로 에피소드 인덱스와 스트림 remaining 반환
@@ -205,36 +162,69 @@ function getFutureDate(info, rtn, time) {
     return futureDate;
 }
 
-async function getVideoDuration(filePath) {
-    try {
-        const { stdout } = await execFilePromise(config.ffmpeg.ffprobePath, [
-            '-v', 'error',
-            '-count_frames', '-select_streams', 'v:0',
-            '-show_entries', 'stream=nb_read_frames,r_frame_rate',
-            '-of', 'default=noprint_wrappers=1', filePath
-        ]);
+/**
+ * 특정 날짜/시간(Date 객체)에 재생될 것으로 예상되는 에피소드 정보 및 스트림 재생 위치 반환
+ */
+function getEpAtDate(targetDate, rtn) {
+    const ep = videoInfo[rtn.index];
+    const streamNow = rtn.now - getEditOffset(ep._editParsed, rtn.now);
 
-        const lines = stdout.trim().split("\n");
-        let nbFrames = 0, frameRate = 0;
+    let diffSec = targetDate.getTime() / 1000 - Date.now() / 1000;
+    let remainStreamTime = ep._streamDurationSec - streamNow;
 
-        for (const line of lines) {
-            if (line.startsWith("nb_read_frames")) {
-                nbFrames = parseInt(line.split("=")[1], 10);
-            } else if (line.startsWith("r_frame_rate")) {
-                const [num, den] = line.split("=")[1].trim().split("/").map(Number);
-                if (den !== 0) frameRate = num / den;
+    let targetIdx = rtn.index;
+    let targetStreamPos = streamNow + diffSec;
+
+    if (diffSec >= remainStreamTime) {
+        diffSec -= remainStreamTime;
+        if (totalVideoDurationSec > 0) diffSec %= totalVideoDurationSec;
+
+        targetIdx = (rtn.index + 1) % videoInfo.length;
+        while (true) {
+            let nextEp = videoInfo[targetIdx];
+            if (!nextEp.disable) {
+                if (diffSec < nextEp._streamDurationSec) {
+                    targetStreamPos = diffSec;
+                    break;
+                }
+                diffSec -= nextEp._streamDurationSec;
+            }
+            targetIdx = (targetIdx + 1) % videoInfo.length;
+        }
+    } else if (diffSec < 0) {
+        let absDiff = -diffSec;
+        if (absDiff <= streamNow) {
+            targetStreamPos = streamNow - absDiff;
+        } else {
+            absDiff -= streamNow;
+            if (totalVideoDurationSec > 0) absDiff %= totalVideoDurationSec;
+
+            targetIdx = (rtn.index - 1 + videoInfo.length) % videoInfo.length;
+            while (true) {
+                let prevEp = videoInfo[targetIdx];
+                if (!prevEp.disable) {
+                    if (absDiff <= prevEp._streamDurationSec) {
+                        targetStreamPos = prevEp._streamDurationSec - absDiff;
+                        break;
+                    }
+                    absDiff -= prevEp._streamDurationSec;
+                }
+                targetIdx = (targetIdx - 1 + videoInfo.length) % videoInfo.length;
             }
         }
-
-        return (nbFrames > 0 && frameRate > 0) ? nbFrames / frameRate : 0;
-    } catch {
-        return 0;
     }
+
+    return {
+        idx: targetIdx,
+        info: videoInfo[targetIdx],
+        streamPos: targetStreamPos
+    };
 }
+
 
 /**
  * 내부적으로 스트림 시간 기반으로 동작.
- * phashTime은 스트림 시간 (getTimeAsync에서 변환, 또는 lastQuery에서 재사용)
+ * phashTime은 스트림 시간 (lastQuery에서 재사용)
  * 반환값의 now도 스트림 시간 (lastQuery 저장용)
  */
 function getLiveVideoTime(requestTime, phashTime, nowIdx) {
@@ -265,103 +255,58 @@ function getLiveVideoTime(requestTime, phashTime, nowIdx) {
     };
 }
 
-function floorToDecimal(num, digits) {
-    const factor = Math.pow(10, digits);
-    return Math.floor(num * factor) / factor;
-}
 
-let loading = false;
-
-async function getTimeAsync(youtube_url) {
-    if (loading) return null;
-    loading = true;
-
-    try {
-        const deleteMP4 = async function () {
-            await fs.promises.unlink(config.searcher.livemp4_path).catch(console.error);
-        };
-
-        const streamTime = await downloadVideo(
-            youtube_url,
-            config.searcher.livemp4_path,
-            20
-        );
-
-        if (streamTime.size < 1024) {
-            await deleteMP4();
-            return null;
-        }
-
-        const downloadTime = floorToDecimal((streamTime.ed - streamTime.st) / 1000, 5);
-        if (downloadTime < 1) {
-            await deleteMP4();
-            return null;
-        }
-
-        console.log("비디오 다운로드 완료.");
-
-        const videoTime = floorToDecimal(
-            await getVideoDuration(config.searcher.livemp4_path),
-            5
-        );
-
-        if (videoTime < downloadTime) {
-            await deleteMP4();
-            console.error("다운로드타임이 비디오타임보다 깁니다.");
-            return null;
-        }
-
-        // C++ 검색기가 config.json을 필요로 하므로, config 객체를 json으로 변환하여 저장
-        const targetConfigPath = config.searcher.commandLine
-            .find(arg => arg.endsWith('.json') && arg.includes('config'));
-
-        if (targetConfigPath)
-            await fs.promises.writeFile(targetConfigPath, JSON.stringify(config), 'utf8');
-
-        const out = await execFilePromise(
-            config.searcher.path,
-            config.searcher.commandLine,
-            { encoding: "utf8" }
-        );
-
-        if (targetConfigPath)
-            await fs.promises.unlink(targetConfigPath).catch(console.error);
-
-        await deleteMP4();
-
-        if (!out.stdout) return null;
-
-        const json = JSON.parse(out.stdout);
-        if (json.error || !json.matches?.length) return null;
-
-        const mJson = json.matches[0];
-        if (videoTime < mJson.clipTimestamp) {
-            console.error("매칭된 클립 위치가 비디오 길이보다 깁니다.");
-            return null;
-        }
-
-        const realTimestamp =
-            streamTime.st +
-            mJson.clipTimestamp * 1000;
-
-        delete mJson.filepath;
-
-        console.log(JSON.stringify({ ...mJson, videoTime, downloadTime, realTimestamp }));
-
-        // C++ 검색기의 dbTimestamp(파일 위치) → 스트림 시간으로 변환
-        const matchIdx = indexMap[mJson.filename];
-        const matchedEp = matchIdx !== undefined ? videoInfo[matchIdx] : null;
-        const streamPhash = matchedEp
-            ? mJson.dbTimestamp - getEditOffset(matchedEp._editParsed, mJson.dbTimestamp)
-            : mJson.dbTimestamp;
-
-        return getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
-    } catch (err) {
-        console.error(err);
+/**
+ * 데몬 모드 searcher.exe 결과를 처리하여 현재 방영 정보 산출
+ * live-searcher.js에서 받은 JSON 결과와 세그먼트 타이밍을 조합.
+ *
+ * @param {object} jsonResult - searcher.exe stdout JSON 파싱 결과
+ * @param {object} segmentInfo - { path, st, ed, size, segmentId }
+ * @param {number} currentIndex - 현재 방영 중인 회차의 videoInfo 인덱스 (-1이면 미확정)
+ * @returns {object|null} getLiveVideoTime 결과
+ */
+function processSearchResult(jsonResult, segmentInfo, currentIndex) {
+    if (!jsonResult || jsonResult.error || !jsonResult.matches || !jsonResult.matches.length)
         return null;
-    } finally {
-        loading = false;
+
+    let mJson = jsonResult.matches[0];
+
+    // ── 현재 회차 우선 채택 로직 ──
+    // 1위가 현재 회차가 아니지만, 현재 회차가 순위 안에 있고
+    // matchCount 격차가 크지 않으면(1위의 50% 이상) 현재 회차를 채택
+    if (currentIndex >= 0 && jsonResult.matches.length > 1) {
+        const topMatchCount = mJson.matchCount;
+        const topIdx = indexMap[mJson.filename];
+
+        if (topIdx !== currentIndex) {
+            const currentEp = videoInfo[currentIndex];
+            if (currentEp) {
+                const currentMatch = jsonResult.matches.find(m =>
+                    indexMap[m.filename] === currentIndex
+                );
+
+                if (currentMatch && currentMatch.matchCount >= topMatchCount * 0.5) {
+                    console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재화 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
+                    mJson = currentMatch;
+                }
+            }
+        }
     }
+
+    // realTimestamp: 파일 쓰기 시작 시점 + 클립 내 매칭 프레임 위치
+    const realTimestamp = segmentInfo.st + mJson.clipTimestamp * 1000;
+
+    // C++ 검색기의 dbTimestamp(파일 위치) → 스트림 시간으로 변환
+    const matchIdx = indexMap[mJson.filename];
+    const matchedEp = matchIdx !== undefined ? videoInfo[matchIdx] : null;
+    const streamPhash = matchedEp
+        ? mJson.dbTimestamp - getEditOffset(matchedEp._editParsed, mJson.dbTimestamp)
+        : mJson.dbTimestamp;
+
+    delete mJson.filepath;
+    console.log(JSON.stringify({ ...mJson, realTimestamp }));
+
+    return getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
 }
 
 /**
@@ -409,4 +354,4 @@ function getAdjustedVideoTime(requestTime, phashTime, nowIdx) {
     return rtn;
 }
 
-module.exports = { videoInfo, getTimeAsync, getLiveVideoTime, getAdjustedVideoTime, getRemainingTime, getFutureDate, getEffectiveIndex };
+module.exports = { videoInfo, processSearchResult, getLiveVideoTime, getAdjustedVideoTime, getRemainingTime, getFutureDate, getEffectiveIndex, getEditOffset, getEpAtDate };
