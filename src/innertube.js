@@ -519,15 +519,17 @@ function _waitForVerify(messageId) {
  *   null 반환 시 재시도 중단. 생략 시 동일 메시지로 재시도.
  */
 function sendChat(message, retryProc) {
-    return new Promise(function (resolve) {
-        sendQueue.push({
-            message: message,
-            retryProc: retryProc || null,
-            resolve: resolve
-        });
-        if (!queueRunning)
-            _processQueue();
-    });
+    console.log(message);
+    return;
+    // return new Promise(function (resolve) {
+    //     sendQueue.push({
+    //         message: message,
+    //         retryProc: retryProc || null,
+    //         resolve: resolve
+    //     });
+    //     if (!queueRunning)
+    //         _processQueue();
+    // });
 }
 
 async function _processQueue() {

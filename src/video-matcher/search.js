@@ -1,6 +1,6 @@
 const { fromHHMMSS } = require('../func.js');
 const videoInfo = require('../data/video-info.json');
-const config = require('../data/config-search.js');
+const config = require('../data/config-youtube.js');
 
 // --- 초기 메타데이터 전처리 및 시간 캐싱 ---
 const indexMap = Object.create(null);
@@ -251,7 +251,7 @@ function getLiveVideoTime(requestTime, phashTime, nowIdx) {
         now: now,
         start: spent._startSec,
         end: spent._streamDurationSec,
-        requestTime: requestTime
+        requestTime: Date.now()
     };
 }
 
@@ -262,31 +262,48 @@ function getLiveVideoTime(requestTime, phashTime, nowIdx) {
  *
  * @param {object} jsonResult - searcher.exe stdout JSON 파싱 결과
  * @param {object} segmentInfo - { path, st, ed, size, segmentId }
- * @param {number} currentIndex - 현재 방영 중인 회차의 videoInfo 인덱스 (-1이면 미확정)
+ * @param {object} cmp - 현재 방영 중인 회차와 시간 정보 객체 (getEpisodeInfo 반환값)
  * @returns {object|null} getLiveVideoTime 결과
  */
-function processSearchResult(jsonResult, segmentInfo, currentIndex) {
+function processSearchResult(jsonResult, segmentInfo, cmp) {
     if (!jsonResult || jsonResult.error || !jsonResult.matches || !jsonResult.matches.length)
         return null;
 
     let mJson = jsonResult.matches[0];
 
-    // ── 현재 회차 우선 채택 로직 ──
-    // 1위가 현재 회차가 아니지만, 현재 회차가 순위 안에 있고
-    // matchCount 격차가 크지 않으면(1위의 50% 이상) 현재 회차를 채택
-    if (currentIndex >= 0 && jsonResult.matches.length > 1) {
-        const topMatchCount = mJson.matchCount;
-        const topIdx = indexMap[mJson.filename];
+    // ── 현재 회차 및 현재 시간 우선 채택 로직 ──
+    if (cmp && jsonResult.matches.length > 1) {
+        let adoptedMatch = null;
 
-        if (topIdx !== currentIndex) {
-            const currentEp = videoInfo[currentIndex];
-            if (currentEp) {
+        // 1. 현재 회차와 일치하며, 시차가 20초 이내인 결과가 있다면 매칭율 복잡한 계산 없이 우선 즉시 채택
+        for (const match of jsonResult.matches) {
+            const matchIdx = indexMap[match.filename];
+            if (matchIdx === cmp.index) {
+                const diffNow = Math.abs(match.dbTimestamp - cmp.now);
+                if (diffNow <= config.sync.segment_duration) {
+                    adoptedMatch = match;
+                    break;
+                }
+            }
+        }
+
+        if (adoptedMatch) {
+            if (adoptedMatch !== mJson) {
+                console.log(`pHash 보정: 1위 ${mJson.filename} → 시차 20초 이내 현재회차 ${adoptedMatch.filename} 즉시 채택`);
+            }
+            mJson = adoptedMatch;
+        } else {
+            // 2. 기존 폴백: 1위가 방영 회차가 아닐 때, 현재 회차가 순위 안에 있으면(1위 매칭점수의 50% 이상) 채택
+            const topMatchCount = mJson.matchCount;
+            const topIdx = indexMap[mJson.filename];
+
+            if (topIdx !== cmp.index) {
                 const currentMatch = jsonResult.matches.find(m =>
-                    indexMap[m.filename] === currentIndex
+                    indexMap[m.filename] === cmp.index
                 );
 
                 if (currentMatch && currentMatch.matchCount >= topMatchCount * 0.5) {
-                    console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재화 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
+                    console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재회차 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
                     mJson = currentMatch;
                 }
             }

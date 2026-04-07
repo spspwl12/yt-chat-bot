@@ -141,14 +141,15 @@ class LiveSearcher extends EventEmitter {
         if (targetConfigPath) {
             try {
                 fs.writeFileSync(targetConfigPath, JSON.stringify(this._config), 'utf8');
-            } catch (_) {}
+            } catch (_) { }
         }
 
         // searcher.exe --daemon 실행 인자 구성
         const args = [
             '--daemon',
-            ...this._config.searcher.commandLine.slice(1) // 첫번째(클립 경로)를 제외한 나머지
+            ...this._config.searcher.commandLine // 이제 config-search.js의 commandLine에 클립 경로 플레이스홀더가 없으므로 전부 전달
         ];
+
 
         console.log(`🔍 데몬 시작: ${this._config.searcher.path} ${args.join(' ')}`);
 
@@ -248,17 +249,17 @@ class LiveSearcher extends EventEmitter {
                 this._daemon.stdin.write('quit\n');
                 // 정상 종료 대기 후 강제 종료
                 setTimeout(() => {
-                    try { this._daemon.kill('SIGTERM'); } catch (_) {}
+                    try { this._daemon.kill('SIGTERM'); } catch (_) { }
                 }, 2000);
             } catch (_) {
-                try { this._daemon.kill('SIGTERM'); } catch (_2) {}
+                try { this._daemon.kill('SIGTERM'); } catch (_2) { }
             }
             this._daemon = null;
         }
     }
 
     _deleteSegment(filePath) {
-        fs.promises.unlink(filePath).catch(() => {});
+        fs.promises.unlink(filePath).catch(() => { });
     }
 }
 

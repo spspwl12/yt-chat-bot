@@ -66,7 +66,7 @@ class LiveDownloader extends EventEmitter {
         const segmentPattern = path.join(segmentDir, 'live_segment_%06d.mp4');
 
         // seg 폴더 생성 (없으면)
-        try { fs.mkdirSync(segmentDir, { recursive: true }); } catch (_) {}
+        try { fs.mkdirSync(segmentDir, { recursive: true }); } catch (_) { }
 
         // 이전 세그먼트 파일 제거 (재시작 시 번호 충돌 방지)
         this._cleanupOldSegments();
@@ -99,8 +99,8 @@ class LiveDownloader extends EventEmitter {
         this._ytdlp.stdout.pipe(this._ffmpeg.stdin);
 
         // 파이프 에러 무시 (한쪽이 먼저 종료될 때 EPIPE 방지)
-        this._ffmpeg.stdin.on('error', () => {});
-        this._ytdlp.stdout.on('error', () => {});
+        this._ffmpeg.stdin.on('error', () => { });
+        this._ytdlp.stdout.on('error', () => { });
 
         // ── stderr 모니터링 ──
         this._ytdlp.stderr.on('data', (data) => {
@@ -133,7 +133,7 @@ class LiveDownloader extends EventEmitter {
                 // ffmpeg가 아직 안 죽었으면 잠시 대기 후 재시작
                 setTimeout(() => {
                     if (!ffmpegExited && this._ffmpeg) {
-                        try { this._ffmpeg.kill('SIGTERM'); } catch (_) {}
+                        try { this._ffmpeg.kill('SIGTERM'); } catch (_) { }
                     }
                     this._scheduleRestart();
                 }, 2000);
@@ -146,7 +146,7 @@ class LiveDownloader extends EventEmitter {
             if (this._running && !this._restarting && !ytdlpExited) {
                 // ffmpeg만 죽은 경우 → yt-dlp도 종료 후 재시작
                 if (this._ytdlp) {
-                    try { this._ytdlp.kill('SIGTERM'); } catch (_) {}
+                    try { this._ytdlp.kill('SIGTERM'); } catch (_) { }
                 }
                 this._scheduleRestart();
             }
@@ -196,25 +196,25 @@ class LiveDownloader extends EventEmitter {
                 const prevPath = path.join(segmentDir, prevFile);
 
                 // 파일 존재 및 크기 확인
-                let fileSize = 0;
+                let fileStat;
                 try {
-                    fileSize = fs.statSync(prevPath).size;
+                    fileStat = fs.statSync(prevPath);
                 } catch (_) {
                     console.error(`📥 세그먼트 파일 없음: ${prevFile}`);
                     return;
                 }
 
-                if (fileSize < 1024) {
-                    console.log(`📥 세그먼트 ${prevFile} 크기 부족 (${fileSize}B), 스킵`);
-                    fs.promises.unlink(prevPath).catch(() => {});
+                if (fileStat.size < 1024) {
+                    console.log(`📥 세그먼트 ${prevFile} 크기 부족 (${fileStat.size}B), 스킵`);
+                    fs.promises.unlink(prevPath).catch(() => { });
                     return;
                 }
 
                 const segmentInfo = {
                     path: prevPath,
-                    st: this._segmentTimes[prevNum] || Date.now(),
+                    st: fileStat.birthtimeMs,   // 파일이 디스크에 실제 생성된 시점
                     ed: Date.now(),
-                    size: fileSize,
+                    size: fileStat.size,
                     segmentId: this._segmentCounter++
                 };
 
@@ -260,21 +260,21 @@ class LiveDownloader extends EventEmitter {
 
     _killProcesses() {
         if (this._ytdlp && this._ffmpeg) {
-            try { this._ytdlp.stdout.unpipe(this._ffmpeg.stdin); } catch (_) {}
+            try { this._ytdlp.stdout.unpipe(this._ffmpeg.stdin); } catch (_) { }
         }
         if (this._ytdlp) {
-            try { this._ytdlp.kill('SIGTERM'); } catch (_) {}
+            try { this._ytdlp.kill('SIGTERM'); } catch (_) { }
             this._ytdlp = null;
         }
         if (this._ffmpeg) {
-            try { this._ffmpeg.kill('SIGTERM'); } catch (_) {}
+            try { this._ffmpeg.kill('SIGTERM'); } catch (_) { }
             this._ffmpeg = null;
         }
     }
 
     _closeWatcher() {
         if (this._watcher) {
-            try { this._watcher.close(); } catch (_) {}
+            try { this._watcher.close(); } catch (_) { }
             this._watcher = null;
         }
     }
@@ -292,10 +292,10 @@ class LiveDownloader extends EventEmitter {
             const files = fs.readdirSync(dir);
             for (const f of files) {
                 if (f.startsWith('live_segment_') && f.endsWith('.mp4')) {
-                    try { fs.unlinkSync(path.join(dir, f)); } catch (_) {}
+                    try { fs.unlinkSync(path.join(dir, f)); } catch (_) { }
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 }
 

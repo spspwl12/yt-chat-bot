@@ -794,7 +794,8 @@ function initCommand() {
 
     // 5. 이벤트 연결: 매칭 결과 수신 → 싱크 보정
     searcher.on('match', ({ result, segment }) => {
-        const rtn = search_lib.processSearchResult(result, segment);
+        const cmp = getEpisodeInfo();
+        const rtn = search_lib.processSearchResult(result, segment, cmp);
         onMatchResult(rtn);
     });
 
