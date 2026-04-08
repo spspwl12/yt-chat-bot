@@ -1,6 +1,7 @@
 const { fromHHMMSS } = require('../func.js');
 const videoInfo = require('../data/video-info.json');
 const config = require('../data/config-youtube.js');
+const eventBus = require('../event-bus.js');
 
 // --- 초기 메타데이터 전처리 및 시간 캐싱 ---
 const indexMap = Object.create(null);
@@ -321,7 +322,8 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
         : mJson.dbTimestamp;
 
     delete mJson.filepath;
-    console.log(JSON.stringify({ ...mJson, realTimestamp }));
+    const searchLog = { ...mJson, realTimestamp };
+    eventBus.emit('search_result', searchLog);
 
     return getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
 }

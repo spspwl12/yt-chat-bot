@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YT Chat Bot Dashboard</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,15 +17,18 @@
             --secondary: #10b981;
             --error: #ef4444;
             --error-hover: #dc2626;
+            --warning: #f59e0b;
+            --info: #3b82f6;
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
         }
 
+        * { box-sizing: border-box; }
+
         body {
-            margin: 0; 
-            padding: 0;
+            margin: 0; padding: 0;
             background-color: var(--bg-color);
-            background-image: 
+            background-image:
                 radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
                 radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
             background-attachment: fixed;
@@ -37,7 +39,6 @@
             overflow: hidden;
         }
 
-        /* Glassmorphism Classes */
         .glass {
             background: var(--surface-color);
             backdrop-filter: blur(16px);
@@ -46,9 +47,10 @@
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         }
 
-        /* Sidebar */
+        /* ── Sidebar ── */
         .sidebar {
-            width: 260px;
+            width: 220px;
+            min-width: 220px;
             display: flex;
             flex-direction: column;
             border-right: 1px solid var(--surface-border);
@@ -56,10 +58,10 @@
         }
 
         .sidebar h1 {
-            font-size: 1.3rem;
+            font-size: 1.15rem;
             font-weight: 700;
             text-align: center;
-            padding: 24px;
+            padding: 20px 16px;
             margin: 0;
             border-bottom: 1px solid var(--surface-border);
             background: linear-gradient(90deg, #c084fc, #818cf8);
@@ -71,20 +73,20 @@
             background: transparent;
             border: none;
             color: var(--text-dim);
-            padding: 16px 24px;
+            padding: 13px 20px;
             text-align: left;
-            font-size: 1rem;
+            font-size: 0.88rem;
             font-weight: 500;
             cursor: pointer;
             border-bottom: 1px solid var(--surface-border);
             transition: all 0.3s ease;
             position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .nav-btn:hover {
-            color: var(--text-main);
-            background: rgba(255,255,255,0.03);
-        }
+        .nav-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
 
         .nav-btn.active {
             color: var(--text-main);
@@ -94,20 +96,19 @@
         .nav-btn.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
             background-color: var(--primary);
-            border-radius: 0 4px 4px 0;
+            border-radius: 0 3px 3px 0;
         }
 
-        /* Connection Status Indicator */
+        .nav-icon { font-size: 1.05rem; }
+
         .conn-status {
             margin-top: auto;
-            padding: 20px;
+            padding: 16px;
             text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-dim);
             border-top: 1px solid var(--surface-border);
             display: flex;
@@ -117,8 +118,7 @@
         }
 
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px; height: 8px;
             border-radius: 50%;
             background-color: var(--error);
             box-shadow: 0 0 8px var(--error);
@@ -130,106 +130,104 @@
             box-shadow: 0 0 8px var(--secondary);
         }
 
-        /* Content Area */
+        /* ── Content Area ── */
         .content {
             flex: 1;
-            padding: 40px;
+            padding: 30px;
             overflow-y: auto;
             position: relative;
         }
 
         .panel {
             display: none;
-            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             opacity: 0;
-            transform: translateY(20px);
+            transform: translateY(15px);
         }
 
-        .panel.active {
-            display: block;
-        }
+        .panel.active { display: block; }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         h2 {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: 600;
             margin-top: 0;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             color: var(--text-main);
         }
 
-        /* Widgets */
+        /* ── Status Cards ── */
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 24px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
         }
 
         .status-card {
-            padding: 24px;
-            border-radius: 16px;
+            padding: 20px;
+            border-radius: 14px;
             text-align: center;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .status-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         }
 
-        .status-card h3 { 
-            margin: 0 0 12px 0; 
-            font-size: 0.95rem; 
-            font-weight: 500;
-            color: var(--text-dim); 
+        .status-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
-        .status-card p { 
-            margin: 0; 
-            font-size: 2.5rem; 
-            font-weight: 700; 
+
+        .status-card p {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
             background: linear-gradient(90deg, #34d399, #10b981);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        /* Buttons Arrays */
+        /* ── Buttons ── */
         .btn {
             background-color: var(--primary);
             color: #fff;
             border: none;
-            padding: 10px 20px;
+            padding: 9px 18px;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 0.88rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 3px 10px rgba(139, 92, 246, 0.3);
         }
 
         .btn:hover {
             background-color: var(--primary-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(139, 92, 246, 0.4);
         }
 
         .btn-ban {
             background-color: var(--error);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-            font-size: 0.85rem;
-            padding: 8px 16px;
+            box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
+            font-size: 0.8rem;
+            padding: 6px 14px;
         }
-        
+
         .btn-ban:hover {
             background-color: var(--error-hover);
-            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+            box-shadow: 0 5px 14px rgba(239, 68, 68, 0.4);
         }
 
         .btn-ban:disabled {
@@ -240,81 +238,82 @@
             transform: none;
         }
 
-        /* Chat UI */
+        .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+
+        /* ── Chat UI ── */
         .chat-list {
-            border-radius: 16px;
+            border-radius: 14px;
             overflow-y: auto;
             max-height: 500px;
         }
 
-        .chat-list::-webkit-scrollbar {
-            width: 8px;
-        }
+        .chat-list::-webkit-scrollbar { width: 6px; }
         .chat-list::-webkit-scrollbar-thumb {
-            background-color: rgba(255,255,255,0.2);
-            border-radius: 4px;
+            background-color: rgba(255,255,255,0.15);
+            border-radius: 3px;
         }
 
         .chat-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 24px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--surface-border);
             animation: slideUp 0.3s ease;
         }
 
         .chat-item:last-child { border-bottom: none; }
-        
-        .chat-author { font-weight: 600; color: #fcd34d; margin-right: 12px; }
-        .chat-text { color: var(--text-main); font-weight: 400; flex: 1; word-break: break-all; }
-        
-        /* Table / Spams */
+        .chat-author { font-weight: 600; color: #fcd34d; margin-right: 10px; font-size: 0.9rem; }
+        .chat-text { color: var(--text-main); font-weight: 400; flex: 1; word-break: break-all; font-size: 0.9rem; }
+
+        /* ── Table ── */
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 16px 24px; text-align: left; border-bottom: 1px solid var(--surface-border); }
-        th { color: var(--text-dim); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        
+        th, td { padding: 12px 18px; text-align: left; border-bottom: 1px solid var(--surface-border); }
+        th { color: var(--text-dim); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        td { font-size: 0.85rem; }
+
+        /* ── Forms ── */
         .add-spam-form {
             display: flex;
-            gap: 16px;
-            margin-bottom: 24px;
+            gap: 12px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
         .form-input {
-            background: rgba(0,0,0,0.2);
+            background: rgba(0,0,0,0.25);
             border: 1px solid var(--surface-border);
             color: white;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 8px;
             flex: 1;
-            min-width: 200px;
-            font-size: 0.95rem;
+            min-width: 180px;
+            font-size: 0.88rem;
             transition: border-color 0.2s;
         }
-        
+
         .form-input:focus {
             outline: none;
             border-color: var(--primary);
         }
 
-        /* Config */
+        /* ── Config / Code Editor ── */
         .config-block {
-            margin-bottom: 24px;
-            border-radius: 16px;
+            margin-bottom: 20px;
+            border-radius: 14px;
             overflow: hidden;
         }
-        
+
         .config-block-header {
             background: rgba(0,0,0,0.2);
-            padding: 16px 24px;
+            padding: 14px 20px;
             border-bottom: 1px solid var(--surface-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        
-        .config-block-header h3 { margin:0; font-size: 1.1rem; }
+
+        .config-block-header h3 { margin:0; font-size: 1rem; }
 
         textarea.code-editor {
             width: 100%;
@@ -322,55 +321,118 @@
             background: transparent;
             color: #e2e8f0;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             border: none;
-            padding: 24px;
-            box-sizing: border-box;
+            padding: 18px;
             resize: vertical;
             line-height: 1.5;
         }
-        
-        textarea.code-editor:focus {
-            outline: none;
+
+        textarea.code-editor:focus { outline: none; }
+
+        /* ── Log Table ── */
+        .log-container {
+            border-radius: 14px;
+            overflow: hidden;
         }
-        
-        /* Toast Notifications */
+
+        .log-container table td {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.78rem;
+            padding: 8px 14px;
+            vertical-align: top;
+        }
+
+        .log-container table th {
+            padding: 10px 14px;
+            font-size: 0.7rem;
+            position: sticky;
+            top: 0;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 2;
+        }
+
+        .log-scroll {
+            max-height: 520px;
+            overflow-y: auto;
+        }
+
+        .log-scroll::-webkit-scrollbar { width: 6px; }
+        .log-scroll::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.15);
+            border-radius: 3px;
+        }
+
+        /* ── Badge ── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: 'Consolas', monospace;
+        }
+        .badge-green { background: rgba(16,185,129,0.2); color: #34d399; }
+        .badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
+        .badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+
+        /* ── Toast ── */
         #toast-container {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
+            bottom: 24px;
+            right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             z-index: 1000;
         }
-        
+
         .toast {
             background: var(--surface-color);
             backdrop-filter: blur(8px);
             border-left: 4px solid var(--primary);
-            padding: 16px 24px;
+            padding: 14px 20px;
             border-radius: 8px;
             color: white;
             font-weight: 500;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            font-size: 0.88rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
             animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
         }
-        
+
         @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
 
+        /* ── Misc ── */
+        .section-card {
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .truncate {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
 
     <div class="sidebar glass">
-        <h1>Bot Admin</h1>
-        <button class="nav-btn active" data-target="tab-live">Live Monitor</button>
-        <button class="nav-btn" data-target="tab-chat">Chat & Ban</button>
-        <button class="nav-btn" data-target="tab-spam">Spam Users</button>
-        <button class="nav-btn" data-target="tab-config">Configuration</button>
-        
+        <h1>🤖 Bot Admin</h1>
+        <button class="nav-btn active" data-target="tab-live"><span class="nav-icon">📡</span> Live Monitor</button>
+        <button class="nav-btn" data-target="tab-chat"><span class="nav-icon">💬</span> Chat & Ban</button>
+        <button class="nav-btn" data-target="tab-spam"><span class="nav-icon">🛡️</span> Spam Users</button>
+        <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> Search Logs</button>
+        <button class="nav-btn" data-target="tab-commands"><span class="nav-icon">📋</span> Command Logs</button>
+        <button class="nav-btn" data-target="tab-schedule"><span class="nav-icon">📅</span> Schedule</button>
+        <button class="nav-btn" data-target="tab-videoinfo"><span class="nav-icon">🎬</span> Video Info</button>
+        <button class="nav-btn" data-target="tab-config"><span class="nav-icon">⚙️</span> Configuration</button>
+
         <div class="conn-status">
             <div id="status-dot" class="status-dot"></div>
             <span id="status-text">Disconnected</span>
@@ -380,15 +442,23 @@
     <div class="content">
         <!-- Live Monitor -->
         <div id="tab-live" class="panel active">
-            <h2>Live Status Monitor</h2>
+            <h2>📡 Live Status Monitor</h2>
             <div class="status-grid">
                 <div class="status-card glass">
                     <h3>Current Episode</h3>
                     <p id="stat-episode">--</p>
                 </div>
                 <div class="status-card glass">
-                    <h3>Video Time (Sec)</h3>
+                    <h3>Video Time</h3>
                     <p id="stat-sec" style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">--</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>Search Logs</h3>
+                    <p id="stat-search-count" style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text;">0</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>Commands Used</h3>
+                    <p id="stat-cmd-count" style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0</p>
                 </div>
             </div>
             <button class="btn" id="btn-refresh-state">Force Refresh</button>
@@ -396,18 +466,17 @@
 
         <!-- Chat & Ban -->
         <div id="tab-chat" class="panel">
-            <h2>Real-time Chat & Moderation</h2>
+            <h2>💬 Real-time Chat & Moderation</h2>
             <div class="chat-list glass" id="chat-container" style="height: 550px;">
-                <!-- Chat populated via WS -->
             </div>
         </div>
 
         <!-- Spam Users -->
         <div id="tab-spam" class="panel">
-            <h2>Spam Warning List</h2>
-            
-            <div class="glass" style="border-radius: 16px; padding: 24px; margin-bottom: 24px;">
-                <h3 style="margin-top:0; margin-bottom: 16px; font-size:1.1rem;">Manual Add Block</h3>
+            <h2>🛡️ Spam Warning List</h2>
+
+            <div class="section-card glass">
+                <h3 style="margin-top:0; margin-bottom: 14px; font-size:1rem;">Manual Add Block</h3>
                 <div class="add-spam-form">
                     <input type="text" id="spam-name" class="form-input" placeholder="Display Name (Optional)">
                     <input type="text" id="spam-channel" class="form-input" placeholder="Channel ID (Required)">
@@ -416,7 +485,7 @@
                 </div>
             </div>
 
-            <div class="glass" style="border-radius: 16px; overflow: hidden;">
+            <div class="glass" style="border-radius: 14px; overflow: hidden;">
                 <table>
                     <thead>
                         <tr>
@@ -424,59 +493,163 @@
                             <th>Channel ID</th>
                             <th>Warns</th>
                             <th>Reason</th>
-                            <th>Status/Action</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="spam-tbody">
-                        <!-- Spams populated via WS -->
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Configuration -->
-        <div id="tab-config" class="panel">
-            <h2>Configuration Control</h2>
-            
+        <!-- Search Logs (pHash 검색 결과) -->
+        <div id="tab-search" class="panel">
+            <h2>🔍 pHash Search Results</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                실시간 영상 매칭 결과 (searcher.exe → processSearchResult)
+            </p>
+            <div class="log-container glass">
+                <div class="log-scroll" id="search-log-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Rank</th>
+                                <th>File</th>
+                                <th>Similarity</th>
+                                <th>Hamming</th>
+                                <th>Matches</th>
+                                <th>Coverage</th>
+                                <th>DB Timestamp</th>
+                                <th>Clip TS</th>
+                                <th>Real TS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="search-log-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Logs -->
+        <div id="tab-commands" class="panel">
+            <h2>📋 Command Usage Logs</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                유저 명령어 사용 내역 (실시간)
+            </p>
+            <div class="log-container glass">
+                <div class="log-scroll" id="cmd-log-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Command</th>
+                                <th>Group</th>
+                                <th>Args</th>
+                                <th>Response</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cmd-log-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Broadcast Schedule -->
+        <div id="tab-schedule" class="panel">
+            <h2>📅 Broadcast Schedule</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                현재 방송 및 향후 편성표 (다음 150개 회차 한정)
+            </p>
+            <div class="log-container glass">
+                <div class="log-scroll" id="schedule-scroll" style="max-height: 600px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 15%">Date</th>
+                                <th style="width: 15%">Time</th>
+                                <th style="width: 55%">Episode</th>
+                                <th style="width: 15%">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Info Editor -->
+        <div id="tab-videoinfo" class="panel">
+            <h2>🎬 Video Info Editor</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                video-info.json 직접 편집 (저장 후 재시작 필요)
+            </p>
             <div class="config-block glass">
                 <div class="config-block-header">
-                    <h3>youtube-config.js</h3>
+                    <h3>video-info.json</h3>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-sm" onclick="formatVideoInfo()">Format JSON</button>
+                        <button class="btn" onclick="saveVideoInfo()">Save Changes</button>
+                    </div>
+                </div>
+                <textarea id="val-videoinfo" class="code-editor" spellcheck="false" style="height:500px;"></textarea>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div id="tab-config" class="panel">
+            <h2>⚙️ Configuration Control</h2>
+
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>config-youtube.js</h3>
                     <button class="btn" onclick="saveConfig('youtube')">Save Changes</button>
                 </div>
                 <textarea id="val-youtube" class="code-editor" spellcheck="false"></textarea>
             </div>
-            
+
             <div class="config-block glass">
                 <div class="config-block-header">
-                    <h3>search-config.js</h3>
+                    <h3>config-search.js</h3>
                     <button class="btn" onclick="saveConfig('search')">Save Changes</button>
                 </div>
                 <textarea id="val-search" class="code-editor" spellcheck="false"></textarea>
             </div>
         </div>
     </div>
-    
+
     <div id="toast-container"></div>
 
     <script>
         let ws;
         let pinger;
-        
-        // --- UI Interactions ---
+        let searchLogCount = 0;
+        let cmdLogCount = 0;
+
+        // ── UI Interactions ──
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                const target = e.currentTarget;
                 document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
                 document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                
-                const targetId = e.target.getAttribute('data-target');
+
+                const targetId = target.getAttribute('data-target');
                 document.getElementById(targetId).classList.add('active');
-                e.target.classList.add('active');
-                
+                target.classList.add('active');
+
                 // Fetch relevant data on tab switch
                 if(ws && ws.readyState === WebSocket.OPEN) {
                     if (targetId === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
                     if (targetId === 'tab-chat') ws.send(JSON.stringify({action: 'getChat'}));
                     if (targetId === 'tab-spam') ws.send(JSON.stringify({action: 'getSpam'}));
+                    if (targetId === 'tab-search') ws.send(JSON.stringify({action: 'getSearchLogs'}));
+                    if (targetId === 'tab-commands') ws.send(JSON.stringify({action: 'getCommandLogs'}));
+                    if (targetId === 'tab-schedule') ws.send(JSON.stringify({action: 'getSchedule'}));
+                    if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({action: 'getVideoInfo'}));
                     if (targetId === 'tab-config') ws.send(JSON.stringify({action: 'getConfig'}));
                 }
             });
@@ -492,32 +665,50 @@
             setTimeout(() => { toast.remove(); }, 3500);
         }
 
-        // --- WebSocket Logic ---
+        function fmtTime(ts) {
+            const d = new Date(ts);
+            const h = String(d.getHours()).padStart(2,'0');
+            const m = String(d.getMinutes()).padStart(2,'0');
+            const s = String(d.getSeconds()).padStart(2,'0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function secToTime(sec) {
+            if (!sec || isNaN(sec)) return '--:--';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // ── WebSocket Logic ──
         function connectWS() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-            
+
             ws.onopen = () => {
                 document.getElementById('status-dot').classList.add('connected');
                 document.getElementById('status-text').innerText = 'Connected';
-                
-                // Fetch initial data
                 ws.send(JSON.stringify({action: 'getState'}));
-                
-                // Start state polling every 5s if in live tab
+
                 pinger = setInterval(() => {
                     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
                     if (activeTab === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
+                    if (activeTab === 'tab-schedule') ws.send(JSON.stringify({action: 'getSchedule'}));
                 }, 5000);
             };
-            
+
             ws.onclose = () => {
                 document.getElementById('status-dot').classList.remove('connected');
                 document.getElementById('status-text').innerText = 'Reconnecting...';
                 clearInterval(pinger);
-                setTimeout(connectWS, 3000); // Reconnect loop
+                setTimeout(connectWS, 3000);
             };
-            
+
             ws.onmessage = (event) => {
                 try {
                     const msg = JSON.parse(event.data);
@@ -532,57 +723,85 @@
             switch(action) {
                 case 'state':
                     if (payload.episodeInfo) {
-                        const totalEp = payload.totalEpisodes ? payload.totalEpisodes : '--';
-                        const secText = (sec) => {
-                            if (!sec || isNaN(sec)) return '--:--';
-                            const m = Math.floor(sec / 60);
-                            const s = Math.floor(sec % 60).toString().padStart(2, '0');
-                            return `${m}:${s}`;
-                        };
-                        
+                        const totalEp = payload.totalEpisodes || '--';
                         document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}`;
-                        document.getElementById('stat-sec').innerText = `${secText(payload.episodeInfo.now)} / ${secText(payload.totalTime)}`;
-                    }
-                    else {
+                        document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+                    } else {
                         document.getElementById('stat-episode').innerText = '-- / --';
                         document.getElementById('stat-sec').innerText = '-- / --';
                     }
-                    
-                    if (payload.videoId) {
-                        // Backend provided videoId. Iframe removed by user request.
-                    }
+                    document.getElementById('stat-search-count').innerText = searchLogCount;
+                    document.getElementById('stat-cmd-count').innerText = cmdLogCount;
                     break;
+
                 case 'chat_history':
                     renderChats(payload);
                     break;
+
                 case 'chat_push':
                     appendChats(payload);
                     break;
+
                 case 'spam_list':
                     renderSpam(payload);
                     break;
+
                 case 'config_data':
                     document.getElementById('val-youtube').value = payload.youtube;
                     document.getElementById('val-search').value = payload.search;
                     break;
+
                 case 'ban_result':
-                    if (payload.success) showToast('User banned successfully.');
-                    else showToast('Failed to ban user.', true);
+                    if (payload.success) showToast('유저 숨기기 + 스팸가드 등록 완료');
+                    else showToast('차단 실패', true);
                     break;
+
                 case 'spamAdd_result':
-                    showToast('Spammer manually added.');
+                    showToast('스패머 수동 등록 완료');
                     break;
+
                 case 'spamDelete_result':
-                    showToast('Spammer removed.');
+                    showToast('스패머 해제 완료');
                     break;
+
                 case 'saveConfig_result':
-                    if (payload.success) showToast('Configuration saved successfully! Changes apply on next restart.');
-                    else showToast('Failed to save config: ' + payload.error, true);
+                    if (payload.success) showToast('설정 저장 완료! 재시작 시 적용됩니다.');
+                    else showToast('설정 저장 실패: ' + payload.error, true);
+                    break;
+
+                // ── 새 기능 ──
+                case 'videoInfo_data':
+                    document.getElementById('val-videoinfo').value = payload;
+                    break;
+
+                case 'saveVideoInfo_result':
+                    if (payload.success) showToast('video-info.json 저장 완료! 재시작 시 적용됩니다.');
+                    else showToast('저장 실패: ' + payload.error, true);
+                    break;
+
+                case 'search_logs':
+                    renderSearchLogs(payload);
+                    break;
+
+                case 'search_push':
+                    appendSearchLog(payload);
+                    break;
+
+                case 'command_logs':
+                    renderCommandLogs(payload);
+                    break;
+
+                case 'command_push':
+                    appendCommandLog(payload);
+                    break;
+
+                case 'schedule_data':
+                    renderSchedule(payload);
                     break;
             }
         }
 
-        // --- Render Helpers ---
+        // ── Chat Render ──
         function createChatElement(c) {
             const div = document.createElement('div');
             div.className = 'chat-item';
@@ -590,12 +809,12 @@
             const ctxMenuEscaped = c.contextMenu ? escape(JSON.stringify(c.contextMenu)) : '';
             div.innerHTML = `
                 <div>
-                    <span class="chat-author">${c.displayName}</span>
-                    <span class="chat-text">${c.text}</span>
+                    <span class="chat-author">${escapeHtml(c.displayName)}</span>
+                    <span class="chat-text">${escapeHtml(c.text)}</span>
                 </div>
-                <button class="btn btn-ban" ${!canBan ? 'disabled title="Missing Context Menu API"' : ''}
-                        onclick="execBan('${c.displayName}', '${c.channelId}', '${ctxMenuEscaped}')">
-                    유저 차단
+                <button class="btn btn-ban" ${!canBan ? 'disabled title="No Context Menu"' : ''}
+                        onclick="execBan('${escapeHtml(c.displayName)}', '${c.channelId}', '${ctxMenuEscaped}')">
+                    유저 숨기기
                 </button>
             `;
             return div;
@@ -604,41 +823,144 @@
         function renderChats(chats) {
             const container = document.getElementById('chat-container');
             container.innerHTML = '';
-            chats.sort((a,b) => b.timestamp - a.timestamp); // latest first
+            chats.sort((a,b) => b.timestamp - a.timestamp);
             chats.forEach(c => container.appendChild(createChatElement(c)));
         }
 
         function appendChats(chatsArr) {
             const container = document.getElementById('chat-container');
-            // For prepend
             chatsArr.forEach(c => {
                 container.insertBefore(createChatElement(c), container.firstChild);
             });
         }
 
+        // ── Spam Render ──
         function renderSpam(spammers) {
             const tbody = document.getElementById('spam-tbody');
             tbody.innerHTML = '';
             spammers.forEach(u => {
                 const tr = document.createElement('tr');
-                const actionBtn = u.block ? 
-                    `<button class="btn btn-ban" style="padding: 4px 10px;" onclick="execDeleteSpam('${u.channelId}')">Remove Block</button>` : 
-                    `<span style="color:var(--secondary); font-weight:600;">Monitoring</span>`;
+                const actionBtn = u.block ?
+                    `<button class="btn btn-ban btn-sm" onclick="execDeleteSpam('${u.channelId}')">Remove</button>` :
+                    `<span class="badge badge-green">Monitoring</span>`;
 
                 tr.innerHTML = `
-                    <td style="font-weight:600;">${u.name}</td>
-                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.8rem;">${u.channelId}</td>
-                    <td><span style="background:rgba(255,255,255,0.1); padding: 4px 8px; border-radius:4px;">${u.count}</span></td>
-                    <td style="color:#fcd34d;">${u.reason}</td>
+                    <td style="font-weight:600;">${escapeHtml(u.name)}</td>
+                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
+                    <td><span class="badge badge-yellow">${u.count}</span></td>
+                    <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
                     <td>${actionBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        // --- Actions ---
+        // ── Search Log Render ──
+        function simBadge(sim) {
+            if (sim >= 90) return 'badge-green';
+            if (sim >= 70) return 'badge-yellow';
+            return 'badge-red';
+        }
+
+        function createSearchLogRow(d) {
+            const tr = document.createElement('tr');
+            const sim = d.similarity != null ? d.similarity.toFixed(1) : '--';
+            const realTs = d.realTimestamp != null ? new Date(d.realTimestamp).toLocaleTimeString('ko-KR') : '--';
+            tr.innerHTML = `
+                <td>${fmtTime(d.time || d.realTimestamp)}</td>
+                <td><span class="badge badge-purple">${d.rank != null ? d.rank : '--'}</span></td>
+                <td style="font-weight:600; color:#fcd34d;">${d.filename || '--'}</td>
+                <td><span class="badge ${simBadge(d.similarity)}">${sim}%</span></td>
+                <td>${d.hammingDistance != null ? d.hammingDistance : '--'}</td>
+                <td>${d.matchCount != null ? d.matchCount : '--'}</td>
+                <td>${d.coverage != null ? d.coverage.toFixed(1) + '%' : '--'}</td>
+                <td>${d.dbTimestamp != null ? d.dbTimestamp.toFixed(1) : '--'}s</td>
+                <td>${d.clipTimestamp != null ? d.clipTimestamp.toFixed(1) : '--'}s</td>
+                <td style="color:var(--info);">${realTs}</td>
+            `;
+            return tr;
+        }
+
+        function renderSearchLogs(logs) {
+            const tbody = document.getElementById('search-log-tbody');
+            tbody.innerHTML = '';
+            searchLogCount = logs.length;
+            logs.forEach(d => tbody.insertBefore(createSearchLogRow(d), tbody.firstChild));
+        }
+
+        function appendSearchLog(data) {
+            const tbody = document.getElementById('search-log-tbody');
+            tbody.insertBefore(createSearchLogRow(data), tbody.firstChild);
+            searchLogCount++;
+            // 50개 초과 시 오래된 행 제거
+            while (tbody.children.length > 50) tbody.removeChild(tbody.lastChild);
+        }
+
+        // ── Command Log Render ──
+        function groupBadge(g) {
+            const map = {
+                'greeting': 'badge-green', 'help': 'badge-blue', 'episode': 'badge-purple',
+                'timetable': 'badge-yellow', 'next': 'badge-blue', 'last': 'badge-blue',
+                'date': 'badge-yellow', 'suggest': 'badge-green'
+            };
+            return map[g] || 'badge-purple';
+        }
+
+        function createCmdLogRow(d) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${fmtTime(d.time)}</td>
+                <td style="font-weight:600; color:#fcd34d;">${escapeHtml(d.user)}</td>
+                <td style="color:#a78bfa; font-weight:600;">${escapeHtml(d.cmd)}</td>
+                <td><span class="badge ${groupBadge(d.group)}">${d.group}</span></td>
+                <td class="truncate">${escapeHtml(d.args) || '<span style="color:var(--text-dim)">—</span>'}</td>
+                <td class="truncate" style="font-size:0.75rem; color:var(--text-dim);">${escapeHtml(d.response) || '—'}</td>
+            `;
+            return tr;
+        }
+
+        function renderCommandLogs(logs) {
+            const tbody = document.getElementById('cmd-log-tbody');
+            tbody.innerHTML = '';
+            cmdLogCount = logs.length;
+            logs.forEach(d => tbody.insertBefore(createCmdLogRow(d), tbody.firstChild));
+        }
+
+        function appendCommandLog(data) {
+            const tbody = document.getElementById('cmd-log-tbody');
+            tbody.insertBefore(createCmdLogRow(data), tbody.firstChild);
+            cmdLogCount++;
+            while (tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+        }
+
+        // ── Schedule Render ──
+        function renderSchedule(schedule) {
+            const tbody = document.getElementById('schedule-tbody');
+            tbody.innerHTML = '';
+            schedule.forEach(s => {
+                const tr = document.createElement('tr');
+                const dt = new Date(s.date);
+                const isToday = dt.toDateString() === new Date().toDateString();
+                const dstr = isToday ? 'Today' : dt.toLocaleDateString();
+                const tstr = dt.toLocaleTimeString('ko-KR');
+
+                if (s.isCurrent) {
+                    tr.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                }
+
+                tr.innerHTML = `
+                    <td style="color:var(--text-dim);">${dstr}</td>
+                    <td style="font-weight:600; color:var(--info);">${tstr}</td>
+                    <td style="color:#fcd34d;">${escapeHtml(s.alias)} 화 - ${escapeHtml(s.title)}</td>
+                    <td>${s.isCurrent ? '<span class="badge badge-red">ON AIR</span>' : ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Actions ──
         function execBan(name, channelId, contextMenuStr) {
-            if (!confirm(`[${name}] 님을 채널에서 차단하시겠습니까? (유튜브 및 내부 스팸가드 동시 차단)`)) return;
+            if (!confirm(`[${name}] 유저를 숨기시겠습니까? (유튜브 유저숨기기 + 스팸가드 동시 적용)`)) return;
             const contextMenuParams = contextMenuStr ? JSON.parse(unescape(contextMenuStr)) : null;
             ws.send(JSON.stringify({
                 action: 'ban',
@@ -647,7 +969,7 @@
         }
 
         function execDeleteSpam(channelId) {
-            if(!confirm(`Remove this user from the ban list?`)) return;
+            if(!confirm('이 유저를 밴 목록에서 제거합니까?')) return;
             ws.send(JSON.stringify({ action: 'spamDelete', payload: { channelId } }));
         }
 
@@ -660,13 +982,13 @@
             const displayName = document.getElementById('spam-name').value.trim() || 'Unknown';
             const reason = document.getElementById('spam-reason').value.trim() || 'Manual Add';
 
-            if (!channelId) return showToast('Channel ID is strictly required.', true);
-            
+            if (!channelId) return showToast('Channel ID는 필수입니다.', true);
+
             ws.send(JSON.stringify({
                 action: 'spamAdd',
                 payload: { channelId, displayName, reason }
             }));
-            
+
             document.getElementById('spam-channel').value = '';
             document.getElementById('spam-name').value = '';
             document.getElementById('spam-reason').value = '';
@@ -675,6 +997,28 @@
         window.saveConfig = function(target) {
             const content = document.getElementById(`val-${target}`).value;
             ws.send(JSON.stringify({ action: 'saveConfig', payload: { target, content } }));
+        };
+
+        window.saveVideoInfo = function() {
+            const content = document.getElementById('val-videoinfo').value;
+            // 먼저 클라이언트에서 JSON 유효성 검사
+            try {
+                JSON.parse(content);
+            } catch(e) {
+                return showToast('JSON 파싱 에러: ' + e.message, true);
+            }
+            ws.send(JSON.stringify({ action: 'saveVideoInfo', payload: { content } }));
+        };
+
+        window.formatVideoInfo = function() {
+            const el = document.getElementById('val-videoinfo');
+            try {
+                const obj = JSON.parse(el.value);
+                el.value = JSON.stringify(obj, null, 2);
+                showToast('JSON 포맷 완료');
+            } catch(e) {
+                showToast('JSON 파싱 에러: ' + e.message, true);
+            }
         };
 
         // Bootstrap

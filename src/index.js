@@ -99,7 +99,6 @@ async function main() {
                         continue;
                     }
                     typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
-                    console.log('💬 [' + msg.displayName + '] ' + msg.text);
                 }
                 if (chkInput.warn > 0) {
                     spamGuard.addPenalty(msg.channelId, msg.displayName, chkInput.warn);

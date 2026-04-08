@@ -7,10 +7,33 @@ const chatHistory = require('./chat-history.js');
 const { banUser, blockUser } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
 const cfgYoutube = require('./data/config-youtube.js');
+const eventBus = require('./event-bus.js');
 
 let spamGuardRef = null;
 let getEpisodeInfoRef = null;
 let clients = new Set();
+
+// ═══════════════════════════════════════
+//  로그 버퍼 (최근 N개 메모리 보관)
+// ═══════════════════════════════════════
+const MAX_SEARCH_LOGS = 50;
+const MAX_COMMAND_LOGS = 100;
+const searchLogs = [];
+const commandLogs = [];
+
+// 이벤트 버스 리스너
+eventBus.on('search_result', (data) => {
+    const entry = { time: Date.now(), ...data };
+    searchLogs.push(entry);
+    while (searchLogs.length > MAX_SEARCH_LOGS) searchLogs.shift();
+    broadcastMsg({ action: 'search_push', payload: entry });
+});
+
+eventBus.on('command_used', (data) => {
+    commandLogs.push(data);
+    while (commandLogs.length > MAX_COMMAND_LOGS) commandLogs.shift();
+    broadcastMsg({ action: 'command_push', payload: data });
+});
 
 function broadcastMsg(data) {
     const msg = JSON.stringify(data);
@@ -213,6 +236,65 @@ async function handleAction(client, req) {
         } catch(e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: false, error: e.message } }));
         }
+    }
+    // ── 새 기능: video-info.json 편집 ──
+    else if (action === 'getVideoInfo') {
+        try {
+            const viText = fs.readFileSync(path.join(__dirname, 'data', 'video-info.json'), 'utf8');
+            sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: viText }));
+        } catch(e) {
+            sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: '[]' }));
+        }
+    }
+    else if (action === 'saveVideoInfo') {
+        const { content } = payload;
+        try {
+            // JSON 유효성 검증
+            JSON.parse(content);
+            fs.writeFileSync(path.join(__dirname, 'data', 'video-info.json'), content, 'utf8');
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
+        } catch(e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── 새 기능: 검색 로그 ──
+    else if (action === 'getSearchLogs') {
+        sendWSFrame(client, JSON.stringify({ action: 'search_logs', payload: searchLogs }));
+    }
+    // ── 새 기능: 명령어 로그 ──
+    else if (action === 'getCommandLogs') {
+        sendWSFrame(client, JSON.stringify({ action: 'command_logs', payload: commandLogs }));
+    }
+    // ── 새 기능: 편성표 ──
+    else if (action === 'getSchedule') {
+        const epInfo = getEpisodeInfoRef ? getEpisodeInfoRef() : null;
+        if (!epInfo || !search_lib.videoInfo) {
+            sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: [] }));
+            return;
+        }
+
+        const n = search_lib.videoInfo.length;
+        const schedule = [];
+        let currentIdx = epInfo.index % n;
+        
+        let count = 0;
+        let cIdx = currentIdx;
+        while (count < n && schedule.length < 150) { // Limit to full cycle or 150 max
+            const e = search_lib.videoInfo[cIdx];
+            if (!e.disable) {
+                const fdate = search_lib.getFutureDate(e, epInfo, 0);
+                schedule.push({
+                    alias: e.alias,
+                    title: e.title || e.shorten || e.name,
+                    date: fdate.getTime(),
+                    isCurrent: count === 0
+                });
+            }
+            cIdx = (cIdx + 1) % n;
+            count++;
+        }
+        
+        sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: schedule }));
     }
 }
 

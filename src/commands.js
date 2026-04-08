@@ -12,6 +12,7 @@ const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
     toHHMMSS, fromHHMMSS, formatDate, getClockEmoji, parseKoreanDate } = require('./func.js');
 
 const profanitySet = require('./data/profanity-list.js');
+const eventBus = require('./event-bus.js');
 const videoInfo = search_lib.videoInfo;
 const searcher = new TextSearchEngine(subtitles);
 const retryPattern = ["$1", "$1 ", " $1", "$1", "$1"];
@@ -120,34 +121,47 @@ async function handleCommand(type, text, displayName, _input) {
     if (group === cmd)
         return null;
 
+    // ★ 명령어 사용 로그 발행
+    const _emitLog = (response) => {
+        eventBus.emit('command_used', {
+            time: Date.now(),
+            user: displayName,
+            cmd: cmd,
+            group: group,
+            args: args.length > 0 ? args[0] : null,
+            response: typeof response === 'string' ? response.slice(0, 120) : (response && response.msg ? response.msg.slice(0, 120) : null),
+        });
+        return response;
+    };
+
     // 8. 단순 봇 인사 명령어
     if (group === 'greeting') {
         setCooldown(cmd);
-        return greeting_lib(displayName);
+        return _emitLog(greeting_lib(displayName));
     }
 
     // 9. 봇 도움말/가이드 출력
     if (group === 'help') {
         setCooldown(cmd);
-        return 'ℹ️ 명령어: !몇화, !다음화, !시간표, !건의, !마지막화, !날짜' +
+        return _emitLog('ℹ️ 명령어: !몇화, !다음화, !시간표, !건의, !마지막화, !날짜' +
             'ℹ️ 이 프로그램은 비공식 봇이며, SBS와는 아무런 관련이 없습니다. ' +
-            'ℹ️ 명령은 3분마다 가능합니다. (도배 방지) ';
+            'ℹ️ 명령은 3분마다 가능합니다. (도배 방지) ');
     }
 
     // 10. 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
     if (group === 'episode') {
-        return handleEpisodeCommand(cmd, args, _input);
+        return _emitLog(handleEpisodeCommand(cmd, args, _input));
     }
 
     // 11. 곧 방영될 회차 리스트 목록 요약(시간표) 출력
     if (group === 'timetable') {
         setCooldown(cmd);
-        return {
+        return _emitLog({
             msg: printTimeTable(retryPattern[0]),
             proc: function (attempt) {
                 return printTimeTable(retryPattern[attempt]);
             }
-        };
+        });
     }
 
     // 12. 다음 방영 예정 회차 정보 조회
@@ -156,10 +170,10 @@ async function handleCommand(type, text, displayName, _input) {
 
         if (!rtn) {
             setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return `⚠️ 잠시 후 다시 시도해 주세요.`;
+            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
         }
 
-        return printNextEpisode(cmd, rtn);
+        return _emitLog(printNextEpisode(cmd, rtn));
     }
 
     // 13. 전 대역 마지막 회차 방영 예정일 조회
@@ -168,22 +182,22 @@ async function handleCommand(type, text, displayName, _input) {
 
         if (!rtn) {
             setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return `⚠️ 잠시 후 다시 시도해 주세요.`;
+            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
         }
 
         setCooldown(cmd);
-        return printNumEpisode(rtn, cfg.episode.end);
+        return _emitLog(printNumEpisode(rtn, cfg.episode.end));
     }
 
     // 13.5 날짜 지정 회차 조회
     if (group === 'date') {
-        return handleDateCommand(cmd, args);
+        return _emitLog(handleDateCommand(cmd, args));
     }
 
     // 14. 봇 건의 및 피드백 로깅
     if (group === 'suggest') {
         setCooldown(cmd);
-        return `${displayName} 님, 접수되었습니다. 감사합니다. (쿨타임 3분)`;
+        return _emitLog(`${displayName} 님, 접수되었습니다. 감사합니다. (쿨타임 3분)`);
     }
 
     return null;
@@ -266,7 +280,6 @@ function handleEpisodeCommand(cmd, args, _input) {
                 const pfSub = subtitles[key][matched[0] - 1]; // 추출된 자막 구간
 
                 if (pfSub) {
-                    console.log("subtitle search ->", key, JSON.stringify(pfSub));
 
                     const subInfo = videoInfo.find(e => e.name === key);
                     if (!subInfo) continue;
@@ -509,8 +522,6 @@ function onMatchResult(rtn) {
 
     // 샘플이 min_consecutive개 이상 모였을 때 연속성 검증 로직 실행
     if (tempQuery.length >= minConsecutive) {
-        console.log("현재 영상 정보를 불러왔습니다. 객체: ");
-        console.log(tempQuery);
         const cmp = getEpisodeInfo() || { index: -1, now: 0 };
 
         // 최근 minConsecutive개가 모두 연속적으로 일치하는지 확인
@@ -533,8 +544,6 @@ function onMatchResult(rtn) {
 
         // 연속 일치 수가 min_consecutive 이상이면 확정
         if (adopted && consecutiveCount >= minConsecutive) {
-            console.log(`연속 ${consecutiveCount}개 일치 — 확정:`);
-            console.log(adopted);
             copyQuery(adopted);
             return;
         }
@@ -548,14 +557,6 @@ function onMatchResult(rtn) {
         Math.abs(rtn.now - cmp.now) <= cfg.sync.tolerance_sec) {
         copyQuery(rtn);
         return;
-    } else {
-        if (cmp) {
-            console.log(JSON.stringify({
-                gapidx: rtn.index - cmp.index,
-                gapnow: Math.abs(rtn.now - cmp.now)
-            }));
-        }
-        console.log("현재 영상 정보와 싱크가 맞지 않습니다.");
     }
 }
 
