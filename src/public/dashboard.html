@@ -461,7 +461,10 @@
                     <p id="stat-cmd-count" style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0</p>
                 </div>
             </div>
-            <button class="btn" id="btn-refresh-state">Force Refresh</button>
+            <div style="display:flex; gap:12px;">
+                <button class="btn" id="btn-refresh-state">Force Refresh</button>
+                <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted: OFF</button>
+            </div>
         </div>
 
         <!-- Chat & Ban -->
@@ -732,6 +735,12 @@
                     }
                     document.getElementById('stat-search-count').innerText = searchLogCount;
                     document.getElementById('stat-cmd-count').innerText = cmdLogCount;
+                    if (payload.botMuted !== undefined) {
+                        updateMuteBtn(payload.botMuted);
+                    }
+                    break;
+                case 'mute_state':
+                    updateMuteBtn(payload);
                     break;
 
                 case 'chat_history':
@@ -812,10 +821,16 @@
                     <span class="chat-author">${escapeHtml(c.displayName)}</span>
                     <span class="chat-text">${escapeHtml(c.text)}</span>
                 </div>
-                <button class="btn btn-ban" ${!canBan ? 'disabled title="No Context Menu"' : ''}
-                        onclick="execBan('${escapeHtml(c.displayName)}', '${c.channelId}', '${ctxMenuEscaped}')">
-                    유저 숨기기
-                </button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-ban" ${!canBan ? 'disabled title="No Context Menu"' : ''}
+                            onclick="execBan('${escapeHtml(c.displayName)}', '${c.channelId}', '${ctxMenuEscaped}')">
+                        유저 숨기기
+                    </button>
+                    <button class="btn btn-ban" style="background-color: var(--warning);"
+                            onclick="execSpamOnly('${escapeHtml(c.displayName)}', '${c.channelId}')">
+                        Spam 추가
+                    </button>
+                </div>
             `;
             return div;
         }
@@ -967,6 +982,33 @@
                 payload: { channelId, displayName: name, contextMenuParams }
             }));
         }
+
+        function execSpamOnly(name, channelId) {
+            if (!confirm(`[${name}] 스팸 리스트에만 추가하시겠습니까? (유튜브 차단 X)`)) return;
+            ws.send(JSON.stringify({
+                action: 'spamAdd',
+                payload: { channelId, displayName: name, reason: '채팅 탭에서 빠른 추가' }
+            }));
+        }
+
+        let isMutedUI = false;
+        function updateMuteBtn(muted) {
+            isMutedUI = muted;
+            const btn = document.getElementById('btn-toggle-mute');
+            if (muted) {
+                btn.innerText = 'Bot Muted: ON (말 못함)';
+                btn.style.backgroundColor = 'var(--error)';
+            } else {
+                btn.innerText = 'Bot Muted: OFF (정상 대화)';
+                btn.style.backgroundColor = 'var(--secondary)';
+            }
+        }
+
+        document.getElementById('btn-toggle-mute').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'setMute', payload: !isMutedUI }));
+            }
+        });
 
         function execDeleteSpam(channelId) {
             if(!confirm('이 유저를 밴 목록에서 제거합니까?')) return;

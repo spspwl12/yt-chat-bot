@@ -50,7 +50,8 @@ async function main() {
 
     // 대시보드 웹 서버 백그라운드 시작 (getEpisodeInfo 전달)
     const { getEpisodeInfo } = require('./commands.js');
-    startServer(8080, spamGuard, getEpisodeInfo);
+    const { startServer, broadcastSpam, isBotMuted } = require('./web-server.js');
+    startServer(12345, spamGuard, getEpisodeInfo);
 
     while (running) {
         try {

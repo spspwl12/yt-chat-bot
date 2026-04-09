@@ -289,9 +289,9 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
         }
 
         if (adoptedMatch) {
-            if (adoptedMatch !== mJson) {
-                console.log(`pHash 보정: 1위 ${mJson.filename} → 시차 20초 이내 현재회차 ${adoptedMatch.filename} 즉시 채택`);
-            }
+            //if (adoptedMatch !== mJson) {
+            //console.log(`pHash 보정: 1위 ${mJson.filename} → 시차 20초 이내 현재회차 ${adoptedMatch.filename} 즉시 채택`);
+            //}
             mJson = adoptedMatch;
         } else {
             // 2. 기존 폴백: 1위가 방영 회차가 아닐 때, 현재 회차가 순위 안에 있으면(1위 매칭점수의 50% 이상) 채택
@@ -304,7 +304,7 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
                 );
 
                 if (currentMatch && currentMatch.matchCount >= topMatchCount * 0.5) {
-                    console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재회차 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
+                    //console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재회차 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
                     mJson = currentMatch;
                 }
             }

@@ -220,6 +220,9 @@ class LiveDownloader extends EventEmitter {
 
                 this.emit('segment', segmentInfo);
 
+                // 다운로드 성공 → 재시작 카운터 초기화
+                this._restartCount = 0;
+
                 // 타이밍 기록 정리
                 delete this._segmentTimes[prevNum];
             }

@@ -13,6 +13,20 @@ let spamGuardRef = null;
 let getEpisodeInfoRef = null;
 let clients = new Set();
 
+const MUTE_FILE = path.join(__dirname, 'data', 'bot-mute.json');
+let botMuted = false;
+try {
+    botMuted = JSON.parse(fs.readFileSync(MUTE_FILE, 'utf8')).muted === true;
+} catch {}
+
+function isBotMuted() {
+    return botMuted;
+}
+
+function saveMuteState() {
+    try { fs.writeFileSync(MUTE_FILE, JSON.stringify({ muted: botMuted }), 'utf8'); } catch {}
+}
+
 // ═══════════════════════════════════════
 //  로그 버퍼 (최근 N개 메모리 보관)
 // ═══════════════════════════════════════
@@ -166,10 +180,16 @@ async function handleAction(client, req) {
                 episodeInfo: epInfo,
                 totalEpisodes: totalEpisodes || totalEpCount,
                 totalTime: totalTime,
-                videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null
+                videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null,
+                botMuted: botMuted
             } 
         }));
     } 
+    else if (action === 'setMute') {
+        botMuted = payload;
+        saveMuteState();
+        broadcastMsg({ action: 'mute_state', payload: botMuted });
+    }
     else if (action === 'getChat') {
         sendWSFrame(client, JSON.stringify({ action: 'chat_history', payload: chatHistory.getMessages() }));
     }
@@ -381,4 +401,4 @@ function broadcastChat(chatObj) {
     broadcastMsg({ action: 'chat_push', payload: Array.isArray(chatObj) ? chatObj : [chatObj] });
 }
 
-module.exports = { startServer, broadcastChat, broadcastSpam };
+module.exports = { startServer, broadcastChat, broadcastSpam, isBotMuted };

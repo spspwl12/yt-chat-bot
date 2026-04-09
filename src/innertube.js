@@ -519,6 +519,12 @@ function _waitForVerify(messageId) {
  *   null 반환 시 재시도 중단. 생략 시 동일 메시지로 재시도.
  */
 function sendChat(message, retryProc) {
+    const { isBotMuted } = require('./web-server.js');
+    if (isBotMuted && isBotMuted()) {
+        console.log('🔇 [Muted] ' + message);
+        return Promise.resolve(false);
+    }
+
     return new Promise(function (resolve) {
         sendQueue.push({
             message: message,
