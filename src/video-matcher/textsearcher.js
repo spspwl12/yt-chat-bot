@@ -39,15 +39,39 @@ function toJamo(str) {
     return result;
 }
 
-// ─── 경음→평음 정규화 (relaxed jamo) ────────────────────────
+// ─── 한국어 오타/구어체 정규화 (relaxed jamo) ───────────────
 
 function relaxJamo(jamoStr) {
     return jamoStr
+        // ① 경음 → 평음 (ㄲ→ㄱ, ㄸ→ㄷ, ㅃ→ㅂ, ㅆ→ㅅ, ㅉ→ㅈ)
         .replace(/ㄲ/g, 'ㄱ')
         .replace(/ㄸ/g, 'ㄷ')
         .replace(/ㅃ/g, 'ㅂ')
         .replace(/ㅆ/g, 'ㅅ')
-        .replace(/ㅉ/g, 'ㅈ');
+        .replace(/ㅉ/g, 'ㅈ')
+        // ② 격음 → 평음 (ㅋ→ㄱ, ㅌ→ㄷ, ㅍ→ㅂ, ㅊ→ㅈ)
+        //    기억에 의존한 검색 시 격음/평음 혼동 빈번
+        .replace(/ㅋ/g, 'ㄱ')
+        .replace(/ㅌ/g, 'ㄷ')
+        .replace(/ㅍ/g, 'ㅂ')
+        .replace(/ㅊ/g, 'ㅈ')
+        // ③ ㅐ/ㅔ/ㅒ/ㅖ → ㅐ (현대 한국어에서 거의 구분 불가)
+        .replace(/ㅔ/g, 'ㅐ')
+        .replace(/ㅒ/g, 'ㅐ')
+        .replace(/ㅖ/g, 'ㅐ')
+        // ④ ㅗ/ㅜ 통합 (구어체: 도↔두, 고↔구, 보↔부)
+        .replace(/ㅜ/g, 'ㅗ')
+        // ⑤ ㅛ/ㅠ 통합 (구어체: 교↔규, 요↔유)
+        .replace(/ㅠ/g, 'ㅛ')
+        // ⑥ ㅙ/ㅚ/ㅞ → ㅚ (현대 발음 동일: 왜/외/웨)
+        .replace(/ㅙ/g, 'ㅚ')
+        .replace(/ㅞ/g, 'ㅚ')
+        // ⑦ ㅘ/ㅝ 단순화 (와↔워 혼동)
+        .replace(/ㅝ/g, 'ㅘ')
+        // ⑧ ㅢ → ㅣ (의→이, 가장 흔한 발음 변화)
+        .replace(/ㅢ/g, 'ㅣ')
+        // ⑨ ㅟ → ㅣ (위→이, 빠른 발음 시 축약)
+        .replace(/ㅟ/g, 'ㅣ');
 }
 
 // ─── 발음 정규화 (연음/거센소리/ㅎ탈락) ─────────────────────
@@ -166,33 +190,30 @@ function ngramSimilarity(a, b, n = 2) {
     return union === 0 ? 0 : intersection / union;
 }
 
-// ─── 토큰 커버리지 (문자+자모+발음 3중) ────────────────────
+// ─── 토큰 커버리지 (문자+자모+발음+relaxed 4중) ────────────────────
+// _qc/_tc: { jamo, pron, relaxed } 사전 계산 캐시 (선택)
 
-function tokenCoverage(token, target) {
+function tokenCoverage(token, target, _qc, _tc) {
     if (token.length <= 1) return target.includes(token) ? 1 : 0;
 
     const charCov2 = ngramCoverage(token, target, 2);
     const charCov3 = ngramCoverage(token, target, 3);
     const charScore = charCov2 * 0.4 + charCov3 * 0.6;
 
-    const jamoToken = toJamo(token);
-    const jamoTarget = toJamo(target);
-    const jamoCov3 = ngramCoverage(jamoToken, jamoTarget, 3);
-    const jamoCov4 = ngramCoverage(jamoToken, jamoTarget, 4);
-    const jamoScore = jamoCov3 * 0.4 + jamoCov4 * 0.6;
+    const jamoToken = _qc ? _qc.jamo : toJamo(token);
+    const jamoTarget = _tc ? _tc.jamo : toJamo(target);
+    const jamoScore = ngramCoverage(jamoToken, jamoTarget, 3) * 0.4
+        + ngramCoverage(jamoToken, jamoTarget, 4) * 0.6;
 
-    const pronToken = toPronunciationJamo(token);
-    const pronTarget = toPronunciationJamo(target);
-    const pronCov3 = ngramCoverage(pronToken, pronTarget, 3);
-    const pronCov4 = ngramCoverage(pronToken, pronTarget, 4);
-    const pronScore = pronCov3 * 0.4 + pronCov4 * 0.6;
+    const pronToken = _qc ? _qc.pron : toPronunciationJamo(token);
+    const pronTarget = _tc ? _tc.pron : toPronunciationJamo(target);
+    const pronScore = ngramCoverage(pronToken, pronTarget, 3) * 0.4
+        + ngramCoverage(pronToken, pronTarget, 4) * 0.6;
 
-    // 경음→평음 정규화 비교
-    const relaxedJamoToken = relaxJamo(jamoToken);
-    const relaxedJamoTarget = relaxJamo(jamoTarget);
-    const relaxedCov3 = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 3);
-    const relaxedCov4 = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 4);
-    const relaxedScore = relaxedCov3 * 0.4 + relaxedCov4 * 0.6;
+    const relaxedJamoToken = _qc ? _qc.relaxed : relaxJamo(jamoToken);
+    const relaxedJamoTarget = _tc ? _tc.relaxed : relaxJamo(jamoTarget);
+    const relaxedScore = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 3) * 0.4
+        + ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 4) * 0.6;
 
     return Math.max(charScore, jamoScore, pronScore, relaxedScore);
 }
@@ -203,7 +224,6 @@ function normalizeText(text) {
     return text.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ]/g, '').toLowerCase();
 }
 
-// 문자열 내 부분문자열 등장 횟수
 function countOccurrences(str, sub) {
     let count = 0, pos = 0;
     while ((pos = str.indexOf(sub, pos)) !== -1) {
@@ -213,86 +233,91 @@ function countOccurrences(str, sub) {
     return count;
 }
 
-function textSimilarity(query, target) {
-    const normQ = normalizeText(query);
-    const normT = normalizeText(target);
+// queryCache를 생성하는 헬퍼 (검색 1회당 1번만 호출)
+function buildQueryCache(query) {
+    const norm = normalizeText(query);
+    const jamo = toJamo(norm);
+    const pron = toPronunciationJamo(norm);
+    const relaxed = relaxJamo(jamo);
+    const rawTokens = query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean);
+    const tokens = rawTokens.map(t => normalizeText(t)).filter(t => t.length >= 2);
+    const tokenCaches = tokens.map(t => {
+        const j = toJamo(t);
+        return { norm: t, jamo: j, pron: toPronunciationJamo(t), relaxed: relaxJamo(j) };
+    });
+    return { norm, jamo, pron, relaxed, tokens, tokenCaches };
+}
+
+function textSimilarity(query, target, qCache, tCache) {
+    const normQ = qCache ? qCache.norm : normalizeText(query);
+    const normT = tCache ? tCache.norm : normalizeText(target);
     if (normQ === normT) return 1.0;
     if (normQ.length === 0 || normT.length === 0) return 0;
 
-    const jamoQ = toJamo(normQ);
-    const jamoT = toJamo(normT);
-    const pronQ = toPronunciationJamo(normQ);
-    const pronT = toPronunciationJamo(normT);
+    const jamoQ = qCache ? qCache.jamo : toJamo(normQ);
+    const jamoT = tCache ? tCache.jamo : toJamo(normT);
+    const pronQ = qCache ? qCache.pron : toPronunciationJamo(normQ);
+    const pronT = tCache ? tCache.pron : toPronunciationJamo(normT);
 
-    // 1. 문자 n-gram 커버리지
     const charCov = (ngramCoverage(normQ, normT, 2) * 0.25)
         + (ngramCoverage(normQ, normT, 3) * 0.35)
         + (ngramCoverage(normQ, normT, 4) * 0.40);
 
-    // 2. 자모 n-gram 커버리지
     const jamoCov = (ngramCoverage(jamoQ, jamoT, 3) * 0.3)
         + (ngramCoverage(jamoQ, jamoT, 4) * 0.35)
         + (ngramCoverage(jamoQ, jamoT, 5) * 0.35);
 
-    // 3. 발음 자모 n-gram 커버리지
     const pronCov = (ngramCoverage(pronQ, pronT, 3) * 0.3)
         + (ngramCoverage(pronQ, pronT, 4) * 0.35)
         + (ngramCoverage(pronQ, pronT, 5) * 0.35);
 
-    // 4. 경음→평음 정규화 자모 n-gram 커버리지
-    const relaxedJamoQ = relaxJamo(jamoQ);
-    const relaxedJamoT = relaxJamo(jamoT);
+    const relaxedJamoQ = qCache ? qCache.relaxed : relaxJamo(jamoQ);
+    const relaxedJamoT = tCache ? tCache.relaxed : relaxJamo(jamoT);
     const relaxedCov = (ngramCoverage(relaxedJamoQ, relaxedJamoT, 3) * 0.3)
         + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 4) * 0.35)
         + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 5) * 0.35);
 
     const overallCoverage = Math.max(charCov, jamoCov, pronCov, relaxedCov);
 
-    // 4. 토큰별 AND 매칭
-    const rawTokens = query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean);
-    const tokens = rawTokens.map(t => normalizeText(t)).filter(t => t.length >= 2);
+    const tokens = qCache ? qCache.tokens : query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean).map(t => normalizeText(t)).filter(t => t.length >= 2);
+    const tokenCachesArr = qCache ? qCache.tokenCaches : null;
 
     let andScore = overallCoverage;
     let tokenInclusionBonus = 0;
 
     if (tokens.length >= 2) {
-        const perToken = tokens.map(t => tokenCoverage(t, normT));
+        const perToken = tokenCachesArr
+            ? tokenCachesArr.map(tc => tokenCoverage(tc.norm, normT, tc, tCache))
+            : tokens.map(t => tokenCoverage(t, normT));
         const maxCov = Math.max(...perToken);
         const avgCov = perToken.reduce((a, b) => a + b, 0) / perToken.length;
-
-        // 핵심 키워드 매칭 우선 (maxCov 가중치 높임)
         andScore = (maxCov * 0.5) + (avgCov * 0.5);
-
-        // 개별 토큰이 타겟에 포함되면 보너스 (핵심 키워드 매칭)
         for (const t of tokens) {
             if (t.length >= 2 && normT.includes(t)) {
-                const bonus = Math.min(0.4, 0.15 + t.length * 0.05);
-                tokenInclusionBonus = Math.max(tokenInclusionBonus, bonus);
+                tokenInclusionBonus = Math.max(tokenInclusionBonus, Math.min(0.4, 0.15 + t.length * 0.05));
             }
         }
     } else if (tokens.length === 1) {
-        andScore = tokenCoverage(tokens[0], normT);
+        andScore = tokenCachesArr
+            ? tokenCoverage(tokenCachesArr[0].norm, normT, tokenCachesArr[0], tCache)
+            : tokenCoverage(tokens[0], normT);
         if (tokens[0].length >= 2 && normT.includes(tokens[0])) {
             tokenInclusionBonus = Math.min(0.4, 0.15 + tokens[0].length * 0.05);
         }
     }
 
-    // 5. 전체 포함 보너스
     let containsBonus = 0;
     if (normQ.length >= 2 && normT.includes(normQ)) containsBonus = 0.3;
 
-    // 6. Jaccard bigram
     const bigramSim = ngramSimilarity(normQ, normT, 2);
 
-    // 7. 키워드 반복 페널티: 쿼리에서 N번 등장하는 키워드가 타겟에서 N번 미만이면 감점
     let repetitionPenalty = 1.0;
     for (const t of tokens) {
         if (t.length >= 2) {
             const qCount = countOccurrences(normQ, t);
             const tCount = countOccurrences(normT, t);
             if (qCount > 1 && tCount < qCount) {
-                repetitionPenalty = Math.min(repetitionPenalty,
-                    0.5 + 0.5 * tCount / qCount);
+                repetitionPenalty = Math.min(repetitionPenalty, 0.5 + 0.5 * tCount / qCount);
             }
         }
     }
@@ -318,20 +343,29 @@ class SearchEngine {
         for (const key of sortedKeys) {
             const items = data[key];
 
-            const itemsWithNormalized = items.map(item => ({
-                index: item.index,
-                originalText: item.text,
-                normalizedText: normalizeText(item.text)
-            }));
+            const itemsWithNormalized = items.map(item => {
+                const normalizedText = normalizeText(item.text);
+                const jamoText = toJamo(normalizedText);
+                return {
+                    index: item.index,
+                    originalText: item.text,
+                    normalizedText,
+                    jamoText,
+                    pronJamoText: toPronunciationJamo(item.text),
+                    relaxedJamoText: relaxJamo(jamoText)
+                };
+            });
 
             const combinedNormalized = itemsWithNormalized.map(i => i.normalizedText).join('');
-            const individualTexts = itemsWithNormalized.map(i => i.normalizedText);
+            const jamoCombined = toJamo(combinedNormalized);
 
             processed.push({
                 key,
                 combinedText: combinedNormalized,
+                jamoCombined,
+                relaxedJamoCombined: relaxJamo(jamoCombined),
                 items: itemsWithNormalized,
-                individualTexts
+                individualTexts: itemsWithNormalized.map(i => i.normalizedText)
             });
         }
 
@@ -353,12 +387,13 @@ class SearchEngine {
 
     // ─── 개별 아이템에서 매칭된 인덱스 찾기 (textSimilarity 기반) ──
 
-    findMatchedIndices(items, searchQuery) {
+    findMatchedIndices(items, searchQuery, qCache) {
         const matchedResults = [];
+        const normSearchQ = qCache ? qCache.norm : normalizeText(searchQuery);
 
         for (const item of items) {
-            // textSimilarity로 정밀 점수 계산
-            const simScore = textSimilarity(searchQuery, item.originalText);
+            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+            const simScore = textSimilarity(searchQuery, item.originalText, qCache, tCache);
 
             if (simScore > 0.1) {
                 matchedResults.push({
@@ -366,8 +401,7 @@ class SearchEngine {
                     score: Math.round(simScore * 100)
                 });
             } else {
-                // 폴백: 부분 문자열 매칭
-                if (item.normalizedText.includes(normalizeText(searchQuery))) {
+                if (item.normalizedText.includes(normSearchQ)) {
                     matchedResults.push({
                         index: item.index,
                         score: Math.round(simScore * 100) || 50
@@ -409,10 +443,10 @@ class SearchEngine {
             searchStart = pos + 1;
         }
 
-        // 자모 기반 퍼지 매칭
+        // 자모 기반 퍼지 매칭 (캐시된 jamoCombined 사용)
         if (matchedIndices.size === 0) {
             const jamoQuery = toJamo(query);
-            const jamoCombined = toJamo(combinedText);
+            const jamoCombined = this._currentJamoCombined || toJamo(combinedText);
 
             for (let i = 0; i <= jamoCombined.length - jamoQuery.length; i++) {
                 let matches = 0;
@@ -436,7 +470,7 @@ class SearchEngine {
         // 경음→평음 정규화 자모 퍼지 매칭
         if (matchedIndices.size === 0) {
             const relaxedQuery = relaxJamo(toJamo(query));
-            const relaxedCombined = relaxJamo(toJamo(combinedText));
+            const relaxedCombined = this._currentRelaxedJamoCombined || relaxJamo(toJamo(combinedText));
 
             for (let i = 0; i <= relaxedCombined.length - relaxedQuery.length; i++) {
                 let matches = 0;
@@ -468,6 +502,9 @@ class SearchEngine {
         if (!normalizedQuery) {
             return [];
         }
+
+        // 쿼리 캐시 1회 생성 (모든 textSimilarity 호출에서 재사용)
+        const qCache = buildQueryCache(query);
 
         // Phase 1: 후보 수집 (Fuse.js + n-gram 커버리지)
 
@@ -505,19 +542,17 @@ class SearchEngine {
                 }
                 const charHitRate = queryBigrams.length > 0 ? charHits / queryBigrams.length : 0;
 
-                // 자모 trigram 히트
-                const jamoCombined = toJamo(item.combinedText);
+                // 자모 trigram 히트 (캐시 사용)
                 let jamoHits = 0;
                 for (const tg of jamoTrigrams) {
-                    if (jamoCombined.includes(tg)) jamoHits++;
+                    if (item.jamoCombined.includes(tg)) jamoHits++;
                 }
                 const jamoHitRate = jamoTrigrams.length > 0 ? jamoHits / jamoTrigrams.length : 0;
 
-                // 경음→평음 정규화 자모 trigram 히트
-                const relaxedCombined = relaxJamo(jamoCombined);
+                // 경음→평음 정규화 자모 trigram 히트 (캐시 사용)
                 let relaxedHits = 0;
                 for (const tg of relaxedTrigrams) {
-                    if (relaxedCombined.includes(tg)) relaxedHits++;
+                    if (item.relaxedJamoCombined.includes(tg)) relaxedHits++;
                 }
                 const relaxedHitRate = relaxedTrigrams.length > 0 ? relaxedHits / relaxedTrigrams.length : 0;
 
@@ -568,14 +603,21 @@ class SearchEngine {
         for (const result of allResults) {
             const matchedIndicesWithScores = this.findMatchedIndices(
                 result.items,
-                query
+                query,
+                qCache
             );
 
             if (matchedIndicesWithScores.length === 0) {
+                // 캐시된 자모 데이터를 findContinuousMatches에 전달
+                const obj = this.processedData.find(f => f.key === result.key);
+                this._currentJamoCombined = obj ? obj.jamoCombined : null;
+                this._currentRelaxedJamoCombined = obj ? obj.relaxedJamoCombined : null;
                 const continuousMatches = this.findContinuousMatches(
                     result.items,
                     normalizedQuery
                 );
+                this._currentJamoCombined = null;
+                this._currentRelaxedJamoCombined = null;
 
                 if (continuousMatches.length > 0) {
                     // 연속 매칭된 아이템의 textSimilarity 최고점 계산
@@ -583,7 +625,8 @@ class SearchEngine {
                     for (const idx of continuousMatches) {
                         const item = result.items.find(i => i.index === idx);
                         if (item) {
-                            const sim = textSimilarity(query, item.originalText);
+                            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+                            const sim = textSimilarity(query, item.originalText, qCache, tCache);
                             if (sim > bestSimScore) bestSimScore = sim;
                         }
                     }
@@ -638,12 +681,12 @@ class SearchEngine {
                 const item = obj.items[f - 1];
                 if (!item) return;
 
-                const sim = textSimilarity(query, item.originalText);
+                const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+                const sim = textSimilarity(query, item.originalText, qCache, tCache);
                 const simScore = Math.round(sim * 100);
 
                 if (simScore > e.alpha) e.alpha = simScore;
 
-                // textSimilarity 점수가 기존 score보다 높으면 score도 갱신
                 if (simScore > e.score) {
                     e.score = simScore;
                 }

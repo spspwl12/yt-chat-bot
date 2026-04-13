@@ -28,7 +28,7 @@ const tempQuery = [];
 // 명령어를 그룹으로 분류 (같은 그룹의 alias는 쿨타임 공유)
 const COMMAND_GROUPS = {
     'greeting': ['!안녕', '!인사', '!하이', '!헬로', '!ㅎㅇ', '!gd', '!반가워', '!방가'],
-    'help': ['!도움', '!안내', '!소개', '!헬프', '!가이드', '!도움말', '!사용법', '!설명서', '!명령어'],
+    'help': ['!도움', '!안내', '!소개', '!헬프', '!가이드', '!도움말', '!사용법', '!설명서', '!명령어', '!commands', '!command'],
     'episode': ['!대사', '!몇회', '!몇화', '!몇편', '!편수', '!화차', '!지금몇화', '!지금몇회', '!회차'],
     'timetable': ['!시간표', '!편성표'],
     'next': ['!다음', '!다음화', '!다음회'],
@@ -101,7 +101,8 @@ async function handleCommand(type, text, displayName, _input) {
         text.length < cfg.input.text_min_length || text.length > cfg.input.text_max_length)
         return null;
 
-    // 3. 명령어 접두사('!') 여부 확인
+    // 3. 명령어 접두사('!') 여부 확인 — " ! 검색어"도 "!검색어"로 인식
+    text = text.replace(/^\s*!\s*/, '!');
     if (!text.startsWith('!'))
         return null;
 
@@ -197,7 +198,7 @@ async function handleCommand(type, text, displayName, _input) {
     // 14. 봇 건의 및 피드백 로깅
     if (group === 'suggest') {
         setCooldown(cmd);
-        return _emitLog(`${displayName} 님, 접수되었습니다. 감사합니다. (쿨타임 3분)`);
+        return _emitLog(`${displayName} 님, 접수되었습니다. 감사합니다. (쿨타임 2분)`);
     }
 
     return null;
@@ -238,7 +239,7 @@ function handleEpisodeCommand(cmd, args, _input) {
     if (args[0].length < cfg.input.search_min_length) {
         _input.warn = cfg.subtitle_score.warn_base; // 너무 짧은 악의적 검색어엔 페널티 부여
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. (쿨타임 3분)`;
+        return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. (쿨타임 2분)`;
     }
 
     // 10-5. 비속어 필터링: 검색어에 비속어가 포함되어 있으면 즉시 차단
@@ -257,7 +258,7 @@ function handleEpisodeCommand(cmd, args, _input) {
     if (searchInfo.length <= 0) {
         _input.warn = cfg.subtitle_score.warn_base; // 결과 없음 페널티
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 대사를 정확히 입력하세요. (쿨타임 3분)`;
+        return `⚠️ 대사를 정확히 입력하세요. (쿨타임 2분)`;
     }
 
     if (searchInfo && searchInfo.length > 0) {
@@ -338,11 +339,11 @@ function handleEpisodeCommand(cmd, args, _input) {
                 return {
                     msg: `📜 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
                         firstResult.subInfo.title, retryPattern[0])}" 에 등장하며 ` +
-                        `${message} 정확도: ${firstResult.unicodescore}% (쿨타임 3분)`,
+                        `${message} 정확도: ${firstResult.unicodescore}% (쿨타임 2분)`,
                     proc: function (attempt) {
                         return `📜 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
                             firstResult.subInfo.title, retryPattern[attempt])}" 에 등장하며 ` +
-                            `${message} 정확도: ${firstResult.unicodescore}%  (쿨타임 3분)`;
+                            `${message} 정확도: ${firstResult.unicodescore}%  (쿨타임 2분)`;
                     }
                 };
             } else {
@@ -350,16 +351,19 @@ function handleEpisodeCommand(cmd, args, _input) {
                     const mapped = validResults.map((r, i) => {
                         const rankEmoji = toUnicodeNumber2((i + 1).toString());
                         const title = insertSpaces(r.subInfo.shorten, retryPattern[attempt]);
-                        const timeMsg = r.outOfbounds ? `스트리밍X` : `${r.emoji} ${r.timestr}`;
+                        const timeMsg = r.outOfbounds ?
+                            `스트리밍X` :
+                            `${r.emoji} ${r.timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
+
                         return {
-                            n: `${rankEmoji} ${r.unicodenum}화 ${title} (${timeMsg.replace(/ /g, '')}) 일치:${r.unicodescore}%`,
-                            s: `${rankEmoji} ${r.unicodenum}화 (${timeMsg.replace(/ /g, '')}) 일치:${r.unicodescore}%`
+                            n: `${rankEmoji} ${r.unicodenum}화 ${title} (${timeMsg.replace(/ /g, '')})`,
+                            s: `${rankEmoji} ${r.unicodenum}화 (${timeMsg.replace(/ /g, '')})`
                         };
                     });
-                    const WrongMsg = "⚠️ 입력한 대사에 오탈자가 있어 결과가 정확하지 않음.";
+                    const WrongMsg = "⚠️ 대사를 정확히 입력하세요.";
                     return {
-                        n: `${WrongMsg} ${mapped.map(e => e.n).join(' ')} (쿨타임 3분)`,
-                        s: `${WrongMsg} ${mapped.map(e => e.s).join(' ')} (쿨타임 3분)`
+                        n: `${WrongMsg} ${mapped.map(e => e.n).join(' ')} (쿨타임 2분)`,
+                        s: `${WrongMsg} ${mapped.map(e => e.s).join(' ')} (쿨타임 2분)`
                     };
                 };
 
@@ -369,7 +373,7 @@ function handleEpisodeCommand(cmd, args, _input) {
                         if (attempt === 1)
                             return makeMsg(attempt).s;
                         else
-                            return '⚠️ 출력에 실패했습니다. (쿨타임 3분)'
+                            return '⚠️ 출력에 실패했습니다. (쿨타임 2분)'
                     }
                 };
             }
@@ -379,7 +383,7 @@ function handleEpisodeCommand(cmd, args, _input) {
     // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시
     _input.warn = cfg.subtitle_score.warn_base;
     setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-    return `⚠️ 대사를 정확히 입력하세요. (쿨타임 3분)`;
+    return `⚠️ 대사를 정확히 입력하세요. (쿨타임 2분)`;
 }
 
 function handleDateCommand(cmd, args) {
@@ -467,7 +471,7 @@ function handleDateCommand(cmd, args) {
             }
 
             const overlapStr = overlaps.join(" 및 ");
-            return `🗓️ [${reqDateStr}] 해당 날짜에 ${overlapStr} 이(가) 방영될 예정이고 🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 3분)`;
+            return `🗓️ [${reqDateStr}] 해당 날짜에 ${overlapStr} 이(가) 방영될 예정이고 🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 2분)`;
         }
     };
 
@@ -604,9 +608,7 @@ function noticeChangeEpisode() {
                         { w: 1, t: `📍"!날짜" 를 입력하면 해당 날짜의 에피소드 회차를 확인할 수 있습니다.` },
                         { w: 1, t: `📍"!몇화 <대사>"를 입력하면 해당 대사의 등장 시간을 확인할 수 있습니다. (예: !몇화 괜히똥만쌌네)` },
                         { w: 1, t: `📍"!몇화 <숫자>" 입력하면 해당 회차의 시작 시간을 확인할 수 있습니다. (예: !몇화 124)` },
-                        { w: 1, t: `📍"!건의 <할말>" 을 입력하면 개발자에게 건의할 수 있습니다. (회차정보 오류나 기타 등등)` },
-                        { w: 3, t: `❗대사 검색 명령어는 다른 명령어에 비해 개별 쿨타임 가중치가 높게 적용됩니다. (오·남용 방지)` },
-                        { w: 2, t: `❗에피소드 시작 후 20초 및 종료 20초 전에는 봇 명령어가 처리되지 않습니다.` }
+                        { w: 1, t: `📍"!건의 <할말>" 을 입력하면 개발자에게 건의할 수 있습니다. (회차정보 오류나 기타 등등)` }
                     ];
 
                     const selectedMessage = (function (msg) { // 가중치 기반 랜덤 선택
@@ -659,10 +661,10 @@ function printNextEpisode(cmd, rtn) {
     setCooldown(cmd);
     return {
         msg: `👉🏻 다음 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
-            `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 3분)`,
+            `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`,
         proc: function (attempt) {
             return `👉🏻 다음 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
-                `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 3분)`;
+                `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`;
         }
     };
 }
@@ -729,10 +731,10 @@ function printNowEpisode(rtn) {
     return {
         // 3. 응답 텍스트 포맷 (재시도 회차에 맞춘 스팸 회피용 공백 치환 포함)
         msg: `🎬 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
-            `🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 3분)`,
+            `🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 2분)`,
         proc: function (attempt) {
             return `🎬 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
-                `🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 3분)`;
+                `🕒 남은 시간은 ${timestr} 초 입니다. (쿨타임 2분)`;
         }
     };
 };
@@ -763,10 +765,10 @@ function printNumEpisode(rtn, num) {
     return {
         // 4. 예정 시각 및 에피소드 제목 안내 텍스트 반환
         msg: `🔜 예정 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
-            `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 3분)`,
+            `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`,
         proc: function (attempt) {
             return `🔜 예정 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
-                `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 3분)`;
+                `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`;
         }
     };
 }
