@@ -39,6 +39,17 @@ function toJamo(str) {
     return result;
 }
 
+// ─── 경음→평음 정규화 (relaxed jamo) ────────────────────────
+
+function relaxJamo(jamoStr) {
+    return jamoStr
+        .replace(/ㄲ/g, 'ㄱ')
+        .replace(/ㄸ/g, 'ㄷ')
+        .replace(/ㅃ/g, 'ㅂ')
+        .replace(/ㅆ/g, 'ㅅ')
+        .replace(/ㅉ/g, 'ㅈ');
+}
+
 // ─── 발음 정규화 (연음/거센소리/ㅎ탈락) ─────────────────────
 
 const JONG_TO_CHO = {
@@ -176,7 +187,14 @@ function tokenCoverage(token, target) {
     const pronCov4 = ngramCoverage(pronToken, pronTarget, 4);
     const pronScore = pronCov3 * 0.4 + pronCov4 * 0.6;
 
-    return Math.max(charScore, jamoScore, pronScore);
+    // 경음→평음 정규화 비교
+    const relaxedJamoToken = relaxJamo(jamoToken);
+    const relaxedJamoTarget = relaxJamo(jamoTarget);
+    const relaxedCov3 = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 3);
+    const relaxedCov4 = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 4);
+    const relaxedScore = relaxedCov3 * 0.4 + relaxedCov4 * 0.6;
+
+    return Math.max(charScore, jamoScore, pronScore, relaxedScore);
 }
 
 // ─── 텍스트 유사도 (통합) ───────────────────────────────────
@@ -221,7 +239,14 @@ function textSimilarity(query, target) {
         + (ngramCoverage(pronQ, pronT, 4) * 0.35)
         + (ngramCoverage(pronQ, pronT, 5) * 0.35);
 
-    const overallCoverage = Math.max(charCov, jamoCov, pronCov);
+    // 4. 경음→평음 정규화 자모 n-gram 커버리지
+    const relaxedJamoQ = relaxJamo(jamoQ);
+    const relaxedJamoT = relaxJamo(jamoT);
+    const relaxedCov = (ngramCoverage(relaxedJamoQ, relaxedJamoT, 3) * 0.3)
+        + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 4) * 0.35)
+        + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 5) * 0.35);
+
+    const overallCoverage = Math.max(charCov, jamoCov, pronCov, relaxedCov);
 
     // 4. 토큰별 AND 매칭
     const rawTokens = query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean);
@@ -395,9 +420,32 @@ class SearchEngine {
                     if (jamoCombined[i + j] === jamoQuery[j]) matches++;
                 }
                 if (matches / jamoQuery.length >= 0.75) {
-                    // 매칭 위치에 해당하는 아이템 인덱스 찾기 (자모 인덱스 → 문자 인덱스 변환 근사)
                     const approxCharPos = Math.floor(i * combinedText.length / jamoCombined.length);
                     const approxCharEnd = Math.floor((i + jamoQuery.length) * combinedText.length / jamoCombined.length);
+
+                    for (const range of indexRanges) {
+                        if (approxCharPos < range.end && approxCharEnd > range.start) {
+                            matchedIndices.add(range.index);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 경음→평음 정규화 자모 퍼지 매칭
+        if (matchedIndices.size === 0) {
+            const relaxedQuery = relaxJamo(toJamo(query));
+            const relaxedCombined = relaxJamo(toJamo(combinedText));
+
+            for (let i = 0; i <= relaxedCombined.length - relaxedQuery.length; i++) {
+                let matches = 0;
+                for (let j = 0; j < relaxedQuery.length; j++) {
+                    if (relaxedCombined[i + j] === relaxedQuery[j]) matches++;
+                }
+                if (matches / relaxedQuery.length >= 0.65) {
+                    const approxCharPos = Math.floor(i * combinedText.length / relaxedCombined.length);
+                    const approxCharEnd = Math.floor((i + relaxedQuery.length) * combinedText.length / relaxedCombined.length);
 
                     for (const range of indexRanges) {
                         if (approxCharPos < range.end && approxCharEnd > range.start) {
@@ -437,8 +485,15 @@ class SearchEngine {
             jamoTrigrams.push(jamoQuery.substring(i, i + 3));
         }
 
+        // 경음→평음 정규화 자모 trigram
+        const relaxedJamoQuery = relaxJamo(jamoQuery);
+        const relaxedTrigrams = [];
+        for (let i = 0; i <= relaxedJamoQuery.length - 3; i++) {
+            relaxedTrigrams.push(relaxedJamoQuery.substring(i, i + 3));
+        }
+
         const additionalMatches = [];
-        if (queryBigrams.length > 0 || jamoTrigrams.length > 0) {
+        if (queryBigrams.length > 0 || jamoTrigrams.length > 0 || relaxedTrigrams.length > 0) {
             for (const item of this.processedData) {
                 const alreadyFound = combinedResults.some(r => r.item.key === item.key);
                 if (alreadyFound) continue;
@@ -458,9 +513,20 @@ class SearchEngine {
                 }
                 const jamoHitRate = jamoTrigrams.length > 0 ? jamoHits / jamoTrigrams.length : 0;
 
-                const hitRate = Math.max(charHitRate, jamoHitRate);
+                // 경음→평음 정규화 자모 trigram 히트
+                const relaxedCombined = relaxJamo(jamoCombined);
+                let relaxedHits = 0;
+                for (const tg of relaxedTrigrams) {
+                    if (relaxedCombined.includes(tg)) relaxedHits++;
+                }
+                const relaxedHitRate = relaxedTrigrams.length > 0 ? relaxedHits / relaxedTrigrams.length : 0;
 
-                if (hitRate >= 0.2) {
+                // char/jamo 매칭은 임계 0.2, relaxed만 높을 때는 0.5 (오탐 방지)
+                const baseHitRate = Math.max(charHitRate, jamoHitRate);
+                const hitRate = Math.max(baseHitRate, relaxedHitRate);
+                const threshold = baseHitRate >= 0.2 ? 0.2 : 0.5;
+
+                if (hitRate >= threshold) {
                     additionalMatches.push({
                         key: item.key,
                         items: item.items,
@@ -522,10 +588,13 @@ class SearchEngine {
                         }
                     }
 
-                    const overallScore = Math.max(
-                        Math.round((1 - result.fuseScore) * 100),
-                        Math.round(bestSimScore * 100)
-                    );
+                    // textSimilarity 기반 점수를 주 점수로, fuseScore는 보조로만 사용
+                    // fuseScore만 높고 textSimilarity가 낮으면 과대평가 방지
+                    const simScoreVal = Math.round(bestSimScore * 100);
+                    const fuseScoreVal = Math.round((1 - result.fuseScore) * 100);
+                    const overallScore = simScoreVal > 0
+                        ? Math.max(simScoreVal, Math.min(fuseScoreVal, simScoreVal + 5))
+                        : Math.min(fuseScoreVal, 30);
 
                     finalResults.push({
                         key: result.key,
