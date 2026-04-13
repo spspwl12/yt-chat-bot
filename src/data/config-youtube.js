@@ -15,14 +15,14 @@ module.exports = {
     // ─── 쿨타임 설정 ────────────────────────────────────────
     cooldown: {
         mode: "global",        // 'global' = 전체 명령어 공유 쿨타임, 'per-command' = 명령어 그룹별 개별 쿨타임
-        time_min: 3,                // 쿨타임 시간 (분)
-        error_offset_min: 2,        // 에러 발생 시 쿨타임 차감량 (분) → 실질 대기 = time_min - error_offset_min
+        time_min: 2,                // 쿨타임 시간 (분)
+        error_offset_min: 1,        // 에러 발생 시 쿨타임 차감량 (분) → 실질 대기 = time_min - error_offset_min
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
         text_min_length: 3,         // 명령어 텍스트 최소 길이
         text_max_length: 50,        // 명령어 텍스트 최대 길이
-        search_min_length: 4,       // 대사 검색 시 최소 글자 수
+        search_min_length: 3,       // 대사 검색 시 최소 글자 수
         boundary_sec: 20,           // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
     },
     // ─── 대사 검색 민감도 ────────────────────────────────────────
