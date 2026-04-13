@@ -9,15 +9,17 @@ pHash (Perceptual Hash) 기반 영상 핑거프린팅으로 **현재 방영 중�
 
 ## ✨ 주요 기능
 
-### 🎬 실시간 회차 인식
-- C언어로 작성된 pHash 검색 엔진이 라이브 스트림에서 20초 클립을 캡처하여 DB의 영상 핑거프린트와 매칭
-- 현재 방영 중인 회차와 시점(초 단위)을 자동 인식
-- 다수결(과반) 검증으로 매칭 신뢰도 보장
-- `edit_time`(편집된 구간) 반영으로 실제 스트리밍 시간 정확도 보정
+### 🎬 실시간 스트리밍 & 회차 인식
+- **단일 파이프라인 다운로드:** `yt-dlp`와 `ffmpeg`를 파이프 통신으로 연결해 수시로 프로세스를 띄우는 오버헤드를 없애고 20초 단위 세그먼트를 매끄럽게 추출
+- **데몬 모드 검색 엔진:** C언어로 작성된 pHash 엔진(`searcher.exe`)이 백그라운드 데몬으로 상주하며 로드된 DB를 캐싱해 빛의 속도로 파일 매칭 수행
+- 현재 방영 중인 회차와 시점(초 단위)을 자동 인식 및 과반수(다수결) 검증
+- `edit_time`(편집된 구간) 반영으로 실제 스트리밍 재생 시간에 맞추어 정확도 보정
 
 ### 📜 자막 기반 대사 검색 ( 선택 )
 - SBS 공식 사이트의 자막 데이터를 활용한 대사 검색
-- 오타 허용 및 유사도 기반 랭킹 (Jamo 분해 비교)
+- **9종 한국어 오타/구어체 자동 정규화** (경음↔평음, 격음↔평음, ㅐ↔ㅔ, ㅗ↔ㅜ, ㅘ↔ㅝ 등)
+- 오타 허용 및 유사도 기반 랭킹 (Jamo 분해 + 발음 정규화 + relaxed 비교 4중 레이어)
+- 자모/발음/relaxed 사전 캐싱으로 검색 속도 최적화
 - 검색된 대사의 등장 예정 시간 계산
 
 ### 🛡️ 도배 방지 & 자동 차단
@@ -25,6 +27,13 @@ pHash (Perceptual Hash) 기반 영상 핑거프린팅으로 **현재 방영 중�
 - 누적 경고 20회 도달 시 YouTube 채팅 자동 차단 (InnerTube API)
 - 비속어 필터링
 - 대사 검색 오·남용 시 가중 페널티 부여
+
+### 🖥️ 웹 대시보드 (컨트롤 패널)
+- `http://localhost:12345` 에 접속해 봇 상태 실시간 모니터링
+- **실시간 채팅 스트리밍** 및 사용자 원클릭 밴/차단
+- 대사 검색 로그 및 명령어 사용 내역 실시간 확인
+- 스팸(도배) 경고 목록 관리 및 봇 챗봇 응답 음소거(Mute) 기능 지원
+- 서버 설정 즉시 변경 (config-youtube.js 실시간 반영)
 
 ### 🔐 InnerTube HTTP/2 API
 - YouTube InnerTube API 직접 호출 (**API 할당량 제한 없음**)
@@ -78,6 +87,9 @@ node src/index.js
 ---
 
 ## 💬 채팅 명령어
+
+> **명령어 접두사 `!`는 앞뒤 공백을 허용합니다.**  
+> `!몇화`, `! 몇화`, ` ! 몇화` 모두 동일하게 인식됩니다.
 
 ### 회차 정보
 
@@ -161,25 +173,36 @@ node src/index.js
 ### 시스템 흐름
 
 ```
-라이브 스트림 → yt-dlp (20초 클립) → FFmpeg (프레임 추출) → searcher.exe (pHash 매칭)
-                                                                    ↓
-YouTube InnerTube API ← commands.js (명령어 처리) ← search.js (회차/시간 계산)
-       ↕                        ↕
-  채팅 읽기/쓰기          spam-guard.js (도배 차단)
+[비디오 파이프라인]
+라이브 스트림 → yt-dlp (stdout) → FFmpeg (stdin) → 20초 세그먼트(.mp4) 생성
+                                                            ↓
+[검색 데몬]                                             searcher.exe (상시구동 데몬)
+                                                            ↓ 매칭 결과 JSON
+[데이터 흐름]                                            search.js (회차 분석)
+YouTube InnerTube API ← commands.js (명령어)  ←-----------┘
+       ↕                        ↕                                   |
+  채팅 읽기/쓰기          spam-guard.js (도배 차단)                event-bus.js
+       ↓                                                            ↓
+chat-history.js  ←-----------  웹 대시보드 (web-server.js)  <--------
 ```
 
 ### 핵심 모듈
 
 | 파일 | 역할 |
 |------|------|
-| `src/index.js` | 메인 폴링 루프 + PM2 라이프사이클 |
+| `src/index.js` | 메인 폴링 루프 + PM2 라이프사이클 + 서비스 시작점 |
 | `src/innertube.js` | InnerTube HTTP/2 API (인증, 채팅 수신/발신, 차단) |
 | `src/commands.js` | 명령어 파싱, 쿨타임, 에피소드 알림, 대사 검색 |
-| `src/video-matcher/search.js` | pHash 기반 영상 매칭, 시간 계산, edit_time 보정 |
-| `src/video-matcher/textsearcher.js` | 자막 유사도 검색 엔진 (Jamo 기반) |
+| `src/video-matcher/search.js` | 매칭 결과 처리, 편집 시간(edit_time) 보정 통합 모듈 |
+| `src/video-matcher/live-downloader.js` | yt-dlp + ffmpeg 단일 파이프라인 (20초 스트림 분할) |
+| `src/video-matcher/live-searcher.js` | searcher.exe 데몬 매니저 (큐 기반 연속 검색 처리) |
+| `src/video-matcher/textsearcher.js` | 자막 유사도 검색 엔진 (Jamo 기반, 9종 오타 정규화, 사전 캐싱 최적화) |
 | `src/video-indexer/indexer.js` | 영상 디렉토리 → 핑거프린트 DB 생성 |
 | `src/video-indexer/searcher.js` | Node.js 기반 핑거프린트 검색기 (단일/멀티스레드) |
 | `src/spam-guard.js` | 슬라이딩 윈도우 도배 감지 + 자동 차단 |
+| `src/web-server.js` | 웹 대시보드 백엔드 (SSE 실시간 로그, 밴/차단/설정 관리) |
+| `src/chat-history.js` | 대시보드용 최근 유튜브 채팅 버퍼 캐시 |
+| `src/event-bus.js` | 모듈 간 의존성을 낮추는 전역 이벤트 큐 (검색/명령어 로그 전송) |
 | `src/greeting.js` | 인사 응답 생성 |
 | `src/func.js` | 유틸리티 함수 (시간 변환, 텍스트 포맷팅 등) |
 | `csource/searcher/` | C언어 pHash 검색 엔진 소스 |
@@ -213,10 +236,16 @@ youtube-chat-bot/
 │   ├── commands.js           # 명령어 핸들러
 │   ├── greeting.js           # 인사 응답
 │   ├── spam-guard.js         # 도배 방지
+│   ├── web-server.js         # 웹 대시보드 서버
+│   ├── chat-history.js       # 실시간 채팅 버퍼 
+│   ├── event-bus.js          # 전역 이벤트 중계
 │   ├── func.js               # 유틸리티 함수
 │   ├── path.js               # 경로 헬퍼
+│   ├── public/               # 웹 대시보드 프론트엔드 (HTML/CSS/JS)
 │   ├── video-matcher/        # 영상 매칭 모듈
-│   │   ├── search.js         #   시간 계산 + pHash 매칭
+│   │   ├── search.js         #   시간 계산, 전체 파이프라인 총괄
+│   │   ├── live-downloader.js#   yt-dlp + ffmpeg 다운로드 파이프라인
+│   │   ├── live-searcher.js  #   searcher.exe 데몬 매니저
 │   │   └── textsearcher.js   #   자막 검색 엔진
 │   ├── video-indexer/        # 핑거프린트 생성 도구
 │   │   ├── indexer.js        #   영상 → 핑거프린트 변환
