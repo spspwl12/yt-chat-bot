@@ -356,14 +356,14 @@ function handleEpisodeCommand(cmd, args, _input) {
                             `${r.emoji} ${r.timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
 
                         return {
-                            n: `${rankEmoji} ${r.unicodenum}화 ${title} (${timeMsg.replace(/ /g, '')})`,
-                            s: `${rankEmoji} ${r.unicodenum}화 (${timeMsg.replace(/ /g, '')})`
+                            n: `${rankEmoji}${r.unicodenum})${title}${timeMsg.replace(/ /g, '')}`,
+                            s: `${rankEmoji}${r.unicodenum}화${timeMsg.replace(/ /g, '')}`
                         };
                     });
-                    const WrongMsg = "⚠️ 대사를 정확히 입력하세요.";
+                    const WrongMsg = "⚠️ 결과가 부정확함.";
                     return {
-                        n: `${WrongMsg} ${mapped.map(e => e.n).join(' ')} (쿨타임 2분)`,
-                        s: `${WrongMsg} ${mapped.map(e => e.s).join(' ')} (쿨타임 2분)`
+                        n: `${WrongMsg} ${mapped.map(e => e.n).join('')} (쿨타임 2분)`,
+                        s: `${WrongMsg} ${mapped.map(e => e.s).join('')} (쿨타임 2분)`
                     };
                 };
 
