@@ -437,6 +437,7 @@
             <div id="status-dot" class="status-dot"></div>
             <span id="status-text">Disconnected</span>
         </div>
+        </div>
     </div>
 
     <div class="content">
@@ -461,9 +462,10 @@
                     <p id="stat-cmd-count" style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0</p>
                 </div>
             </div>
-            <div style="display:flex; gap:12px;">
+            <div style="display:flex; gap:12px; margin-top: 20px;">
                 <button class="btn" id="btn-refresh-state">Force Refresh</button>
                 <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted: OFF</button>
+                <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot Bot</button>
             </div>
         </div>
 
@@ -494,7 +496,8 @@
                         <tr>
                             <th>Name</th>
                             <th>Channel ID</th>
-                            <th>Warns</th>
+                            <th>Usage</th>
+                            <th>Remaining</th>
                             <th>Reason</th>
                             <th>Action</th>
                         </tr>
@@ -850,24 +853,69 @@
         }
 
         // ── Spam Render ──
-        function renderSpam(spammers) {
+        function fmtRemaining(ms) {
+            if (!ms || ms <= 0) return '<span style="color:var(--text-dim)">—</span>';
+            const totalSec = Math.ceil(ms / 1000);
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            if (h > 0) return `${h}시간 ${m}분 ${s}초`;
+            if (m > 0) return `${m}분 ${s}초`;
+            return `${s}초`;
+        }
+
+        let spamData = [];
+        let spamReceivedAt = 0;
+        let spamTimer = null;
+
+        function renderSpamTable() {
             const tbody = document.getElementById('spam-tbody');
             tbody.innerHTML = '';
-            spammers.forEach(u => {
+            const elapsed = Date.now() - spamReceivedAt;
+            spamData.forEach((u, i) => {
                 const tr = document.createElement('tr');
                 const actionBtn = u.block ?
                     `<button class="btn btn-ban btn-sm" onclick="execDeleteSpam('${u.channelId}')">Remove</button>` :
                     `<span class="badge badge-green">Monitoring</span>`;
 
+                const currentRemaining = u.block ? -1 : Math.max(0, (u.remainingMs || 0) - elapsed);
+                const remainingText = u.block ? '<span style="color:var(--text-dim)">차단됨</span>' :
+                    `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
+
+                const usageText = u.commandCount != null ?
+                    `<span class="badge badge-blue">${u.commandCount}회</span>` :
+                    '<span style="color:var(--text-dim)">—</span>';
+
                 tr.innerHTML = `
                     <td style="font-weight:600;">${escapeHtml(u.name)}</td>
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
-                    <td><span class="badge badge-yellow">${u.count}</span></td>
+                    <td>${usageText}</td>
+                    <td class="spam-remaining" data-idx="${i}">${remainingText}</td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
                     <td>${actionBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function tickSpamTimers() {
+            const elapsed = Date.now() - spamReceivedAt;
+            document.querySelectorAll('.spam-remaining').forEach(td => {
+                const idx = parseInt(td.dataset.idx);
+                const u = spamData[idx];
+                if (!u || u.block) return;
+                const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
+                td.innerHTML = `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
+            });
+        }
+
+        function renderSpam(spammers) {
+            spamData = spammers;
+            spamReceivedAt = Date.now();
+            renderSpamTable();
+            
+            if (spamTimer) clearInterval(spamTimer);
+            spamTimer = setInterval(tickSpamTimers, 1000);
         }
 
         // ── Search Log Render ──
@@ -1060,6 +1108,13 @@
                 showToast('JSON 포맷 완료');
             } catch(e) {
                 showToast('JSON 파싱 에러: ' + e.message, true);
+            }
+        };
+
+        window.rebootBot = function() {
+            if (confirm('정말로 봇을 재부팅하시겠습니까? (설정 반영 등에 필요합니다)\n\n※ 서버/콘솔 외부 환경에서 자동 재시작(PM2, 스크립트 반복문 등) 기능이 켜져 있어야 다시 켜집니다.')) {
+                ws.send(JSON.stringify({ action: 'reboot_bot' }));
+                showToast('재부팅 명령을 전송했습니다. 연결이 곧 끊어집니다.', true);
             }
         };
 

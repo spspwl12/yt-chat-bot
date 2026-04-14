@@ -126,17 +126,22 @@ function parseWSFrame(buffer) {
 function broadcastSpam() {
     const spammers = [];
     if (spamGuardRef) {
-        // 경고자 추가
+        const now = Date.now();
+        // 명령어 사용자 추가 (commandHistory 기준 penaltyDuration 이내)
         for (const [channelId, data] of spamGuardRef.tracker.entries()) {
-            if (data.warns > 0 && !spamGuardRef.banned.has(channelId)) {
-                spammers.push({
-                    channelId,
-                    count: data.warns,
-                    name: '경고 누적 닉네임 불명',
-                    block: false,
-                    reason: '경고 누적'
-                });
-            }
+            if (spamGuardRef.banned.has(channelId)) continue;
+            const info = spamGuardRef.getTrackerInfo(channelId);
+            if (!info || info.commandCount <= 0) continue;
+            spammers.push({
+                channelId,
+                count: data.warns,
+                name: (info && info.displayName) || data.displayName || '이름 불명',
+                block: false,
+                reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
+                remainingMs: info.remainingMs,
+                totalMs: info.totalMs,
+                commandCount: info.commandCount
+            });
         }
         // 밴된 유저 추가
         for (const [channelId, data] of spamGuardRef.banned.entries()) {
@@ -197,9 +202,19 @@ async function handleAction(client, req) {
         const spammers = [];
         if (spamGuardRef) {
             for (const [channelId, data] of spamGuardRef.tracker.entries()) {
-                if (data.warns > 0 && !spamGuardRef.banned.has(channelId)) {
-                    spammers.push({ channelId, count: data.warns, name: '경고 누적 닉네임 불명', block: false, reason: '경고 누적' });
-                }
+                if (spamGuardRef.banned.has(channelId)) continue;
+                const info = spamGuardRef.getTrackerInfo(channelId);
+                if (!info || info.commandCount <= 0) continue;
+                spammers.push({
+                    channelId,
+                    count: data.warns,
+                    name: (info && info.displayName) || data.displayName || '이름 불명',
+                    block: false,
+                    reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
+                    remainingMs: info.remainingMs,
+                    totalMs: info.totalMs,
+                    commandCount: info.commandCount
+                });
             }
             for (const [channelId, data] of spamGuardRef.banned.entries()) {
                 spammers.push({ channelId, count: spamGuardRef.warnLimit || 0, name: data.displayName || '이름 불명', block: true, reason: data.reason || '도배' });
@@ -276,6 +291,14 @@ async function handleAction(client, req) {
         } catch(e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
         }
+    }
+    // ── 새 기능: 봇 재부팅 (설정 리로드) ──
+    else if (action === 'reboot_bot') {
+        console.log("🔄 관리자 웹에서 재부팅 요청을 받았습니다. 프로세스를 종료합니다...");
+        sendWSFrame(client, JSON.stringify({ action: 'notification', payload: 'Rebooting...' }));
+        setTimeout(() => {
+            process.exit(0);
+        }, 1000);
     }
     // ── 새 기능: 검색 로그 ──
     else if (action === 'getSearchLogs') {
