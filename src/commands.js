@@ -360,7 +360,7 @@ function handleEpisodeCommand(cmd, args, _input) {
                             s: `${rankEmoji}${r.unicodenum}화${timeMsg.replace(/ /g, '')}`
                         };
                     });
-                    const WrongMsg = "⚠️ 결과가 부정확함.";
+                    const WrongMsg = "⚠️ 대사를 정확히 입력하세요.";
                     return {
                         n: `${WrongMsg} ${mapped.map(e => e.n).join('')} (쿨타임 2분)`,
                         s: `${WrongMsg} ${mapped.map(e => e.s).join('')} (쿨타임 2분)`
@@ -599,24 +599,24 @@ function noticeChangeEpisode() {
 
                 // 5. 확률(tip_chance)에 맞춰 사용자 가이드(꿀팁) 중 한 가지 랜덤 추가 발송
                 if (Math.random() < cfg.notice.tip_chance) {
-                    const messages = [  // w: weight, t: text
-                        { w: 2, t: `📍"!몇화" 를 입력하면 현재 회차를 확인할 수 있습니다.` },
-                        { w: 1, t: `📍"!다음화" 를 입력하면 다음 회차를 확인할 수 있습니다.` },
-                        { w: 1, t: `📍"!마지막화" 를 입력하면 마지막 회차를 확인할 수 있습니다.` },
-                        { w: 1, t: `📍"!명령어" 를 입력하면 봇 명령어 목록을 볼 수 있습니다.` },
-                        { w: 1, t: `📍"!시간표" 를 입력하면 다음 회차부터 일정을 확인할 수 있습니다.` },
-                        { w: 1, t: `📍"!날짜" 를 입력하면 해당 날짜의 에피소드 회차를 확인할 수 있습니다.` },
-                        { w: 1, t: `📍"!몇화 <대사>"를 입력하면 해당 대사의 등장 시간을 확인할 수 있습니다. (예: !몇화 괜히똥만쌌네)` },
-                        { w: 1, t: `📍"!몇화 <숫자>" 입력하면 해당 회차의 시작 시간을 확인할 수 있습니다. (예: !몇화 124)` },
-                        { w: 1, t: `📍"!건의 <할말>" 을 입력하면 개발자에게 건의할 수 있습니다. (회차정보 오류나 기타 등등)` }
-                    ];
+                    // const messages = [  // w: weight, t: text
+                    //     { w: 2, t: `📍"!몇화" 를 입력하면 현재 회차를 확인할 수 있습니다.` },
+                    //     { w: 1, t: `📍"!다음화" 를 입력하면 다음 회차를 확인할 수 있습니다.` },
+                    //     { w: 1, t: `📍"!마지막화" 를 입력하면 마지막 회차를 확인할 수 있습니다.` },
+                    //     { w: 1, t: `📍"!명령어" 를 입력하면 봇 명령어 목록을 볼 수 있습니다.` },
+                    //     { w: 1, t: `📍"!시간표" 를 입력하면 다음 회차부터 일정을 확인할 수 있습니다.` },
+                    //     { w: 1, t: `📍"!날짜" 를 입력하면 해당 날짜의 에피소드 회차를 확인할 수 있습니다.` },
+                    //     { w: 1, t: `📍"!몇화 <대사>"를 입력하면 해당 대사의 등장 시간을 확인할 수 있습니다. (예: !몇화 괜히똥만쌌네)` },
+                    //     { w: 1, t: `📍"!몇화 <숫자>" 입력하면 해당 회차의 시작 시간을 확인할 수 있습니다. (예: !몇화 124)` },
+                    //     { w: 1, t: `📍"!건의 <할말>" 을 입력하면 개발자에게 건의할 수 있습니다. (회차정보 오류나 기타 등등)` }
+                    // ];
 
-                    const selectedMessage = (function (msg) { // 가중치 기반 랜덤 선택
-                        let r = Math.random() * msg.reduce((s, m) => s + m.w, 0);
-                        return msg.find(m => (r -= m.w) < 0).t;
-                    })(messages);
+                    // const selectedMessage = (function (msg) { // 가중치 기반 랜덤 선택
+                    //     let r = Math.random() * msg.reduce((s, m) => s + m.w, 0);
+                    //     return msg.find(m => (r -= m.w) < 0).t;
+                    // })(messages);
 
-                    sendChat(selectedMessage);
+                    // sendChat(selectedMessage);
                 }
             }, delay);
         }
