@@ -21,6 +21,8 @@ const spamGuard = new SpamGuard({
     windowSec: cfg.spam.spam_window_sec || 10,
     maxCount: cfg.spam.spam_max_count || 5,
     warnLimit: cfg.spam.spam_warn_limit || 3,
+    penaltyDurationHrs: cfg.spam.penalty_duration_hrs !== undefined ? cfg.spam.penalty_duration_hrs : 12,
+    penaltyAddSec: cfg.spam.penalty_add_sec || 0,
 });
 
 let running = true;
@@ -78,7 +80,7 @@ async function main() {
             }
 
             const messages = result.messages || [];
-            
+
             // 실시간 채팅을 대시보드 버퍼로 전송
             chatHistory.addMessages(messages);
             if (messages.length > 0) broadcastChat(messages);

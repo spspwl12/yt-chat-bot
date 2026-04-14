@@ -10,7 +10,9 @@ module.exports = {
     spam: {
         spam_window_sec: 300,       // 봇 경고 해제 시간 s 단위  ( 300 : 5분 )
         spam_max_count: 1,          // 봇이 몇번 경고를 참을건지 ( 이 횟수가 넘어가면 경고시작 )
-        spam_warn_limit: 100         // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
+        spam_warn_limit: 50,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
+        penalty_duration_hrs: 12,   // 명령어 입력 기록 유지 시간 (기본 12시간)
+        penalty_add_sec: 300         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
     cooldown: {
