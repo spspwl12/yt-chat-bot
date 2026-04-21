@@ -146,7 +146,7 @@ async function handleCommand(type, text, displayName, _input) {
         setCooldown(cmd);
         return _emitLog('ℹ️ 명령어: !몇화, !다음화, !시간표, !건의, !마지막화, !날짜' +
             'ℹ️ 이 프로그램은 비공식 봇이며, SBS와는 아무런 관련이 없습니다. ' +
-            'ℹ️ 명령은 3분마다 가능합니다. (도배 방지) ');
+            'ℹ️ 명령은 2분마다 가능합니다. (도배 방지) ');
     }
 
     // 10. 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
