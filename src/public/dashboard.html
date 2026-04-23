@@ -418,6 +418,62 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+
+        /* ── Sub Tabs ── */
+        .sub-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--surface-border);
+            width: fit-content;
+        }
+
+        .sub-tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 10px 24px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sub-tab-btn:not(:last-child) {
+            border-right: 1px solid var(--surface-border);
+        }
+
+        .sub-tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .sub-tab-btn.active {
+            color: var(--text-main);
+            background: rgba(139, 92, 246, 0.15);
+        }
+
+        .sub-tab-btn .sub-tab-count {
+            font-size: 0.72rem;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 7px;
+            border-radius: 10px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .sub-tab-btn.active .sub-tab-count {
+            background: rgba(139, 92, 246, 0.3);
+        }
+
+        .sub-panel { display: none; }
+        .sub-panel.active { display: block; animation: slideUp 0.25s ease forwards; }
     </style>
 </head>
 <body>
@@ -478,7 +534,7 @@
 
         <!-- Spam Users -->
         <div id="tab-spam" class="panel">
-            <h2>🛡️ Spam Warning List</h2>
+            <h2>🛡️ Spam Management</h2>
 
             <div class="section-card glass">
                 <h3 style="margin-top:0; margin-bottom: 14px; font-size:1rem;">Manual Add Block</h3>
@@ -490,21 +546,50 @@
                 </div>
             </div>
 
-            <div class="glass" style="border-radius: 14px; overflow: hidden;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Channel ID</th>
-                            <th>Usage</th>
-                            <th>Remaining</th>
-                            <th>Reason</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="spam-tbody">
-                    </tbody>
-                </table>
+            <div class="sub-tabs">
+                <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count" id="spam-warn-count">0</span></button>
+                <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count" id="spam-ban-count">0</span></button>
+            </div>
+
+            <div id="spam-warn-panel" class="sub-panel active">
+                <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                    <div class="log-scroll" style="max-height: 500px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Channel ID</th>
+                                    <th>Usage</th>
+                                    <th>Warns</th>
+                                    <th>Remaining</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="spam-warn-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="spam-ban-panel" class="sub-panel">
+                <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                    <div class="log-scroll" style="max-height: 500px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Channel ID</th>
+                                    <th>Reason</th>
+                                    <th>Banned At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="spam-ban-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -852,6 +937,18 @@
             });
         }
 
+        // ── Sub-tab switching ──
+        document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget;
+                const parent = target.closest('.panel');
+                parent.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+                parent.querySelectorAll('.sub-panel').forEach(p => p.classList.remove('active'));
+                target.classList.add('active');
+                document.getElementById(target.dataset.sub).classList.add('active');
+            });
+        });
+
         // ── Spam Render ──
         function fmtRemaining(ms) {
             if (!ms || ms <= 0) return '<span style="color:var(--text-dim)">—</span>';
@@ -864,35 +961,48 @@
             return `${s}초`;
         }
 
-        let spamData = [];
+        let spamWarnData = [];
+        let spamBanData = [];
         let spamReceivedAt = 0;
         let spamTimer = null;
 
-        function renderSpamTable() {
-            const tbody = document.getElementById('spam-tbody');
+        function renderSpamWarnTable() {
+            const tbody = document.getElementById('spam-warn-tbody');
             tbody.innerHTML = '';
             const elapsed = Date.now() - spamReceivedAt;
-            spamData.forEach((u, i) => {
+            spamWarnData.forEach((u, i) => {
                 const tr = document.createElement('tr');
-                const actionBtn = u.block ?
-                    `<button class="btn btn-ban btn-sm" onclick="execDeleteSpam('${u.channelId}')">Remove</button>` :
-                    `<span class="badge badge-green">Monitoring</span>`;
-
-                const currentRemaining = u.block ? -1 : Math.max(0, (u.remainingMs || 0) - elapsed);
-                const remainingText = u.block ? '<span style="color:var(--text-dim)">차단됨</span>' :
-                    `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
-
+                const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
                 const usageText = u.commandCount != null ?
                     `<span class="badge badge-blue">${u.commandCount}회</span>` :
                     '<span style="color:var(--text-dim)">—</span>';
+                const warnBadge = u.count > 0 ?
+                    `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>` :
+                    '<span class="badge badge-green">0</span>';
 
                 tr.innerHTML = `
                     <td style="font-weight:600;">${escapeHtml(u.name)}</td>
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
                     <td>${usageText}</td>
-                    <td class="spam-remaining" data-idx="${i}">${remainingText}</td>
+                    <td>${warnBadge}</td>
+                    <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderSpamBanTable() {
+            const tbody = document.getElementById('spam-ban-tbody');
+            tbody.innerHTML = '';
+            spamBanData.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${escapeHtml(u.name)}</td>
+                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
+                    <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
+                    <td style="color:var(--text-dim); font-size:0.8rem;">${u.bannedAt || '—'}</td>
+                    <td><button class="btn btn-ban btn-sm" onclick="execDeleteSpam('${u.channelId}')">Remove</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -902,17 +1012,23 @@
             const elapsed = Date.now() - spamReceivedAt;
             document.querySelectorAll('.spam-remaining').forEach(td => {
                 const idx = parseInt(td.dataset.idx);
-                const u = spamData[idx];
-                if (!u || u.block) return;
+                const u = spamWarnData[idx];
+                if (!u) return;
                 const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
                 td.innerHTML = `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
             });
         }
 
         function renderSpam(spammers) {
-            spamData = spammers;
+            spamWarnData = spammers.filter(u => !u.block);
+            spamBanData = spammers.filter(u => u.block);
             spamReceivedAt = Date.now();
-            renderSpamTable();
+
+            document.getElementById('spam-warn-count').innerText = spamWarnData.length;
+            document.getElementById('spam-ban-count').innerText = spamBanData.length;
+
+            renderSpamWarnTable();
+            renderSpamBanTable();
             
             if (spamTimer) clearInterval(spamTimer);
             spamTimer = setInterval(tickSpamTimers, 1000);
@@ -955,8 +1071,8 @@
             const tbody = document.getElementById('search-log-tbody');
             tbody.insertBefore(createSearchLogRow(data), tbody.firstChild);
             searchLogCount++;
-            // 50개 초과 시 오래된 행 제거
-            while (tbody.children.length > 50) tbody.removeChild(tbody.lastChild);
+            // 200개 초과 시 오래된 행 제거
+            while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
         }
 
         // ── Command Log Render ──
@@ -993,7 +1109,7 @@
             const tbody = document.getElementById('cmd-log-tbody');
             tbody.insertBefore(createCmdLogRow(data), tbody.firstChild);
             cmdLogCount++;
-            while (tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+            while (tbody.children.length > 300) tbody.removeChild(tbody.lastChild);
         }
 
         // ── Schedule Render ──

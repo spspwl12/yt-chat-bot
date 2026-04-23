@@ -30,8 +30,8 @@ function saveMuteState() {
 // ═══════════════════════════════════════
 //  로그 버퍼 (최근 N개 메모리 보관)
 // ═══════════════════════════════════════
-const MAX_SEARCH_LOGS = 50;
-const MAX_COMMAND_LOGS = 100;
+const MAX_SEARCH_LOGS = 200;
+const MAX_COMMAND_LOGS = 300;
 const searchLogs = [];
 const commandLogs = [];
 
@@ -135,11 +135,11 @@ function broadcastSpam() {
             spammers.push({
                 channelId,
                 count: data.warns,
+                warnLimit: spamGuardRef.warnLimit,
                 name: (info && info.displayName) || data.displayName || '이름 불명',
                 block: false,
                 reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
                 remainingMs: info.remainingMs,
-                totalMs: info.totalMs,
                 commandCount: info.commandCount
             });
         }
@@ -150,7 +150,8 @@ function broadcastSpam() {
                 count: spamGuardRef.warnLimit || 0,
                 name: data.displayName || '이름 불명',
                 block: true,
-                reason: data.reason || '도배'
+                reason: data.reason || '도배',
+                bannedAt: data.bannedAt || null
             });
         }
     }
@@ -208,16 +209,16 @@ async function handleAction(client, req) {
                 spammers.push({
                     channelId,
                     count: data.warns,
+                    warnLimit: spamGuardRef.warnLimit,
                     name: (info && info.displayName) || data.displayName || '이름 불명',
                     block: false,
                     reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
                     remainingMs: info.remainingMs,
-                    totalMs: info.totalMs,
                     commandCount: info.commandCount
                 });
             }
             for (const [channelId, data] of spamGuardRef.banned.entries()) {
-                spammers.push({ channelId, count: spamGuardRef.warnLimit || 0, name: data.displayName || '이름 불명', block: true, reason: data.reason || '도배' });
+                spammers.push({ channelId, count: spamGuardRef.warnLimit || 0, name: data.displayName || '이름 불명', block: true, reason: data.reason || '도배', bannedAt: data.bannedAt || null });
             }
         }
         sendWSFrame(client, JSON.stringify({ action: 'spam_list', payload: spammers }));
