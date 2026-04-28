@@ -236,6 +236,12 @@ function handleEpisodeCommand(cmd, args, _input) {
 
     // 10-4. 숫자 형식이 아닌 일반 텍스트가 인자로 넘어왔다고 가정하여 
     // 내부 자막 데이터세트를 기반으로 '대사 검색' 알고리즘 수행
+    if (cfg.input.enable_search === false) {
+        _input.warn = cfg.subtitle_score.warn_base; // 너무 짧은 악의적 검색어엔 페널티 부여
+        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+        return `⚠️ 대사 검색 기능이 비활성화되어 있습니다. (쿨타임 2분)`;
+    }
+
     if (args[0].length < cfg.input.search_min_length) {
         _input.warn = cfg.subtitle_score.warn_base; // 너무 짧은 악의적 검색어엔 페널티 부여
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));

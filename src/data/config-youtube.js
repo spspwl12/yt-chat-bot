@@ -24,6 +24,7 @@ module.exports = {
     input: {
         text_min_length: 3,         // 명령어 텍스트 최소 길이
         text_max_length: 50,        // 명령어 텍스트 최대 길이
+        enable_search: true,        // 대사 검색 기능 사용 여부
         search_min_length: 3,       // 대사 검색 시 최소 글자 수
         boundary_sec: 20,           // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
     },
