@@ -68,8 +68,8 @@ function relaxJamo(jamoStr) {
         .replace(/ㅞ/g, 'ㅚ')
         // ⑦ ㅘ/ㅝ 단순화 (와↔워 혼동)
         .replace(/ㅝ/g, 'ㅘ')
-        // ⑧ ㅢ → ㅣ (의→이, 가장 흔한 발음 변화)
-        .replace(/ㅢ/g, 'ㅣ')
+        // ⑧ ㅢ → ㅐ (의→에 조사 발음 오타 및 흔한 혼동 반영)
+        .replace(/ㅢ/g, 'ㅐ')
         // ⑨ ㅟ → ㅣ (위→이, 빠른 발음 시 축약)
         .replace(/ㅟ/g, 'ㅣ');
 }
@@ -190,8 +190,52 @@ function ngramSimilarity(a, b, n = 2) {
     return union === 0 ? 0 : intersection / union;
 }
 
-// ─── 토큰 커버리지 (문자+자모+발음+relaxed 4중) ────────────────────
-// _qc/_tc: { jamo, pron, relaxed } 사전 계산 캐시 (선택)
+// ─── 초성/중성/종성 성분별 유사도 ────────────────────────────
+
+function decomposeToComponents(str) {
+    const comps = [];
+    for (const ch of str) {
+        if (isHangulSyllable(ch)) {
+            comps.push(decompose(ch));
+        }
+    }
+    return comps;
+}
+
+/**
+ * 검색어와 대상 문자열을 초성/중성/종성 단위로 분해한 뒤,
+ * 슬라이딩 윈도우로 가장 성분 일치율이 높은 위치를 탐색.
+ * 예: "서언"(ㅅㅓ·ㅇㅓㄴ) vs "서원"(ㅅㅓ·ㅇㅝㄴ) → 5/6 = 0.83
+ */
+function componentCoverage(qComps, tComps) {
+    if (qComps.length === 0 || tComps.length === 0) return 0;
+    if (qComps.length > tComps.length) return 0;
+
+    let bestScore = 0;
+
+    for (let offset = 0; offset <= tComps.length - qComps.length; offset++) {
+        let matched = 0;
+        let total = 0;
+
+        for (let i = 0; i < qComps.length; i++) {
+            const q = qComps[i];
+            const t = tComps[offset + i];
+
+            total += 3;
+            if (q.cho === t.cho) matched++;
+            if (q.jung === t.jung) matched++;
+            if (q.jong === t.jong) matched++;
+        }
+
+        const score = matched / total;
+        if (score > bestScore) bestScore = score;
+    }
+
+    return bestScore;
+}
+
+// ─── 토큰 커버리지 (문자+자모+발음+relaxed+성분 5중) ────────────────────
+// _qc/_tc: { jamo, pron, relaxed, comps } 사전 계산 캐시 (선택)
 
 function tokenCoverage(token, target, _qc, _tc) {
     if (token.length <= 1) return target.includes(token) ? 1 : 0;
@@ -215,7 +259,12 @@ function tokenCoverage(token, target, _qc, _tc) {
     const relaxedScore = ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 3) * 0.4
         + ngramCoverage(relaxedJamoToken, relaxedJamoTarget, 4) * 0.6;
 
-    return Math.max(charScore, jamoScore, pronScore, relaxedScore);
+    // 초성/중성/종성 성분별 매칭
+    const qComps = _qc ? _qc.comps : decomposeToComponents(token);
+    const tComps = _tc ? _tc.comps : decomposeToComponents(target);
+    const compScore = componentCoverage(qComps, tComps);
+
+    return Math.max(charScore, jamoScore, pronScore, relaxedScore, compScore);
 }
 
 // ─── 텍스트 유사도 (통합) ───────────────────────────────────
@@ -241,11 +290,12 @@ function buildQueryCache(query) {
     const relaxed = relaxJamo(jamo);
     const rawTokens = query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean);
     const tokens = rawTokens.map(t => normalizeText(t)).filter(t => t.length >= 2);
+    const comps = decomposeToComponents(norm);
     const tokenCaches = tokens.map(t => {
         const j = toJamo(t);
-        return { norm: t, jamo: j, pron: toPronunciationJamo(t), relaxed: relaxJamo(j) };
+        return { norm: t, jamo: j, pron: toPronunciationJamo(t), relaxed: relaxJamo(j), comps: decomposeToComponents(t) };
     });
-    return { norm, jamo, pron, relaxed, tokens, tokenCaches };
+    return { norm, jamo, pron, relaxed, comps, tokens, tokenCaches };
 }
 
 function textSimilarity(query, target, qCache, tCache) {
@@ -277,7 +327,12 @@ function textSimilarity(query, target, qCache, tCache) {
         + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 4) * 0.35)
         + (ngramCoverage(relaxedJamoQ, relaxedJamoT, 5) * 0.35);
 
-    const overallCoverage = Math.max(charCov, jamoCov, pronCov, relaxedCov);
+    // 초성/중성/종성 성분별 매칭
+    const qComps = qCache ? qCache.comps : decomposeToComponents(normQ);
+    const tComps = tCache ? tCache.comps : decomposeToComponents(normT);
+    const componentCov = componentCoverage(qComps, tComps);
+
+    const overallCoverage = Math.max(charCov, jamoCov, pronCov, relaxedCov, componentCov);
 
     const tokens = qCache ? qCache.tokens : query.split(/[\s,.!?;:·\-—–'"()\[\]{}<>\/\\…]+/).filter(Boolean).map(t => normalizeText(t)).filter(t => t.length >= 2);
     const tokenCachesArr = qCache ? qCache.tokenCaches : null;
@@ -352,7 +407,8 @@ class SearchEngine {
                     normalizedText,
                     jamoText,
                     pronJamoText: toPronunciationJamo(item.text),
-                    relaxedJamoText: relaxJamo(jamoText)
+                    relaxedJamoText: relaxJamo(jamoText),
+                    components: decomposeToComponents(normalizedText)
                 };
             });
 
@@ -392,7 +448,7 @@ class SearchEngine {
         const normSearchQ = qCache ? qCache.norm : normalizeText(searchQuery);
 
         for (const item of items) {
-            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText, comps: item.components };
             const simScore = textSimilarity(searchQuery, item.originalText, qCache, tCache);
 
             if (simScore > 0.1) {
@@ -625,7 +681,7 @@ class SearchEngine {
                     for (const idx of continuousMatches) {
                         const item = result.items.find(i => i.index === idx);
                         if (item) {
-                            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+                            const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText, comps: item.components };
                             const sim = textSimilarity(query, item.originalText, qCache, tCache);
                             if (sim > bestSimScore) bestSimScore = sim;
                         }
@@ -681,7 +737,7 @@ class SearchEngine {
                 const item = obj.items[f - 1];
                 if (!item) return;
 
-                const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText };
+                const tCache = { norm: item.normalizedText, jamo: item.jamoText, pron: item.pronJamoText, relaxed: item.relaxedJamoText, comps: item.components };
                 const sim = textSimilarity(query, item.originalText, qCache, tCache);
                 const simScore = Math.round(sim * 100);
 

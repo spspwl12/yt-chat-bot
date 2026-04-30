@@ -1,5 +1,5 @@
 const search_lib = require('./video-matcher/search.js');
-const TextSearchEngine = require('./video-matcher/textsearcher.js');
+const TextSearchEngine = require('./textsearcher.js');
 const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
@@ -9,7 +9,7 @@ const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
 const { sendChat } = require('./innertube.js');
 const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
-    toHHMMSS, fromHHMMSS, formatDate, getClockEmoji, parseKoreanDate } = require('./func.js');
+    toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate } = require('./func.js');
 
 const profanitySet = require('./data/profanity-list.js');
 const eventBus = require('./event-bus.js');
@@ -32,8 +32,11 @@ const COMMAND_GROUPS = {
     'episode': ['!대사', '!몇회', '!몇화', '!몇편', '!편수', '!화차', '!지금몇화', '!지금몇회', '!회차'],
     'timetable': ['!시간표', '!편성표'],
     'next': ['!다음', '!다음화', '!다음회'],
+    'nextnext': ['!다다음', '!다다음화', '!다다음회'],
+    'first': ['!첫화', '!첫회', '!처음화', '!처음회'],
     'last': ['!마지막', '!마지막화', '!마지막회', '!최종화', '!최종회'],
     'date': ['!날짜'],
+    'time': ['!시간', '!타임', '!남은시간'],
     'suggest': ['!건의'],
 };
 
@@ -137,6 +140,9 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 8. 단순 봇 인사 명령어
     if (group === 'greeting') {
+        if (!cfg.input.enable_greeting) {
+            return null;
+        }
         setCooldown(cmd);
         return _emitLog(greeting_lib(displayName));
     }
@@ -144,7 +150,7 @@ async function handleCommand(type, text, displayName, _input) {
     // 9. 봇 도움말/가이드 출력
     if (group === 'help') {
         setCooldown(cmd);
-        return _emitLog('ℹ️ 명령어: !몇화, !다음화, !시간표, !건의, !마지막화, !날짜' +
+        return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간, !시간표, !건의, !첫화, !마지막화, !날짜' +
             'ℹ️ 이 프로그램은 비공식 봇이며, SBS와는 아무런 관련이 없습니다. ' +
             'ℹ️ 명령은 2분마다 가능합니다. (도배 방지) ');
     }
@@ -174,10 +180,57 @@ async function handleCommand(type, text, displayName, _input) {
             return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
         }
 
-        return _emitLog(printNextEpisode(cmd, rtn));
+        return _emitLog(printFutureEpisode(cmd, rtn, 1, '다음'));
     }
 
-    // 13. 전 대역 마지막 회차 방영 예정일 조회
+    // 12.1. 다다음 방영 예정 회차 정보 조회
+    if (group === 'nextnext') {
+        const rtn = getEpisodeInfo();
+
+        if (!rtn) {
+            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
+        }
+
+        return _emitLog(printFutureEpisode(cmd, rtn, 2, '다다음'));
+    }
+
+    // 12.5. 현재 에피소드 및 남은 시간 단축 출력 (!시간)
+    if (group === 'time') {
+        const rtn = getEpisodeInfo();
+
+        if (!rtn) {
+            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
+        }
+
+        setCooldown(cmd);
+        const info = videoInfo[rtn.index];
+        const unicodenum = toUnicodeNumber(info.alias);
+        const timestr = toHHMMSS(rtn.end - rtn.now);
+
+        return _emitLog({
+            msg: `🎬 "${unicodenum}. ${insertSpaces(info.shorten, retryPattern[0])}" 방영중 입니다. ${timestr}초 남음 (쿨타임 2분)`,
+            proc: function (attempt) {
+                return `🎬 "${unicodenum}. ${insertSpaces(info.shorten, retryPattern[attempt])}" 방영중 입니다. ${timestr}초 남음 (쿨타임 2분)`;
+            }
+        });
+    }
+
+    // 13. 전 대역 첫 회차 방영 예정일 조회
+    if (group === 'first') {
+        const rtn = getEpisodeInfo();
+
+        if (!rtn) {
+            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
+        }
+
+        setCooldown(cmd);
+        return _emitLog(printNumEpisode(rtn, cfg.episode.start));
+    }
+
+    // 13.5. 전 대역 마지막 회차 방영 예정일 조회
     if (group === 'last') {
         const rtn = getEpisodeInfo();
 
@@ -224,7 +277,9 @@ function handleEpisodeCommand(cmd, args, _input) {
         return printNowEpisode(rtn);
     }
 
-    const numbers = args[0].match(/^(\d+)(\S)?/);
+    const query = args[0];
+
+    const numbers = query.match(/^(\d+)(\S)?/);
     const parseint = numbers ? parseInt(numbers[1], 10) : NaN;
 
     // 10-3. 숫자가 입력된 경우(예: '!몇화 200화') 해당 숫자의 에피소드 방영 예정 시간 계산 조회
@@ -232,6 +287,23 @@ function handleEpisodeCommand(cmd, args, _input) {
         (!numbers[2] || "화회".includes(numbers[2]))) {
         setCooldown(cmd);
         return printNumEpisode(rtn, parseint);
+    }
+
+    // 10-3.5. 입력된 텍스트가 특정 회차의 제목(title)이나 요약(shorten)의 일부분이라도 공백 무시 일치할 경우, 대사 검색 대신 해당 회차 방영 정보 안내
+    if (query) {
+        const reqStr = query.replace(/\s+/g, '');
+        // 지나치게 짧은 검색어(예: 1글자)로 인해 모든 제목이 매칭되는 것을 방지
+        if (reqStr.length >= cfg.input.search_min_length) {
+            const titleMatched = videoInfo.find(info =>
+                (info.title && info.title.replace(/\s+/g, '').includes(reqStr)) ||
+                (info.shorten && info.shorten.replace(/\s+/g, '').includes(reqStr))
+            );
+
+            if (titleMatched) {
+                setCooldown(cmd);
+                return printNumEpisode(rtn, titleMatched.alias);
+            }
+        }
     }
 
     // 10-4. 숫자 형식이 아닌 일반 텍스트가 인자로 넘어왔다고 가정하여 
@@ -242,14 +314,14 @@ function handleEpisodeCommand(cmd, args, _input) {
         return `⚠️ 대사 검색 기능이 비활성화되어 있습니다. (쿨타임 2분)`;
     }
 
-    if (args[0].length < cfg.input.search_min_length) {
+    if (query.length < cfg.input.search_min_length) {
         _input.warn = cfg.subtitle_score.warn_base; // 너무 짧은 악의적 검색어엔 페널티 부여
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. (쿨타임 2분)`;
     }
 
     // 10-5. 비속어 필터링: 검색어에 비속어가 포함되어 있으면 즉시 차단
-    const searchText = filterText(args[0]);
+    const searchText = filterText(query);
     for (const word of profanitySet) {
         if (searchText.includes(word))
             return null;
@@ -260,7 +332,7 @@ function handleEpisodeCommand(cmd, args, _input) {
         return null;
     }
 
-    const searchInfo = searcher.search(args[0]);
+    const searchInfo = searcher.search(query);
     if (searchInfo.length <= 0) {
         _input.warn = cfg.subtitle_score.warn_base; // 결과 없음 페널티
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
@@ -268,6 +340,16 @@ function handleEpisodeCommand(cmd, args, _input) {
     }
 
     if (searchInfo && searchInfo.length > 0) {
+        // 점수가 같을 경우, 검색된 단어의 출현 빈도(매칭된 대사 수)가 높은 에피소드를 우선 채택하도록 정렬
+        searchInfo.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            const lenA = a.matchedIndices ? a.matchedIndices.length : 0;
+            const lenB = b.matchedIndices ? b.matchedIndices.length : 0;
+            if (lenB !== lenA) return lenB - lenA;
+            if (b.alpha !== a.alpha) return b.alpha - a.alpha;
+            return a.key.localeCompare(b.key, undefined, { numeric: true });
+        });
+
         const validResults = [];
         const removeDup = searchInfo.filter(
             (item, index, self) =>
@@ -292,7 +374,7 @@ function handleEpisodeCommand(cmd, args, _input) {
                     if (!subInfo) continue;
 
                     const subTime = fromHHMMSS(pfSub.start);
-                    const futureDate = search_lib.getFutureDate(subInfo, rtn, subTime);
+                    const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subTime));
                     // 에피소드가 짤린 부분(편집된 구간에 해당하는 자막인지 검증)
                     let outOfbounds = subInfo.disable;
                     if (!outOfbounds && subInfo._editParsed) {
@@ -353,6 +435,11 @@ function handleEpisodeCommand(cmd, args, _input) {
                     }
                 };
             } else {
+                // 100% 미만일 때: 1위와 2위의 점수 차이가 크면 2, 3위를 목록에서 지움
+                if (validResults.length >= 2 && (validResults[0].score - validResults[1].score) >= 20) {
+                    validResults.length = 1;
+                }
+
                 const makeMsg = (attempt) => {
                     const mapped = validResults.map((r, i) => {
                         const rankEmoji = toUnicodeNumber2((i + 1).toString());
@@ -634,42 +721,48 @@ function noticeChangeEpisode() {
 }
 
 /**
- * !다음화 명령어를 처리. 다음에 방영될 에피소드 이름과 예정 시간을 안내.
+ * !다음화, !다다음화 등 미래 에피소드 예정 시간을 안내.
  * @param {string} cmd - 파싱된 사용자의 원본 명령어 이름
  * @param {object} rtn - 계산 기준이 될 현재 에피소드 진행 데이터
+ * @param {number} skipCount - 건너뛸 에피소드 수 (1=다음, 2=다다음)
+ * @param {string} label - 출력될 텍스트 라벨 (예: "다음", "다다음")
  */
-function printNextEpisode(cmd, rtn) {
+function printFutureEpisode(cmd, rtn, skipCount, label) {
     const n = videoInfo.length;
     let currentIdx = (rtn.index + 1) % n;
     let info = null;
+    let foundCount = 0;
 
-    // 1. 현재 인덱스 이후부터 재생 리스트를 순회하며 활성화(disable !== true)된 첫 번째 에피소드 색인
+    // 1. 현재 인덱스 이후부터 재생 리스트를 순회하며 활성화(disable !== true)된 목표 에피소드 색인
     for (let i = 0; i < n; i++) {
         const e = videoInfo[currentIdx];
         if (!e.disable) {
-            info = e;
-            break;
+            foundCount++;
+            if (foundCount === skipCount) {
+                info = e;
+                break;
+            }
         }
         currentIdx = (currentIdx + 1) % n; // 플레이리스트 루프 반복
     }
 
     if (info === null) {
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 다음 회차 정보를 확인할 수 없습니다.`;
+        return `⚠️ ${label} 회차 정보를 확인할 수 없습니다.`;
     }
 
-    // 2. 찾은 다음 에피소드가 방영될 미래의 예정 시각 계산
-    const futureDate = search_lib.getFutureDate(info, rtn, 0);
+    // 2. 찾은 에피소드가 방영될 미래의 예정 시각 계산
+    const futureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
     const unicodenum = toUnicodeNumber(info.alias);
     const timestr = formatDate(futureDate);
     const emoji = getClockEmoji(timestr);
 
     setCooldown(cmd);
     return {
-        msg: `👉🏻 다음 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
+        msg: `👉🏻 ${label} 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
             `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`,
         proc: function (attempt) {
-            return `👉🏻 다음 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
+            return `👉🏻 ${label} 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
                 `${emoji} 예정 시간은 ${timestr} 분 입니다. (쿨타임 2분)`;
         }
     };
@@ -700,7 +793,7 @@ function printTimeTable(change, limitLength = cfg.timetable.default_limit) {
                 continue;
             }
             // 해당 에피소드의 방송 시작 예정 일시 계산
-            const fdate = search_lib.getFutureDate(e, rtn, 0);
+            const fdate = roundUpTime(search_lib.getFutureDate(e, rtn, 0));
             if (!pdate)
                 pdate = fdate;
 
@@ -763,7 +856,7 @@ function printNumEpisode(rtn, num) {
         return printNowEpisode(rtn);
 
     // 3. 해당 회차가 방영될 상대적/절대적 미래 예상 날짜 도출
-    const futureDate = search_lib.getFutureDate(info, rtn, 0);
+    const futureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
     const unicodenum = toUnicodeNumber(info.alias);
     const timestr = formatDate(futureDate);
     const emoji = getClockEmoji(timestr);

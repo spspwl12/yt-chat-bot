@@ -22,6 +22,7 @@ module.exports = {
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
+        enable_greeting: false,     // 봇 인사 기능 사용 여부
         text_min_length: 3,         // 명령어 텍스트 최소 길이
         text_max_length: 50,        // 명령어 텍스트 최대 길이
         enable_search: true,        // 대사 검색 기능 사용 여부
