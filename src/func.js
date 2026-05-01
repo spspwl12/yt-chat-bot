@@ -100,19 +100,9 @@ function roundUpTime(originalTime) {
         let d = new Date(originalTime.getTime());
         if (d.getSeconds() >= 50) {
             d.setMinutes(d.getMinutes() + 1);
+            d.setSeconds(d.getSeconds() - 50);
         }
-        d.setSeconds(0);
         return d;
-    } else if (typeof originalTime === 'string') {
-        const parts = originalTime.split(':');
-        if (parts.length === 3) {
-            let [h, m, s] = parts.map(Number);
-            if (s >= 50) {
-                m++; s -= 50;
-                if (m >= 60) { h++; m -= 60; }
-            }
-            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }
     }
     return originalTime;
 }
