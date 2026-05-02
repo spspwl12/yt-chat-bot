@@ -405,7 +405,11 @@ function handleEpisodeCommand(cmd, args, _input) {
 
             setCooldown(cmd);
 
-            if (validResults[0].score >= 100) {
+            const isDefinitive = validResults[0].score >= 100 || 
+                                 validResults.length === 1 || 
+                                 (validResults[0].score - validResults[1].score >= 20);
+
+            if (isDefinitive) {
                 const firstResult = validResults[0];
 
                 // 1위 검색 결과 외에 다른 회차에서 비슷하게 잡힌 대안 후보군 산출
@@ -424,22 +428,19 @@ function handleEpisodeCommand(cmd, args, _input) {
                     `${firstResult.emoji} 등장 시간은 ${firstResult.timestr} 분 입니다. `) +
                     `${subEpisodeMatching.length > 0 ? `(후보: ${subEpisodeMatching})` : ''}`;
 
+                const prefixEmoji = firstResult.score < 100 ? "⚠️ 📜" : "📜";
+
                 return {
-                    msg: `📜 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
+                    msg: `${prefixEmoji} 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
                         firstResult.subInfo.title, retryPattern[0])}" 에 등장하며 ` +
                         `${message} 정확도: ${firstResult.unicodescore}% (쿨타임 2분)`,
                     proc: function (attempt) {
-                        return `📜 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
+                        return `${prefixEmoji} 요청하신 대사는 "${firstResult.unicodenum}. ${insertSpaces(
                             firstResult.subInfo.title, retryPattern[attempt])}" 에 등장하며 ` +
                             `${message} 정확도: ${firstResult.unicodescore}%  (쿨타임 2분)`;
                     }
                 };
             } else {
-                // 100% 미만일 때: 1위와 2위의 점수 차이가 크면 2, 3위를 목록에서 지움
-                if (validResults.length >= 2 && (validResults[0].score - validResults[1].score) >= 20) {
-                    validResults.length = 1;
-                }
-
                 const makeMsg = (attempt) => {
                     const mapped = validResults.map((r, i) => {
                         const rankEmoji = toUnicodeNumber2((i + 1).toString());
