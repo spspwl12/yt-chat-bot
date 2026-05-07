@@ -38,7 +38,6 @@ const COMMAND_GROUPS = {
     'last': ['!마지막', '!마지막화', '!마지막회', '!최종화', '!최종회'],
     'date': ['!날짜'],
     'time': ['!시간', '!타임', '!남은시간']
-    //'suggest': ['!건의'],
 };
 
 /**
@@ -93,37 +92,48 @@ function setCooldown(cmd, offsetMs = 0) {
  * @returns {string|object|null} 전송할 채팅 텍스트 또는 {msg, proc} 객체 반환, 명령어 무시 시 null 반환
  */
 async function handleCommand(type, text, displayName, _input) {
-    // 0. 쿨타임 강제 초기화 (type이 0인 경우 봇 재시작이나 관리자 트리거로 인식)
+    // 쿨타임 강제 초기화 (type이 0인 경우 봇 재시작이나 관리자 트리거로 인식)
     if (type === 0) {
         delayChatTime = 0;
         delayChatTimeMap.clear();
         return null;
     }
 
-    // 2. 메시지 기본 유효성 검증 (입력 텍스트 타입 확인 및 글자 수 제한)
+    // 메시지 기본 유효성 검증 (입력 텍스트 타입 확인 및 글자 수 제한)
     if (!text || typeof text !== "string" ||
         text.length < cfg.input.text_min_length || text.length > cfg.input.text_max_length)
         return null;
 
-    // 3. 명령어 접두사('!') 여부 확인 — " ! 검색어"도 "!검색어"로 인식
+    // 명령어 접두사('!') 여부 확인 — " ! 검색어"도 "!검색어"로 인식
     text = text.replace(/^\s*!\s*/, '!');
     if (!text.startsWith('!'))
         return null;
 
-    // 4. 공백을 기준으로 명령어(cmd)와 전달 인자(args) 문자열 파싱 분리
+    // 공백을 기준으로 명령어(cmd)와 전달 인자(args) 문자열 파싱 분리
     const parts = text.trim().split(/ (.+)/);
     const cmd = parts[0];
     const args = parts.slice(1);
 
-    // 5. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
+    // 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
     if (isCooldown(cmd))
         return null;
 
-    // 6. 유사어나 동의어(alias)를 통합 그룹 식별자(group)로 묶어 변환 처리
+    // 유사어나 동의어(alias)를 통합 그룹 식별자(group)로 묶어 변환 처리
     const group = getCommandGroup(cmd);
 
-    // 7. 시스템에 등록되지 않은 무효한 명령어 그룹이면 조기에 무시
+    // 시스템에 등록되지 않은 무효한 명령어 그룹이면 조기에 무시
     if (group === cmd)
+        return null;
+
+    const rtn = getEpisodeInfo();
+
+    // 정보 로드 실패 시, 무시
+    if (!rtn) {
+        return null;
+    }
+
+    // 이전 회차가 끝나고 다음 회차가 시작되기 직전 과도기/경계 시간엔 부정확한 정보 방지를 위해 명령어 처리 무시
+    if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec)
         return null;
 
     // ★ 명령어 사용 로그 발행
@@ -140,7 +150,7 @@ async function handleCommand(type, text, displayName, _input) {
         return response;
     };
 
-    // 8. 단순 봇 인사 명령어
+    // 단순 봇 인사 명령어
     if (group === 'greeting') {
         if (!cfg.input.enable_greeting) {
             return null;
@@ -149,7 +159,7 @@ async function handleCommand(type, text, displayName, _input) {
         return _emitLog(greeting_lib(displayName));
     }
 
-    // 9. 봇 도움말/가이드 출력
+    // 봇 도움말/가이드 출력
     if (group === 'help') {
         setCooldown(cmd);
         return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간, !시간표, !첫화, !마지막화, !날짜' +
@@ -157,55 +167,34 @@ async function handleCommand(type, text, displayName, _input) {
             'ℹ️ 명령은 2분마다 가능합니다. (도배 방지) ');
     }
 
-    // 10. 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
+    // 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
     if (group === 'episode') {
-        return _emitLog(handleEpisodeCommand(cmd, args, _input));
+        return _emitLog(handleEpisodeCommand(rtn, cmd, args, _input));
     }
 
-    // 11. 곧 방영될 회차 리스트 목록 요약(시간표) 출력
+    // 곧 방영될 회차 리스트 목록 요약(시간표) 출력
     if (group === 'timetable') {
         setCooldown(cmd);
         return _emitLog({
-            msg: printTimeTable(retryPattern[0]),
+            msg: printTimeTable(rtn, retryPattern[0]),
             proc: function (attempt) {
-                return printTimeTable(retryPattern[attempt]);
+                return printTimeTable(rtn, retryPattern[attempt]);
             }
         });
     }
 
-    // 12. 다음 방영 예정 회차 정보 조회
+    // 다음 방영 예정 회차 정보 조회
     if (group === 'next') {
-        const rtn = getEpisodeInfo();
-
-        if (!rtn) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
-        }
-
-        return _emitLog(printFutureEpisode(cmd, rtn, 1, '다음'));
+        return _emitLog(printFutureEpisode(rtn, cmd, 1, '다음'));
     }
 
-    // 12.1. 다다음 방영 예정 회차 정보 조회
+    // 다다음 방영 예정 회차 정보 조회
     if (group === 'nextnext') {
-        const rtn = getEpisodeInfo();
-
-        if (!rtn) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요.`);
-        }
-
-        return _emitLog(printFutureEpisode(cmd, rtn, 2, '다다음'));
+        return _emitLog(printFutureEpisode(rtn, cmd, 2, '다다음'));
     }
 
-    // 12.5. 현재 에피소드 및 남은 시간 단축 출력 (!시간)
+    // 현재 에피소드 및 남은 시간 단축 출력 (!시간)
     if (group === 'time') {
-        const rtn = getEpisodeInfo();
-
-        if (!rtn) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요. ${COOLDOWN_MSG}`);
-        }
-
         setCooldown(cmd);
         const info = videoInfo[rtn.index];
         const unicodenum = toUnicodeNumber(info.alias);
@@ -221,59 +210,27 @@ async function handleCommand(type, text, displayName, _input) {
         });
     }
 
-    // 13. 전 대역 첫 회차 방영 예정일 조회
+    // 전 대역 첫 회차 방영 예정일 조회
     if (group === 'first') {
-        const rtn = getEpisodeInfo();
-
-        if (!rtn) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요. ${COOLDOWN_MSG}`);
-        }
-
         setCooldown(cmd);
         return _emitLog(printNumEpisode(rtn, cfg.episode.start));
     }
 
-    // 13.5. 전 대역 마지막 회차 방영 예정일 조회
+    // 전 대역 마지막 회차 방영 예정일 조회
     if (group === 'last') {
-        const rtn = getEpisodeInfo();
-
-        if (!rtn) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return _emitLog(`⚠️ 잠시 후 다시 시도해 주세요. ${COOLDOWN_MSG}`);
-        }
-
         setCooldown(cmd);
         return _emitLog(printNumEpisode(rtn, cfg.episode.end));
     }
 
-    // 13.5 날짜 지정 회차 조회
+    // 날짜 지정 회차 조회
     if (group === 'date') {
-        return _emitLog(handleDateCommand(cmd, args));
+        return _emitLog(handleDateCommand(rtn, cmd, args));
     }
-
-    // 14. 봇 건의 및 피드백 로깅
-    // if (group === 'suggest') {
-    //     setCooldown(cmd);
-    //     return _emitLog(`${displayName} 님, 접수되었습니다. 감사합니다. ${COOLDOWN_MSG}`);
-    // }
 
     return null;
 }
 
-function handleEpisodeCommand(cmd, args, _input) {
-    const rtn = getEpisodeInfo();
-
-    if (!rtn) {
-        // 정보 로드 실패 시, 쿨타임 일부 환원 후 에러 메시지 반환
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 잠시 후 다시 시도해 주세요. ${COOLDOWN_MSG}`;
-    }
-
-    // 이전 회차가 끝나고 다음 회차가 시작되기 직전 과도기/경계 시간엔 부정확한 정보 방지를 위해 명령어 처리 무시
-    if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec)
-        return null;
-
+function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 별도 인자가 없으면(예: '!몇화') 현재 실시간으로 방영 중인 회차와 남은 시간 반환
     if (!args || args.length <= 0) {
         setCooldown(cmd);
@@ -483,14 +440,7 @@ function handleEpisodeCommand(cmd, args, _input) {
     return `⚠️ 대사를 정확히 입력하세요. ${COOLDOWN_MSG}`;
 }
 
-function handleDateCommand(cmd, args) {
-    const rtn = getEpisodeInfo();
-
-    if (!rtn) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 잠시 후 다시 시도해 주세요. ${COOLDOWN_MSG}`;
-    }
-
+function handleDateCommand(rtn, cmd, args) {
     if (!args || args.length === 0) {
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 날짜나 시간을 입력하세요. (예: !날짜 19시 30분, !날짜 11/12) ${COOLDOWN_MSG}`;
@@ -674,28 +624,28 @@ function noticeChangeEpisode() {
     if (!rtn)
         return;
 
-    // 1. 방영 중인 회차를 모니터링하다가 인덱스가 바뀐 경우를 탐지
+    // 방영 중인 회차를 모니터링하다가 인덱스가 바뀐 경우를 탐지
     if (noticeIdx.index >= 0) {
         // 알림 중복 방지용 슬립(sleep) 카운터가 0 이하일 때만 알림 발생
         if (rtn.index !== noticeIdx.index && noticeIdx.sleep <= 0) {
 
-            // 2. 알림 도배 방지를 위해 sleep_count만큼 쿨다운 세팅
+            // 알림 도배 방지를 위해 sleep_count만큼 쿨다운 세팅
             noticeIdx.sleep = cfg.notice.sleep_count;
 
-            // 3. 방송 송출 딜레이와 사용자가 봇의 채팅을 자연스럽게 보게끔 랜덤 딜레이 적용
+            // 방송 송출 딜레이와 사용자가 봇의 채팅을 자연스럽게 보게끔 랜덤 딜레이 적용
             const delay = cfg.notice.delay_base_ms + Math.random() * cfg.notice.delay_random_ms;
 
             setTimeout(() => {
                 const info = videoInfo[rtn.index];
                 const unicodenum = toUnicodeNumber(info.alias);
 
-                // 4. 채팅방에 '현재 방영 회차' 기본 안내 메시지 발송
+                // 채팅방에 '현재 방영 회차' 기본 안내 메시지 발송
                 sendChat(`📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 입니다.`,
                     function (attempt) {
                         return `📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 입니다.`;
                     });
 
-                // 5. 확률(tip_chance)에 맞춰 사용자 가이드(꿀팁) 중 한 가지 랜덤 추가 발송
+                // 확률(tip_chance)에 맞춰 사용자 가이드(꿀팁) 중 한 가지 랜덤 추가 발송
                 if (Math.random() < cfg.notice.tip_chance) {
                     // const messages = [  // w: weight, t: text
                     //     { w: 2, t: `📍"!몇화" 를 입력하면 현재 회차를 확인할 수 있습니다.` },
@@ -720,7 +670,7 @@ function noticeChangeEpisode() {
         }
     }
 
-    // 6. 감지 상태 갱신 (인덱스 유지, 슬립 감소)
+    // 감지 상태 갱신 (인덱스 유지, 슬립 감소)
     noticeIdx.index = rtn.index;
     --noticeIdx.sleep;
 }
@@ -732,13 +682,13 @@ function noticeChangeEpisode() {
  * @param {number} skipCount - 건너뛸 에피소드 수 (1=다음, 2=다다음)
  * @param {string} label - 출력될 텍스트 라벨 (예: "다음", "다다음")
  */
-function printFutureEpisode(cmd, rtn, skipCount, label) {
+function printFutureEpisode(rtn, cmd, skipCount, label) {
     const n = videoInfo.length;
     let currentIdx = (rtn.index + 1) % n;
     let info = null;
     let foundCount = 0;
 
-    // 1. 현재 인덱스 이후부터 재생 리스트를 순회하며 활성화(disable !== true)된 목표 에피소드 색인
+    // 현재 인덱스 이후부터 재생 리스트를 순회하며 활성화(disable !== true)된 목표 에피소드 색인
     for (let i = 0; i < n; i++) {
         const e = videoInfo[currentIdx];
         if (!e.disable) {
@@ -756,7 +706,7 @@ function printFutureEpisode(cmd, rtn, skipCount, label) {
         return `⚠️ ${label} 회차 정보를 확인할 수 없습니다.`;
     }
 
-    // 2. 찾은 에피소드가 방영될 미래의 예정 시각 계산
+    // 찾은 에피소드가 방영될 미래의 예정 시각 계산
     const futureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
     const unicodenum = toUnicodeNumber(info.alias);
     const timestr = formatDate(futureDate);
@@ -779,16 +729,15 @@ function printFutureEpisode(cmd, rtn, skipCount, label) {
  * @param {string} change - 동일 문구 스팸 차단 방어막용 특수 공백 패딩 문자열
  * @param {number} limitLength - 유튜브 채팅 길이 제한 상한
  */
-function printTimeTable(change, limitLength = cfg.timetable.default_limit) {
-    const rtn = getEpisodeInfo();
+function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) {
     const n = videoInfo.length;
     let str = "";
     let pdate; // 이전 회차 날짜(일자 변경 표시용)
 
-    // 1. 현재 방송 중인 인덱스의 바로 다음 인덱스부터 탐색 시작
+    // 현재 방송 중인 인덱스의 바로 다음 인덱스부터 탐색 시작
     let currentIdx = (rtn.index) % n;
 
-    // 2. 전체 재생 리스트를 한 바퀴 돌면서 활성화된 에피소드 문자열 조립
+    // 전체 재생 리스트를 한 바퀴 돌면서 활성화된 에피소드 문자열 조립
     for (let i = 0; i < n; i++) {
         const e = videoInfo[currentIdx];
         if (!e.disable) {
@@ -807,7 +756,7 @@ function printTimeTable(change, limitLength = cfg.timetable.default_limit) {
             // 에피소드 이름과 결합 ('→[23:45]에피소드명')
             const candidate = insertSpaces((str ? "→" : "") + hdr + e.shorten, change);
 
-            // 3. 누적된 시간표 문자열의 총 길이가 채팅 제한치(limitLength)를 넘으면 그만 붙이고 즉시 반환
+            // 누적된 시간표 문자열의 총 길이가 채팅 제한치(limitLength)를 넘으면 그만 붙이고 즉시 반환
             if (str.length + candidate.length >= limitLength)
                 return str;
 
@@ -825,15 +774,15 @@ function printTimeTable(change, limitLength = cfg.timetable.default_limit) {
  * @param {object} rtn - 현재 에피소드 진행 데이터 
  */
 function printNowEpisode(rtn) {
-    // 1. 현재 방송 데이터 안에서 재생 중인 영상 메타 데이터를 추출
+    // 현재 방송 데이터 안에서 재생 중인 영상 메타 데이터를 추출
     const info = videoInfo[rtn.index];
     const unicodenum = toUnicodeNumber(info.alias);
 
-    // 2. 현재 방영 중인 에피소드가 끝나기까지 남은 시간(잔여 초수) 계산
+    // 현재 방영 중인 에피소드가 끝나기까지 남은 시간(잔여 초수) 계산
     const timestr = toHHMMSS(rtn.end - rtn.now);
 
     return {
-        // 3. 응답 텍스트 포맷 (재시도 회차에 맞춘 스팸 회피용 공백 치환 포함)
+        // 응답 텍스트 포맷 (재시도 회차에 맞춘 스팸 회피용 공백 치환 포함)
         msg: `🎬 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
             `🕒 남은 시간은 ${timestr} 초 입니다. ${COOLDOWN_MSG}`,
         proc: function (attempt) {
@@ -850,24 +799,24 @@ function printNowEpisode(rtn) {
  * @param {string} num - 검색하려는 대상 에피소드의 고유 번호(alias)
  */
 function printNumEpisode(rtn, num) {
-    // 1. 지정된 숫자 번호로 플레이리스트(영상 DB)에서 대상 에피소드 정보 조회
+    // 지정된 숫자 번호로 플레이리스트(영상 DB)에서 대상 에피소드 정보 조회
     const info = videoInfo.find(e => e.alias == num);
 
     if (!info)
         return null;
 
-    // 2. 요청한 회차가 현재 지금 이미 방영 중이면 별도 로직으로 현재 진행 상태 안내
+    // 요청한 회차가 현재 지금 이미 방영 중이면 별도 로직으로 현재 진행 상태 안내
     if (videoInfo[rtn.index] === info)
         return printNowEpisode(rtn);
 
-    // 3. 해당 회차가 방영될 상대적/절대적 미래 예상 날짜 도출
+    // 해당 회차가 방영될 상대적/절대적 미래 예상 날짜 도출
     const futureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
     const unicodenum = toUnicodeNumber(info.alias);
     const timestr = formatDate(futureDate);
     const emoji = getClockEmoji(timestr);
 
     return {
-        // 4. 예정 시각 및 에피소드 제목 안내 텍스트 반환
+        // 예정 시각 및 에피소드 제목 안내 텍스트 반환
         msg: `🔜 예정 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
             `${emoji} 예정 시간은 ${timestr} 분 입니다. ${COOLDOWN_MSG}`,
         proc: function (attempt) {
@@ -883,35 +832,35 @@ function printNumEpisode(rtn, num) {
  * 에피소드 전환 안내 타이머도 활성화.
  */
 function initCommand() {
-    // 1. 단축 평가 검사: 이미 초기화가 된 상태라면 중복 스케줄링이 되지 않도록 종료
+    // 단축 평가 검사: 이미 초기화가 된 상태라면 중복 스케줄링이 되지 않도록 종료
     if (initCommand.__init)
         return;
     initCommand.__init = true;
 
-    // 2. LiveDownloader 초기화 (실시간 20초 세그먼트 연속 다운로드)
+    // LiveDownloader 초기화 (실시간 20초 세그먼트 연속 다운로드)
     const downloader = new LiveDownloader(schCfg, cfg.sync);
 
-    // 3. LiveSearcher 초기화 (searcher.exe 데몬 상시 구동)
+    // LiveSearcher 초기화 (searcher.exe 데몬 상시 구동)
     const searcher = new LiveSearcher(schCfg, cfg.sync);
 
-    // 4. 이벤트 연결: 세그먼트 다운로드 완료 → searcher 큐에 추가
+    // 이벤트 연결: 세그먼트 다운로드 완료 → searcher 큐에 추가
     downloader.on('segment', (segmentInfo) => {
         searcher.enqueue(segmentInfo);
     });
 
-    // 5. 이벤트 연결: 매칭 결과 수신 → 싱크 보정
+    // 이벤트 연결: 매칭 결과 수신 → 싱크 보정
     searcher.on('match', ({ result, segment }) => {
         const cmp = getEpisodeInfo();
         const rtn = search_lib.processSearchResult(result, segment, cmp);
         onMatchResult(rtn);
     });
 
-    // 6. 에러 로깅
+    // 에러 로깅
     downloader.on('error', (err) => {
         console.error('📥 다운로더 에러:', err.message);
     });
 
-    // 7. 초기 지연 후 시작
+    // 초기 지연 후 시작
     setTimeout(() => {
         searcher.start();    // 데몬 먼저 시작 (DB 로드 시간 필요)
         setTimeout(() => {
@@ -919,10 +868,10 @@ function initCommand() {
         }, cfg.sync.init_delay_ms);
     }, 1000);
 
-    // 8. 에피소드 전환 안내 메시지를 체크하는 타이머 활성화
+    // 에피소드 전환 안내 메시지를 체크하는 타이머 활성화
     setInterval(noticeChangeEpisode, cfg.notice.check_interval_ms);
 
-    // 9. 프로세스 종료 시 정리
+    // 프로세스 종료 시 정리
     const cleanup = () => {
         downloader.stop();
         searcher.stop();
