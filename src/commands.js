@@ -567,21 +567,19 @@ function onMatchResult(rtn) {
     if (!rtn)
         return;
 
-    const minConsecutive = cfg.sync.min_consecutive || 2;
+    const minConsecutive = cfg.sync.min_consecutive || 4;
 
     // 서치 엔진 결과물(rtn) 누적 (동기화 신뢰도를 높이고자 여러 번 샘플링)
     tempQuery.push(rtn);
 
     // 샘플이 min_consecutive개 이상 모였을 때 연속성 검증 로직 실행
     if (tempQuery.length >= minConsecutive) {
-        const cmp = getEpisodeInfo() || { index: -1, now: 0 };
-
         // 최근 minConsecutive개가 모두 연속적으로 일치하는지 확인
-        let consecutiveCount = 0;
-        let adopted = null;
+        let consecutiveCount = 1;
+        let adopted = tempQuery[0];
 
-        for (let i = 0; i < tempQuery.length; i++) {
-            const prev = (i === 0) ? cmp : tempQuery[i - 1];
+        for (let i = 1; i < tempQuery.length; i++) {
+            const prev = tempQuery[i - 1];
             const curr = tempQuery[i];
 
             if (curr.index === prev.index &&
@@ -589,8 +587,8 @@ function onMatchResult(rtn) {
                 consecutiveCount++;
                 adopted = curr;
             } else {
-                consecutiveCount = 0;
-                adopted = null;
+                consecutiveCount = 1;
+                adopted = curr;
             }
         }
 
