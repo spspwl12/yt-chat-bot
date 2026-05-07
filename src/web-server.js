@@ -247,6 +247,46 @@ async function handleAction(client, req) {
         sendWSFrame(client, JSON.stringify({ action: 'spamAdd_result', payload: { success: true } }));
         broadcastSpam();
     }
+    else if (action === 'adjustWarn') {
+        const { channelId, delta } = payload;
+        if (spamGuardRef) {
+            const r = spamGuardRef.tracker.get(channelId);
+            if (r) {
+                r.warns = Math.max(0, (r.warns || 0) + delta);
+                spamGuardRef._refreshExpiry(r);
+                spamGuardRef._saveTrackerDebounced();
+                sendWSFrame(client, JSON.stringify({ action: 'warnAdjust_result', payload: { success: true, newCount: r.warns } }));
+                broadcastSpam();
+            } else {
+                sendWSFrame(client, JSON.stringify({ action: 'warnAdjust_result', payload: { success: false, error: '트래커에 없는 유저' } }));
+            }
+        }
+    }
+    else if (action === 'adjustUsage') {
+        const { channelId, delta } = payload;
+        if (spamGuardRef) {
+            const r = spamGuardRef.tracker.get(channelId);
+            if (r) {
+                if (!r.commandHistory) r.commandHistory = [];
+                const now = Date.now();
+                // 유효한 이력만 보존
+                r.commandHistory = r.commandHistory.filter(t => now - t < spamGuardRef.penaltyDurationMs);
+                if (delta > 0) {
+                    for (let i = 0; i < delta; i++) r.commandHistory.push(now);
+                } else if (delta < 0) {
+                    // 가장 오래된 것부터 제거
+                    const removeCount = Math.min(-delta, r.commandHistory.length);
+                    r.commandHistory.splice(0, removeCount);
+                }
+                spamGuardRef._refreshExpiry(r);
+                spamGuardRef._saveTrackerDebounced();
+                sendWSFrame(client, JSON.stringify({ action: 'usageAdjust_result', payload: { success: true, newCount: r.commandHistory.length } }));
+                broadcastSpam();
+            } else {
+                sendWSFrame(client, JSON.stringify({ action: 'usageAdjust_result', payload: { success: false, error: '트래커에 없는 유저' } }));
+            }
+        }
+    }
     else if (action === 'spamDelete') {
         const { channelId } = payload;
         if(spamGuardRef) {

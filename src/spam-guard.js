@@ -1,7 +1,9 @@
 const fs = require('fs');
 const { sendChat, banUser } = require('./innertube.js');
 const path2 = require('./path.js');
+const path = require('path');
 const BANNED_PATH = path2.findPath('./data/youtube-banned.json');
+const TRACKER_PATH = path2.findPath('./data/youtube-tracker.json') || path.join(__dirname, 'data', 'youtube-tracker.json');
 
 class SpamGuard {
     constructor(opts) {
@@ -11,8 +13,9 @@ class SpamGuard {
         this.warnLimit = opts.warnLimit || 5;
         this.penaltyDurationMs = (opts.penaltyDurationHrs !== undefined ? opts.penaltyDurationHrs : 12) * 60 * 60 * 1000;
         this.penaltyAddMs = (opts.penaltyAddSec || 0) * 1000;
-        this.tracker = new Map();
+        this.tracker = this._loadTracker();
         this.banned = this._loadBanned();
+        this._saveTrackerTimer = null;
 
         console.log(
             '🛡️  도배 방지 — 기본 ' +
@@ -95,6 +98,7 @@ class SpamGuard {
             // 만료 시각 재계산 (누적된 경고 기반)
             this._refreshExpiry(r);
             r.lastWarnedAt = now;
+            this._saveTrackerDebounced();
             return r.warns >= this.warnLimit ? 'ban' : 'warn';
         }
 
@@ -108,6 +112,7 @@ class SpamGuard {
         r.warns += counts;
         r.lastWarnedAt = now;
         this._refreshExpiry(r);
+        this._saveTrackerDebounced();
         return r.warns >= this.warnLimit ? 'ban' : 'warn';
     }
 
@@ -124,6 +129,7 @@ class SpamGuard {
         r.warns += warnCount;
         r.lastWarnedAt = Date.now();
         this._refreshExpiry(r);
+        this._saveTrackerDebounced();
 
         console.log(`⚠️ 경고 [${displayName}] ${r.warns}/${this.warnLimit}(${(r.commandHistory || []).length})`);
     }
@@ -228,6 +234,64 @@ class SpamGuard {
         const obj = {};
         this.banned.forEach(function (v, k) { obj[k] = v; });
         fs.writeFileSync(BANNED_PATH, JSON.stringify(obj, null, 4), 'utf-8');
+    }
+
+    _loadTracker() {
+        try {
+            if (fs.existsSync(TRACKER_PATH)) {
+                const data = JSON.parse(fs.readFileSync(TRACKER_PATH, 'utf-8'));
+                const map = new Map();
+                const now = Date.now();
+                for (const [channelId, entry] of Object.entries(data)) {
+                    // 만료된 commandHistory 필터링
+                    if (entry.commandHistory) {
+                        entry.commandHistory = entry.commandHistory.filter(t => now - t < this.penaltyDurationMs);
+                    }
+                    // 패널티 만료된 경고 리셋
+                    if (entry.warns > 0 && entry.penaltyExpiresAt > 0 && now >= entry.penaltyExpiresAt) {
+                        entry.warns = 0;
+                        entry.penaltyExpiresAt = 0;
+                    }
+                    // 유효한 데이터만 로드 (경고 또는 이력이 있는 경우)
+                    if (entry.warns > 0 || (entry.commandHistory && entry.commandHistory.length > 0)) {
+                        map.set(channelId, entry);
+                    }
+                }
+                console.log(`📂 트래커 로드: ${map.size}명`);
+                return map;
+            }
+        } catch (e) {
+            console.error('트래커 로드 실패:', e.message);
+        }
+        return new Map();
+    }
+
+    _saveTracker() {
+        const obj = {};
+        const now = Date.now();
+        for (const [channelId, entry] of this.tracker.entries()) {
+            // 유효한 데이터만 저장
+            const history = (entry.commandHistory || []).filter(t => now - t < this.penaltyDurationMs);
+            if (entry.warns > 0 || history.length > 0) {
+                obj[channelId] = {
+                    warns: entry.warns || 0,
+                    commandHistory: history,
+                    penaltyExpiresAt: entry.penaltyExpiresAt || 0,
+                    displayName: entry.displayName || null,
+                    lastWarnedAt: entry.lastWarnedAt || 0
+                };
+            }
+        }
+        try {
+            fs.writeFileSync(TRACKER_PATH, JSON.stringify(obj, null, 4), 'utf-8');
+        } catch (e) {
+            console.error('트래커 저장 실패:', e.message);
+        }
+    }
+
+    _saveTrackerDebounced() {
+        if (this._saveTrackerTimer) clearTimeout(this._saveTrackerTimer);
+        this._saveTrackerTimer = setTimeout(() => this._saveTracker(), 2000);
     }
 }
 

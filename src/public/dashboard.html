@@ -474,11 +474,310 @@
 
         .sub-panel { display: none; }
         .sub-panel.active { display: block; animation: slideUp 0.25s ease forwards; }
+
+        /* ── Warn Adjust Buttons ── */
+        .warn-adjust {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .warn-adjust-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px; height: 22px;
+            border: 1px solid var(--surface-border);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .warn-adjust-btn:hover {
+            background: rgba(139, 92, 246, 0.25);
+            color: var(--text-main);
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+
+        .warn-adjust-btn.warn-minus:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: var(--secondary);
+        }
+
+        .warn-adjust-btn.warn-plus:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: var(--error);
+        }
+
+        /* ── Mobile Hamburger ── */
+        .mobile-header {
+            display: none;
+        }
+
+        .hamburger-btn {
+            background: transparent;
+            border: 1px solid var(--surface-border);
+            color: var(--text-main);
+            font-size: 1.4rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .hamburger-btn:hover {
+            background: rgba(255,255,255,0.06);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* ── Mobile Responsive ── */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+                overflow: auto;
+            }
+
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--surface-border);
+                background: var(--surface-color);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                position: sticky;
+                top: 0;
+                z-index: 50;
+            }
+
+            .mobile-header h1 {
+                font-size: 1rem;
+                font-weight: 700;
+                margin: 0;
+                background: linear-gradient(90deg, #c084fc, #818cf8);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .mobile-header .conn-status-mini {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 0.75rem;
+                color: var(--text-dim);
+            }
+
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                width: 260px;
+                min-width: 260px;
+                z-index: 100;
+                transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                overflow-y: auto;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .content {
+                padding: 16px;
+                min-height: 0;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+                margin-bottom: 14px;
+            }
+
+            /* Status cards */
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .status-card {
+                padding: 14px 10px;
+            }
+
+            .status-card p {
+                font-size: 1.4rem;
+            }
+
+            .status-card h3 {
+                font-size: 0.68rem;
+            }
+
+            /* Tables: horizontal scroll */
+            .log-container,
+            .sub-panel > .glass {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .log-scroll {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                min-width: 600px;
+            }
+
+            th, td {
+                padding: 8px 10px;
+                font-size: 0.75rem;
+                white-space: nowrap;
+            }
+
+            th {
+                font-size: 0.65rem;
+            }
+
+            .log-container table td {
+                font-size: 0.7rem;
+                padding: 6px 10px;
+            }
+
+            .log-container table th {
+                padding: 8px 10px;
+                font-size: 0.62rem;
+            }
+
+            /* Chat items */
+            .chat-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 10px 14px;
+            }
+
+            .chat-item > div:last-child {
+                align-self: flex-end;
+            }
+
+            .chat-list {
+                max-height: 400px;
+            }
+
+            /* Forms */
+            .add-spam-form {
+                flex-direction: column;
+            }
+
+            .form-input {
+                min-width: 0;
+                width: 100%;
+            }
+
+            /* Buttons row */
+            #tab-live > div:last-child {
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                font-size: 0.8rem;
+                padding: 8px 14px;
+            }
+
+            /* Code editor */
+            textarea.code-editor {
+                font-size: 0.75rem;
+                padding: 12px;
+                height: 250px;
+            }
+
+            .config-block-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+                padding: 12px 14px;
+            }
+
+            /* Section card */
+            .section-card {
+                padding: 14px;
+            }
+
+            /* Truncate */
+            .truncate {
+                max-width: 150px;
+            }
+
+            /* Sub tabs */
+            .sub-tabs {
+                width: 100%;
+            }
+
+            .sub-tab-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 10px 12px;
+                font-size: 0.8rem;
+            }
+
+            /* Toast */
+            #toast-container {
+                bottom: 12px;
+                right: 12px;
+                left: 12px;
+            }
+
+            .toast {
+                font-size: 0.82rem;
+                padding: 10px 14px;
+            }
+
+            /* Warn adjust compact */
+            .warn-adjust {
+                gap: 3px;
+            }
+
+            .warn-adjust-btn {
+                width: 20px;
+                height: 20px;
+                font-size: 0.78rem;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar glass">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="mobile-header">
+        <button class="hamburger-btn" id="hamburger-btn">☰</button>
+        <h1>🤖 Bot Admin</h1>
+        <div class="conn-status-mini">
+            <div id="status-dot-mobile" class="status-dot"></div>
+        </div>
+    </div>
+
+    <div class="sidebar glass" id="sidebar">
         <h1>🤖 Bot Admin</h1>
         <button class="nav-btn active" data-target="tab-live"><span class="nav-icon">📡</span> Live Monitor</button>
         <button class="nav-btn" data-target="tab-chat"><span class="nav-icon">💬</span> Chat & Ban</button>
@@ -563,6 +862,7 @@
                                     <th>Warns</th>
                                     <th>Remaining</th>
                                     <th>Reason</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="spam-warn-tbody">
@@ -721,6 +1021,24 @@
         let searchLogCount = 0;
         let cmdLogCount = 0;
 
+        // ── Mobile Sidebar Toggle ──
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const hamburger = document.getElementById('hamburger-btn');
+
+        function openSidebar() {
+            sidebar.classList.add('open');
+            overlay.classList.add('active');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        hamburger.addEventListener('click', openSidebar);
+        overlay.addEventListener('click', closeSidebar);
+
         // ── UI Interactions ──
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -731,6 +1049,9 @@
                 const targetId = target.getAttribute('data-target');
                 document.getElementById(targetId).classList.add('active');
                 target.classList.add('active');
+
+                // Close sidebar on mobile after nav click
+                closeSidebar();
 
                 // Fetch relevant data on tab switch
                 if(ws && ws.readyState === WebSocket.OPEN) {
@@ -783,6 +1104,7 @@
 
             ws.onopen = () => {
                 document.getElementById('status-dot').classList.add('connected');
+                document.getElementById('status-dot-mobile').classList.add('connected');
                 document.getElementById('status-text').innerText = 'Connected';
                 ws.send(JSON.stringify({action: 'getState'}));
 
@@ -795,6 +1117,7 @@
 
             ws.onclose = () => {
                 document.getElementById('status-dot').classList.remove('connected');
+                document.getElementById('status-dot-mobile').classList.remove('connected');
                 document.getElementById('status-text').innerText = 'Reconnecting...';
                 clearInterval(pinger);
                 setTimeout(connectWS, 3000);
@@ -855,6 +1178,16 @@
 
                 case 'spamAdd_result':
                     showToast('스패머 수동 등록 완료');
+                    break;
+
+                case 'warnAdjust_result':
+                    if (payload.success) showToast(`경고 횟수 변경: ${payload.newCount}`);
+                    else showToast('경고 조절 실패: ' + (payload.error || ''), true);
+                    break;
+
+                case 'usageAdjust_result':
+                    if (payload.success) showToast(`사용량 변경: ${payload.newCount}회`);
+                    else showToast('사용량 조절 실패: ' + (payload.error || ''), true);
                     break;
 
                 case 'spamDelete_result':
@@ -973,20 +1306,35 @@
             spamWarnData.forEach((u, i) => {
                 const tr = document.createElement('tr');
                 const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
-                const usageText = u.commandCount != null ?
+                const usageBadge = u.commandCount != null ?
                     `<span class="badge badge-blue">${u.commandCount}회</span>` :
                     '<span style="color:var(--text-dim)">—</span>';
                 const warnBadge = u.count > 0 ?
                     `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>` :
-                    '<span class="badge badge-green">0</span>';
+                    `<span class="badge badge-green">0/${u.warnLimit || '?'}</span>`;
 
                 tr.innerHTML = `
                     <td style="font-weight:600;">${escapeHtml(u.name)}</td>
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
-                    <td>${usageText}</td>
-                    <td>${warnBadge}</td>
+                    <td>
+                        <div class="warn-adjust">
+                            <button class="warn-adjust-btn warn-minus" onclick="adjustUsage('${u.channelId}', -1)" title="사용량 -1">−</button>
+                            ${usageBadge}
+                            <button class="warn-adjust-btn warn-plus" onclick="adjustUsage('${u.channelId}', 1)" title="사용량 +1">+</button>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="warn-adjust">
+                            <button class="warn-adjust-btn warn-minus" onclick="adjustWarn('${u.channelId}', -1)" title="경고 -1">−</button>
+                            ${warnBadge}
+                            <button class="warn-adjust-btn warn-plus" onclick="adjustWarn('${u.channelId}', 1)" title="경고 +1">+</button>
+                        </div>
+                    </td>
                     <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
+                    <td>
+                        <button class="btn btn-ban btn-sm" onclick="execSpamOnly('${escapeHtml(u.name)}', '${u.channelId}')">Spam 추가</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1177,6 +1525,18 @@
         function execDeleteSpam(channelId) {
             if(!confirm('이 유저를 밴 목록에서 제거합니까?')) return;
             ws.send(JSON.stringify({ action: 'spamDelete', payload: { channelId } }));
+        }
+
+        function adjustWarn(channelId, delta) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'adjustWarn', payload: { channelId, delta } }));
+            }
+        }
+
+        function adjustUsage(channelId, delta) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'adjustUsage', payload: { channelId, delta } }));
+            }
         }
 
         document.getElementById('btn-refresh-state').addEventListener('click', () => {
