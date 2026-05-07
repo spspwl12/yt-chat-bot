@@ -8,11 +8,11 @@ module.exports = {
     },
     // ─── 스팸 설정 ──────────────────────────────────────────
     spam: {
-        spam_window_sec: 300,       // 봇 경고 해제 시간 s 단위  ( 300 : 5분 )
+        spam_window_sec: 180,       // 봇 경고 해제 시간 s 단위  ( 180 : 3분 )
         spam_max_count: 1,          // 봇이 몇번 경고를 참을건지 ( 이 횟수가 넘어가면 경고시작 )
-        spam_warn_limit: 50,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
-        penalty_duration_hrs: 12,   // 명령어 입력 기록 유지 시간 (기본 12시간)
-        penalty_add_sec: 300         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
+        spam_warn_limit: 200,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
+        penalty_duration_hrs: 24,   // 명령어 입력 기록 유지 시간 (기본 12시간)
+        penalty_add_sec: 180         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
     cooldown: {
@@ -25,8 +25,8 @@ module.exports = {
         enable_greeting: false,     // 봇 인사 기능 사용 여부
         text_min_length: 3,         // 명령어 텍스트 최소 길이
         text_max_length: 50,        // 명령어 텍스트 최대 길이
-        enable_search: true,        // 대사 검색 기능 사용 여부
-        search_min_length: 3,       // 대사 검색 시 최소 글자 수
+        enable_search: true,      // 대사 검색 기능 사용 여부
+        search_min_length: 2,       // 대사 검색 시 최소 글자 수
         boundary_sec: 20,           // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
     },
     // ─── 대사 검색 민감도 ────────────────────────────────────────
@@ -41,10 +41,10 @@ module.exports = {
         start: 1,                   // 에피소드 시작 화
         end: 293,                   // 에피소드 마지막 화
     },
-    // ─── 동기화 (실시간 연속 매칭) ────────────────────────────
+    // ─── 동기화 ─────────────────────────────────────────────
     sync: {
         tolerance_sec: 60,          // 싱크 허용 오차 (초) — 이 범위 내면 동일 싱크로 판단
-        min_consecutive: 3,         // 연속 일치 판정에 필요한 최소 샘플 수 (2 이상)
+        min_consecutive: 4,         // 연속 일치 판정에 필요한 최소 샘플 수 (2 이상)
         init_delay_ms: 5000,        // 초기 동기화 지연 (ms) — 데몬 DB 로드 후 다운로더 시작까지 대기
         segment_duration: 20,       // 세그먼트 길이 (초) — yt-dlp로 캡처할 클립 길이
         restart_delay_ms: 3000,     // 재시작 대기 (ms) — yt-dlp 또는 데몬 비정상 종료 시
