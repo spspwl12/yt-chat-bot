@@ -121,6 +121,7 @@ function toUnicodeNumber(numStr) {
         '9': '𝟿'
     };
 
+    numStr = '' + numStr;
     return numStr.split('').map(ch => map[ch] || ch).join('');
 }
 
@@ -138,6 +139,7 @@ function toUnicodeNumber2(numStr) {
         "9": "9️⃣"
     };
 
+    numStr = '' + numStr;
     return numStr.split('').map(ch => map[ch] || ch).join('');
 }
 

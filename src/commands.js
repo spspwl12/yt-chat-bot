@@ -14,6 +14,8 @@ const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
 const profanitySet = require('./data/profanity-list.js');
 const eventBus = require('./event-bus.js');
 const videoInfo = search_lib.videoInfo;
+const videoMetadata = require('./data/video-metadata.json');
+const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const searcher = new TextSearchEngine(subtitles);
 const retryPattern = ["$1", "$1 ", " $1", "$1", "$1"];
 const COOLDOWN_MSG = "(쿨타임 2분)";
@@ -347,7 +349,7 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
                     }
 
                     const unicodenum = toUnicodeNumber(subInfo.alias);
-                    const unicodescore = toUnicodeNumber('' + score);
+                    const unicodescore = toUnicodeNumber(score);
                     const timestr = formatDate(futureDate);
                     const emoji = getClockEmoji(timestr);
 
@@ -638,9 +640,13 @@ function noticeChangeEpisode() {
                 const unicodenum = toUnicodeNumber(info.alias);
 
                 // 채팅방에 '현재 방영 회차' 기본 안내 메시지 발송
-                sendChat(`📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 입니다.`,
+                const meta = videoMetaMap.get(info.name);
+                const rankSuffix = meta
+                    ? ` (조회수: ${toUnicodeNumber(meta.views_rank)}위, 댓글수: ${toUnicodeNumber(meta.comments_rank)}위)`
+                    : '';
+                sendChat(`📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 입니다.${rankSuffix}`,
                     function (attempt) {
-                        return `📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 입니다.`;
+                        return `📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 입니다.${rankSuffix}`;
                     });
 
                 // 확률(tip_chance)에 맞춰 사용자 가이드(꿀팁) 중 한 가지 랜덤 추가 발송
