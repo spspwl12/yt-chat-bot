@@ -3,7 +3,7 @@ module.exports = {
     yt: {
         video_id: "SnVhT306gAg",    // 봇이 입장할 유튜브 라이브 아이디
         send_delay: 3000,           // 메시지 전송 딜레이
-        max_retries: 3,             // 메세지 재전송 횟수
+        max_retries: 4,             // 메세지 재전송 횟수
         verify_timeout: 10000       // innertube.js의 fetchChat에서 확인 대기 최대 시간
     },
     // ─── 스팸 설정 ──────────────────────────────────────────
