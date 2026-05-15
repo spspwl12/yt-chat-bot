@@ -17,7 +17,7 @@ const videoInfo = search_lib.videoInfo;
 const videoMetadata = require('./data/video-metadata.json');
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const searcher = new TextSearchEngine(subtitles);
-const retryPattern = ["$1", "$1 ", " $1", "$1", "$1"];
+const retryPattern = ["$1", "$1 ", " $1", "", ""];
 const COOLDOWN_MSG = "(쿨타임 2분)";
 
 // ─── 설정 로드 (data/config-youtube.json) ─────────────────────
@@ -256,9 +256,10 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
         const reqStr = query.replace(/\s+/g, '');
         // 지나치게 짧은 검색어(예: 1글자)로 인해 모든 제목이 매칭되는 것을 방지
         if (reqStr.length >= cfg.input.search_min_length) {
+            const lowerQuery = reqStr.toLowerCase();
             const titleMatched = videoInfo.find(info =>
-                (info.title && info.title.replace(/\s+/g, '').includes(reqStr)) ||
-                (info.shorten && info.shorten.replace(/\s+/g, '').includes(reqStr))
+                (info.title && info.title.replace(/\s+/g, '').toLowerCase().includes(lowerQuery)) ||
+                (info.shorten && info.shorten.replace(/\s+/g, '').toLowerCase().includes(lowerQuery))
             );
 
             if (titleMatched) {
