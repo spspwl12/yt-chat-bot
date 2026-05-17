@@ -22,12 +22,14 @@ module.exports = {
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
-        enable_greeting: false,     // 봇 인사 기능 사용 여부
-        text_min_length: 3,         // 명령어 텍스트 최소 길이
-        text_max_length: 50,        // 명령어 텍스트 최대 길이
-        enable_search: true,      // 대사 검색 기능 사용 여부
-        search_min_length: 2,       // 대사 검색 시 최소 글자 수
-        boundary_sec: 20,           // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
+        enable_greeting: false,         // 봇 인사 기능 사용 여부
+        text_min_length: 3,             // 명령어 텍스트 최소 길이
+        text_max_length: 50,            // 명령어 텍스트 최대 길이
+        enable_search: true,            // 대사 검색 기능 사용 여부
+        search_min_length: 2,           // 대사 검색 시 최소 글자 수
+        duplicate_history_hours: 24,    // 지정된 시간(시간 단위) 이내 동일 검색어 재사용 시 차단 (0이면 사용 안함)
+        duplicate_history_penalty: 1,  // 중복 검색 시 부여할 강력한 경고 패널티 점수
+        boundary_sec: 20,               // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
     },
     // ─── 대사 검색 민감도 ────────────────────────────────────────
     subtitle_score: {

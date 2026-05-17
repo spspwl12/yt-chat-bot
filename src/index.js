@@ -92,7 +92,7 @@ async function main() {
                 const checkBan = spamGuard.confirm(msg.channelId);
                 if (checkBan >= 2)
                     continue;
-                const chkInput = { warn: 0, ban: checkBan };
+                const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId };
                 const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
                 if (resp) {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
@@ -101,7 +101,12 @@ async function main() {
                         handleCommand(0);
                         continue;
                     }
-                    typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
+                    const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
+                    p.then(ok => {
+                        if (ok && chkInput.onSuccess) {
+                            chkInput.onSuccess();
+                        }
+                    });
                 }
                 if (chkInput.warn > 0) {
                     spamGuard.addPenalty(msg.channelId, msg.displayName, chkInput.warn);

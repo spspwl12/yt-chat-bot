@@ -143,10 +143,14 @@ function toUnicodeNumber2(numStr) {
     return numStr.split('').map(ch => map[ch] || ch).join('');
 }
 
-
-
 function insertSpaces(text, change) {
-    return text.replace(/([가-힣])(?=[가-힣])/g, change);
+    if (change === "") {
+        // 한글 전체 삭제
+        return text.replace(/[가-힣]/g, "");
+    } else {
+        // 한글 사이에 change 삽입
+        return text.replace(/([가-힣])(?=[가-힣])/g, change);
+    }
 }
 
 function filterText(text) {

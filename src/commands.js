@@ -27,6 +27,7 @@ const cfg = require('./data/config-youtube.js');
 let delayChatTime = 0;                 // global 모드용
 const delayChatTimeMap = new Map();    // per-command 모드용
 const tempQuery = [];
+const searchHistoryMap = new Map();
 
 // 명령어를 그룹으로 분류 (같은 그룹의 alias는 쿨타임 공유)
 const COMMAND_GROUPS = {
@@ -242,13 +243,39 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
     const query = args[0];
 
     const numbers = query.match(/^(\d+)(\S)?/);
-    const parseint = numbers ? parseInt(numbers[1], 10) : NaN;
+    const parseChapter = numbers ? parseInt(numbers[1], 10) : NaN;
+    const isChapter = numbers && parseChapter >= cfg.episode.start && parseChapter <= cfg.episode.end &&
+        (!numbers[2] || "화회".includes(numbers[2]));
+
+    // 24시간(혹은 설정 시간) 이내 동일 검색어 체크 및 강력한 패널티 부과
+    if (cfg.input.duplicate_history_hours > 0) {
+        const normalizedQuery = isChapter ? parseChapter.toString() : filterText(query);
+
+        const now = Date.now();
+        const expiry = now - (cfg.input.duplicate_history_hours * 60 * 60 * 1000);
+
+        // 기한이 지난 오래된 기록 정리
+        const history = (searchHistoryMap.get(_input.channelId) || []).filter(item => item.time >= expiry);
+        const duplicateFound = history.some(item => item.query === normalizedQuery);
+
+        if (duplicateFound) {
+            _input.warn = cfg.input.duplicate_history_penalty || 1;
+            searchHistoryMap.set(_input.channelId, history); // 정리된 이력 저장
+            return null;
+        }
+
+        _input.onSuccess = () => {
+            if (cfg.input.duplicate_history_hours > 0) {
+                history.push({ query: normalizedQuery, time: Date.now() });
+                searchHistoryMap.set(_input.channelId, history);
+            }
+        };
+    }
 
     // 숫자가 입력된 경우(예: '!몇화 200화') 해당 숫자의 에피소드 방영 예정 시간 계산 조회
-    if (numbers && parseint >= cfg.episode.start && parseint <= cfg.episode.end &&
-        (!numbers[2] || "화회".includes(numbers[2]))) {
+    if (isChapter) {
         setCooldown(cmd);
-        return printNumEpisode(rtn, parseint);
+        return printNumEpisode(rtn, parseChapter);
     }
 
     // 입력된 텍스트가 특정 회차의 제목(title)이나 요약(shorten)의 일부분이라도 공백 무시 일치할 경우, 대사 검색 대신 해당 회차 방영 정보 안내
