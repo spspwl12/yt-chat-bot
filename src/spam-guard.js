@@ -94,11 +94,13 @@ class SpamGuard {
 
         // 패널티 중이면(아직 만료 안 됨) → 추가 사용은 경고 누적
         if (r.warns > 0 && now < r.penaltyExpiresAt) {
-            r.warns += counts;
-            // 만료 시각 재계산 (누적된 경고 기반)
-            this._refreshExpiry(r);
-            r.lastWarnedAt = now;
-            this._saveTrackerDebounced();
+            if (counts > 0) {
+                r.warns += counts;
+                // 만료 시각 재계산 (누적된 경고 기반)
+                this._refreshExpiry(r);
+                r.lastWarnedAt = now;
+                this._saveTrackerDebounced();
+            }
             return r.warns >= this.warnLimit ? 'ban' : 'warn';
         }
 
@@ -252,8 +254,10 @@ class SpamGuard {
                         entry.warns = 0;
                         entry.penaltyExpiresAt = 0;
                     }
-                    // 유효한 데이터만 로드 (경고 또는 이력이 있는 경우)
-                    if (entry.warns > 0 || (entry.commandHistory && entry.commandHistory.length > 0)) {
+                    // searchHistory는 별도 만료 시간 적용 불가 (commands.js에서 관리)
+                    // 유효한 데이터만 로드 (경고, 이력, 또는 검색 기록이 있는 경우)
+                    if (entry.warns > 0 || (entry.commandHistory && entry.commandHistory.length > 0) ||
+                        (entry.searchHistory && entry.searchHistory.length > 0)) {
                         map.set(channelId, entry);
                     }
                 }
@@ -272,7 +276,8 @@ class SpamGuard {
         for (const [channelId, entry] of this.tracker.entries()) {
             // 유효한 데이터만 저장
             const history = (entry.commandHistory || []).filter(t => now - t < this.penaltyDurationMs);
-            if (entry.warns > 0 || history.length > 0) {
+            const searchHistory = entry.searchHistory || [];
+            if (entry.warns > 0 || history.length > 0 || searchHistory.length > 0) {
                 obj[channelId] = {
                     warns: entry.warns || 0,
                     commandHistory: history,
@@ -280,6 +285,9 @@ class SpamGuard {
                     displayName: entry.displayName || null,
                     lastWarnedAt: entry.lastWarnedAt || 0
                 };
+                if (searchHistory.length > 0) {
+                    obj[channelId].searchHistory = searchHistory;
+                }
             }
         }
         try {
@@ -292,6 +300,30 @@ class SpamGuard {
     _saveTrackerDebounced() {
         if (this._saveTrackerTimer) clearTimeout(this._saveTrackerTimer);
         this._saveTrackerTimer = setTimeout(() => this._saveTracker(), 2000);
+    }
+    /**
+     * 검색 이력 조회 (commands.js에서 사용)
+     * @param {string} channelId
+     * @returns {Array} searchHistory 배열
+     */
+    getSearchHistory(channelId) {
+        const r = this.tracker.get(channelId);
+        return r ? (r.searchHistory || []) : [];
+    }
+
+    /**
+     * 검색 이력 저장 (commands.js에서 사용)
+     * @param {string} channelId
+     * @param {Array} history - [{query, time}, ...]
+     */
+    setSearchHistory(channelId, history) {
+        let r = this.tracker.get(channelId);
+        if (!r) {
+            r = { warns: 0, commandHistory: [], penaltyExpiresAt: 0 };
+            this.tracker.set(channelId, r);
+        }
+        r.searchHistory = history;
+        this._saveTrackerDebounced();
     }
 }
 

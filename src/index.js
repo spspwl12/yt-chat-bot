@@ -92,7 +92,7 @@ async function main() {
                 const checkBan = spamGuard.confirm(msg.channelId);
                 if (checkBan >= 2)
                     continue;
-                const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId };
+                const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
                 const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
                 if (resp) {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);

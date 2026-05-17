@@ -27,7 +27,6 @@ const cfg = require('./data/config-youtube.js');
 let delayChatTime = 0;                 // global 모드용
 const delayChatTimeMap = new Map();    // per-command 모드용
 const tempQuery = [];
-const searchHistoryMap = new Map();
 
 // 명령어를 그룹으로 분류 (같은 그룹의 alias는 쿨타임 공유)
 const COMMAND_GROUPS = {
@@ -248,26 +247,26 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
         (!numbers[2] || "화회".includes(numbers[2]));
 
     // 24시간(혹은 설정 시간) 이내 동일 검색어 체크 및 강력한 패널티 부과
-    if (cfg.input.duplicate_history_hours > 0) {
+    if (cfg.input.duplicate_history_hours > 0 && _input.spamGuard) {
         const normalizedQuery = isChapter ? parseChapter.toString() : filterText(query);
 
         const now = Date.now();
         const expiry = now - (cfg.input.duplicate_history_hours * 60 * 60 * 1000);
 
         // 기한이 지난 오래된 기록 정리
-        const history = (searchHistoryMap.get(_input.channelId) || []).filter(item => item.time >= expiry);
+        const history = _input.spamGuard.getSearchHistory(_input.channelId).filter(item => item.time >= expiry);
         const duplicateFound = history.some(item => item.query === normalizedQuery);
 
         if (duplicateFound) {
             _input.warn = cfg.input.duplicate_history_penalty || 1;
-            searchHistoryMap.set(_input.channelId, history); // 정리된 이력 저장
+            _input.spamGuard.setSearchHistory(_input.channelId, history); // 정리된 이력 저장
             return null;
         }
 
         _input.onSuccess = () => {
             if (cfg.input.duplicate_history_hours > 0) {
                 history.push({ query: normalizedQuery, time: Date.now() });
-                searchHistoryMap.set(_input.channelId, history);
+                _input.spamGuard.setSearchHistory(_input.channelId, history);
             }
         };
     }
