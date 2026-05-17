@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,10 +24,13 @@
             --text-dim: #94a3b8;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body {
-            margin: 0; padding: 0;
+            margin: 0;
+            padding: 0;
             background-color: var(--bg-color);
             background-image:
                 radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
@@ -86,7 +90,10 @@
             gap: 10px;
         }
 
-        .nav-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
+        .nav-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.03);
+        }
 
         .nav-btn.active {
             color: var(--text-main);
@@ -96,13 +103,17 @@
         .nav-btn.active::before {
             content: '';
             position: absolute;
-            left: 0; top: 0; bottom: 0;
+            left: 0;
+            top: 0;
+            bottom: 0;
             width: 3px;
             background-color: var(--primary);
             border-radius: 0 3px 3px 0;
         }
 
-        .nav-icon { font-size: 1.05rem; }
+        .nav-icon {
+            font-size: 1.05rem;
+        }
 
         .conn-status {
             margin-top: auto;
@@ -118,7 +129,8 @@
         }
 
         .status-dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: var(--error);
             box-shadow: 0 0 8px var(--error);
@@ -145,11 +157,20 @@
             transform: translateY(15px);
         }
 
-        .panel.active { display: block; }
+        .panel.active {
+            display: block;
+        }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         h2 {
@@ -177,7 +198,7 @@
 
         .status-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
         }
 
         .status-card h3 {
@@ -238,7 +259,10 @@
             transform: none;
         }
 
-        .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 0.78rem;
+        }
 
         /* ── Chat UI ── */
         .chat-list {
@@ -247,9 +271,12 @@
             max-height: 500px;
         }
 
-        .chat-list::-webkit-scrollbar { width: 6px; }
+        .chat-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
         .chat-list::-webkit-scrollbar-thumb {
-            background-color: rgba(255,255,255,0.15);
+            background-color: rgba(255, 255, 255, 0.15);
             border-radius: 3px;
         }
 
@@ -262,15 +289,49 @@
             animation: slideUp 0.3s ease;
         }
 
-        .chat-item:last-child { border-bottom: none; }
-        .chat-author { font-weight: 600; color: #fcd34d; margin-right: 10px; font-size: 0.9rem; }
-        .chat-text { color: var(--text-main); font-weight: 400; flex: 1; word-break: break-all; font-size: 0.9rem; }
+        .chat-item:last-child {
+            border-bottom: none;
+        }
+
+        .chat-author {
+            font-weight: 600;
+            color: #fcd34d;
+            margin-right: 10px;
+            font-size: 0.9rem;
+        }
+
+        .chat-text {
+            color: var(--text-main);
+            font-weight: 400;
+            flex: 1;
+            word-break: break-all;
+            font-size: 0.9rem;
+        }
 
         /* ── Table ── */
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 18px; text-align: left; border-bottom: 1px solid var(--surface-border); }
-        th { color: var(--text-dim); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { font-size: 0.85rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px 18px;
+            text-align: left;
+            border-bottom: 1px solid var(--surface-border);
+        }
+
+        th {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            font-size: 0.85rem;
+        }
 
         /* ── Forms ── */
         .add-spam-form {
@@ -281,7 +342,7 @@
         }
 
         .form-input {
-            background: rgba(0,0,0,0.25);
+            background: rgba(0, 0, 0, 0.25);
             border: 1px solid var(--surface-border);
             color: white;
             padding: 10px 14px;
@@ -305,7 +366,7 @@
         }
 
         .config-block-header {
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
             padding: 14px 20px;
             border-bottom: 1px solid var(--surface-border);
             display: flex;
@@ -313,7 +374,10 @@
             align-items: center;
         }
 
-        .config-block-header h3 { margin:0; font-size: 1rem; }
+        .config-block-header h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
 
         textarea.code-editor {
             width: 100%;
@@ -328,7 +392,9 @@
             line-height: 1.5;
         }
 
-        textarea.code-editor:focus { outline: none; }
+        textarea.code-editor:focus {
+            outline: none;
+        }
 
         /* ── Log Table ── */
         .log-container {
@@ -357,9 +423,12 @@
             overflow-y: auto;
         }
 
-        .log-scroll::-webkit-scrollbar { width: 6px; }
+        .log-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
         .log-scroll::-webkit-scrollbar-thumb {
-            background-color: rgba(255,255,255,0.15);
+            background-color: rgba(255, 255, 255, 0.15);
             border-radius: 3px;
         }
 
@@ -372,11 +441,31 @@
             font-weight: 600;
             font-family: 'Consolas', monospace;
         }
-        .badge-green { background: rgba(16,185,129,0.2); color: #34d399; }
-        .badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
-        .badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
-        .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
-        .badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+
+        .badge-green {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .badge-blue {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .badge-yellow {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .badge-purple {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+        }
 
         /* ── Toast ── */
         #toast-container {
@@ -398,12 +487,33 @@
             color: white;
             font-weight: 500;
             font-size: 0.88rem;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
             animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
         }
 
-        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        @keyframes toastIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
 
         /* ── Misc ── */
         .section-card {
@@ -451,7 +561,7 @@
 
         .sub-tab-btn:hover {
             color: var(--text-main);
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .sub-tab-btn.active {
@@ -461,7 +571,7 @@
 
         .sub-tab-btn .sub-tab-count {
             font-size: 0.72rem;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             padding: 2px 7px;
             border-radius: 10px;
             min-width: 20px;
@@ -472,8 +582,14 @@
             background: rgba(139, 92, 246, 0.3);
         }
 
-        .sub-panel { display: none; }
-        .sub-panel.active { display: block; animation: slideUp 0.25s ease forwards; }
+        .sub-panel {
+            display: none;
+        }
+
+        .sub-panel.active {
+            display: block;
+            animation: slideUp 0.25s ease forwards;
+        }
 
         /* ── Warn Adjust Buttons ── */
         .warn-adjust {
@@ -486,10 +602,11 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 22px; height: 22px;
+            width: 22px;
+            height: 22px;
             border: 1px solid var(--surface-border);
             border-radius: 6px;
-            background: rgba(255,255,255,0.06);
+            background: rgba(255, 255, 255, 0.06);
             color: var(--text-dim);
             font-size: 0.85rem;
             font-weight: 700;
@@ -533,14 +650,14 @@
         }
 
         .hamburger-btn:hover {
-            background: rgba(255,255,255,0.06);
+            background: rgba(255, 255, 255, 0.06);
         }
 
         .sidebar-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 99;
         }
 
@@ -634,7 +751,7 @@
 
             /* Tables: horizontal scroll */
             .log-container,
-            .sub-panel > .glass {
+            .sub-panel>.glass {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
             }
@@ -648,7 +765,8 @@
                 min-width: 600px;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 8px 10px;
                 font-size: 0.75rem;
                 white-space: nowrap;
@@ -676,7 +794,7 @@
                 padding: 10px 14px;
             }
 
-            .chat-item > div:last-child {
+            .chat-item>div:last-child {
                 align-self: flex-end;
             }
 
@@ -695,7 +813,7 @@
             }
 
             /* Buttons row */
-            #tab-live > div:last-child {
+            #tab-live>div:last-child {
                 flex-wrap: wrap;
             }
 
@@ -763,8 +881,142 @@
                 font-size: 0.78rem;
             }
         }
+
+        /* ── User Detail Modal ── */
+        .user-detail-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .user-detail-overlay.active {
+            display: flex;
+        }
+
+        .user-detail-modal {
+            background: var(--surface);
+            border: 1px solid var(--surface-border);
+            border-radius: 16px;
+            padding: 28px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .user-detail-modal h3 {
+            margin: 0 0 20px 0;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .user-detail-modal .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .user-detail-modal .detail-section h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .user-detail-modal .detail-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .user-detail-modal .detail-list li {
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.82rem;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .user-detail-modal .detail-list li:last-child {
+            border-bottom: none;
+        }
+
+        .user-detail-modal .detail-list .detail-time {
+            color: var(--text-dim);
+            font-family: monospace;
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        .user-detail-modal .detail-list .detail-query {
+            color: #fcd34d;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .user-detail-modal .detail-empty {
+            color: var(--text-dim);
+            font-size: 0.82rem;
+            font-style: italic;
+            padding: 8px 0;
+        }
+
+        .detail-close-btn {
+            background: var(--error);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            float: right;
+            margin-top: 8px;
+        }
+
+        .detail-close-btn:hover {
+            opacity: 0.85;
+        }
+
+        .detail-info-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .detail-info-item {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 10px;
+            padding: 10px 16px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .detail-info-item .label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-info-item .value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -782,7 +1034,7 @@
         <button class="nav-btn active" data-target="tab-live"><span class="nav-icon">📡</span> Live Monitor</button>
         <button class="nav-btn" data-target="tab-chat"><span class="nav-icon">💬</span> Chat & Ban</button>
         <button class="nav-btn" data-target="tab-spam"><span class="nav-icon">🛡️</span> Spam Users</button>
-        <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> Search Logs</button>
+        <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> pHash Logs</button>
         <button class="nav-btn" data-target="tab-commands"><span class="nav-icon">📋</span> Command Logs</button>
         <button class="nav-btn" data-target="tab-schedule"><span class="nav-icon">📅</span> Schedule</button>
         <button class="nav-btn" data-target="tab-videoinfo"><span class="nav-icon">🎬</span> Video Info</button>
@@ -792,7 +1044,7 @@
             <div id="status-dot" class="status-dot"></div>
             <span id="status-text">Disconnected</span>
         </div>
-        </div>
+    </div>
     </div>
 
     <div class="content">
@@ -806,21 +1058,29 @@
                 </div>
                 <div class="status-card glass">
                     <h3>Video Time</h3>
-                    <p id="stat-sec" style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">--</p>
+                    <p id="stat-sec"
+                        style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">--
+                    </p>
                 </div>
                 <div class="status-card glass">
-                    <h3>Search Logs</h3>
-                    <p id="stat-search-count" style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text;">0</p>
+                    <h3>pHash Logs</h3>
+                    <p id="stat-search-count"
+                        style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text;">0
+                    </p>
                 </div>
                 <div class="status-card glass">
                     <h3>Commands Used</h3>
-                    <p id="stat-cmd-count" style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0</p>
+                    <p id="stat-cmd-count"
+                        style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0
+                    </p>
                 </div>
             </div>
             <div style="display:flex; gap:12px; margin-top: 20px;">
                 <button class="btn" id="btn-refresh-state">Force Refresh</button>
-                <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted: OFF</button>
-                <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot Bot</button>
+                <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
+                    OFF</button>
+                <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot
+                    Bot</button>
             </div>
         </div>
 
@@ -846,8 +1106,10 @@
             </div>
 
             <div class="sub-tabs">
-                <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count" id="spam-warn-count">0</span></button>
-                <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count" id="spam-ban-count">0</span></button>
+                <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
+                        id="spam-warn-count">0</span></button>
+                <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
+                        id="spam-ban-count">0</span></button>
             </div>
 
             <div id="spam-warn-panel" class="sub-panel active">
@@ -1015,6 +1277,15 @@
 
     <div id="toast-container"></div>
 
+    <!-- User Detail Modal -->
+    <div class="user-detail-overlay" id="user-detail-overlay" onclick="if(event.target===this)closeUserDetail()">
+        <div class="user-detail-modal" id="user-detail-modal">
+            <h3 id="user-detail-title">유저 상세 정보</h3>
+            <div id="user-detail-content">Loading...</div>
+            <button class="detail-close-btn" onclick="closeUserDetail()">닫기</button>
+        </div>
+    </div>
+
     <script>
         let ws;
         let pinger;
@@ -1054,15 +1325,15 @@
                 closeSidebar();
 
                 // Fetch relevant data on tab switch
-                if(ws && ws.readyState === WebSocket.OPEN) {
-                    if (targetId === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
-                    if (targetId === 'tab-chat') ws.send(JSON.stringify({action: 'getChat'}));
-                    if (targetId === 'tab-spam') ws.send(JSON.stringify({action: 'getSpam'}));
-                    if (targetId === 'tab-search') ws.send(JSON.stringify({action: 'getSearchLogs'}));
-                    if (targetId === 'tab-commands') ws.send(JSON.stringify({action: 'getCommandLogs'}));
-                    if (targetId === 'tab-schedule') ws.send(JSON.stringify({action: 'getSchedule'}));
-                    if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({action: 'getVideoInfo'}));
-                    if (targetId === 'tab-config') ws.send(JSON.stringify({action: 'getConfig'}));
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    if (targetId === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
+                    if (targetId === 'tab-chat') ws.send(JSON.stringify({ action: 'getChat' }));
+                    if (targetId === 'tab-spam') ws.send(JSON.stringify({ action: 'getSpam' }));
+                    if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
+                    if (targetId === 'tab-commands') ws.send(JSON.stringify({ action: 'getCommandLogs' }));
+                    if (targetId === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
+                    if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({ action: 'getVideoInfo' }));
+                    if (targetId === 'tab-config') ws.send(JSON.stringify({ action: 'getConfig' }));
                 }
             });
         });
@@ -1071,7 +1342,7 @@
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = 'toast';
-            if(isError) toast.style.borderLeftColor = 'var(--error)';
+            if (isError) toast.style.borderLeftColor = 'var(--error)';
             toast.innerText = message;
             container.appendChild(toast);
             setTimeout(() => { toast.remove(); }, 3500);
@@ -1079,9 +1350,9 @@
 
         function fmtTime(ts) {
             const d = new Date(ts);
-            const h = String(d.getHours()).padStart(2,'0');
-            const m = String(d.getMinutes()).padStart(2,'0');
-            const s = String(d.getSeconds()).padStart(2,'0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
             return `${h}:${m}:${s}`;
         }
 
@@ -1094,7 +1365,7 @@
 
         function escapeHtml(str) {
             if (!str) return '';
-            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         // ── WebSocket Logic ──
@@ -1106,12 +1377,12 @@
                 document.getElementById('status-dot').classList.add('connected');
                 document.getElementById('status-dot-mobile').classList.add('connected');
                 document.getElementById('status-text').innerText = 'Connected';
-                ws.send(JSON.stringify({action: 'getState'}));
+                ws.send(JSON.stringify({ action: 'getState' }));
 
                 pinger = setInterval(() => {
                     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
-                    if (activeTab === 'tab-live') ws.send(JSON.stringify({action: 'getState'}));
-                    if (activeTab === 'tab-schedule') ws.send(JSON.stringify({action: 'getSchedule'}));
+                    if (activeTab === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
+                    if (activeTab === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
                 }, 5000);
             };
 
@@ -1127,14 +1398,14 @@
                 try {
                     const msg = JSON.parse(event.data);
                     handleWSMessage(msg);
-                } catch(e) { console.error("Message parse error", e); }
+                } catch (e) { console.error("Message parse error", e); }
             };
         }
 
         function handleWSMessage(msg) {
             const { action, payload } = msg;
 
-            switch(action) {
+            switch (action) {
                 case 'state':
                     if (payload.episodeInfo) {
                         const totalEp = payload.totalEpisodes || '--';
@@ -1228,6 +1499,10 @@
                 case 'schedule_data':
                     renderSchedule(payload);
                     break;
+
+                case 'userDetail':
+                    renderUserDetail(payload);
+                    break;
             }
         }
 
@@ -1259,7 +1534,7 @@
         function renderChats(chats) {
             const container = document.getElementById('chat-container');
             container.innerHTML = '';
-            chats.sort((a,b) => b.timestamp - a.timestamp);
+            chats.sort((a, b) => b.timestamp - a.timestamp);
             chats.forEach(c => container.appendChild(createChatElement(c)));
         }
 
@@ -1332,7 +1607,8 @@
                     </td>
                     <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn btn-sm" style="background:var(--info); margin-right:4px;" onclick="showUserDetail('${u.channelId}')">상세</button>
                         <button class="btn btn-ban btn-sm" onclick="execSpamOnly('${escapeHtml(u.name)}', '${u.channelId}')">Spam 추가</button>
                     </td>
                 `;
@@ -1377,7 +1653,7 @@
 
             renderSpamWarnTable();
             renderSpamBanTable();
-            
+
             if (spamTimer) clearInterval(spamTimer);
             spamTimer = setInterval(tickSpamTimers, 1000);
         }
@@ -1523,7 +1799,7 @@
         });
 
         function execDeleteSpam(channelId) {
-            if(!confirm('이 유저를 밴 목록에서 제거합니까?')) return;
+            if (!confirm('이 유저를 밴 목록에서 제거합니까?')) return;
             ws.send(JSON.stringify({ action: 'spamDelete', payload: { channelId } }));
         }
 
@@ -1540,7 +1816,7 @@
         }
 
         document.getElementById('btn-refresh-state').addEventListener('click', () => {
-            if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({action: 'getState'}));
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'getState' }));
         });
 
         document.getElementById('btn-add-spam').addEventListener('click', () => {
@@ -1560,42 +1836,142 @@
             document.getElementById('spam-reason').value = '';
         });
 
-        window.saveConfig = function(target) {
+        window.saveConfig = function (target) {
             const content = document.getElementById(`val-${target}`).value;
             ws.send(JSON.stringify({ action: 'saveConfig', payload: { target, content } }));
         };
 
-        window.saveVideoInfo = function() {
+        window.saveVideoInfo = function () {
             const content = document.getElementById('val-videoinfo').value;
             // 먼저 클라이언트에서 JSON 유효성 검사
             try {
                 JSON.parse(content);
-            } catch(e) {
+            } catch (e) {
                 return showToast('JSON 파싱 에러: ' + e.message, true);
             }
             ws.send(JSON.stringify({ action: 'saveVideoInfo', payload: { content } }));
         };
 
-        window.formatVideoInfo = function() {
+        window.formatVideoInfo = function () {
             const el = document.getElementById('val-videoinfo');
             try {
                 const obj = JSON.parse(el.value);
                 el.value = JSON.stringify(obj, null, 2);
                 showToast('JSON 포맷 완료');
-            } catch(e) {
+            } catch (e) {
                 showToast('JSON 파싱 에러: ' + e.message, true);
             }
         };
 
-        window.rebootBot = function() {
+        window.rebootBot = function () {
             if (confirm('정말로 봇을 재부팅하시겠습니까? (설정 반영 등에 필요합니다)\n\n※ 서버/콘솔 외부 환경에서 자동 재시작(PM2, 스크립트 반복문 등) 기능이 켜져 있어야 다시 켜집니다.')) {
                 ws.send(JSON.stringify({ action: 'reboot_bot' }));
                 showToast('재부팅 명령을 전송했습니다. 연결이 곧 끊어집니다.', true);
             }
         };
 
+        // ── User Detail Modal ──
+        function showUserDetail(channelId) {
+            document.getElementById('user-detail-content').innerHTML = '<p style="color:var(--text-dim)">불러오는 중...</p>';
+            document.getElementById('user-detail-overlay').classList.add('active');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getUserDetail', payload: { channelId } }));
+            }
+        }
+
+        function closeUserDetail() {
+            document.getElementById('user-detail-overlay').classList.remove('active');
+        }
+
+        function fmtFullDate(ts) {
+            const d = new Date(ts);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${mm}/${dd} ${hh}:${mi}:${ss}`;
+        }
+
+        function renderUserDetail(data) {
+            const content = document.getElementById('user-detail-content');
+            if (!data) {
+                content.innerHTML = '<p class="detail-empty">트래커에 기록이 없는 유저입니다.</p>';
+                return;
+            }
+
+            const now = Date.now();
+            const penaltyRemaining = data.penaltyExpiresAt > now ? data.penaltyExpiresAt - now : 0;
+
+            let html = `
+                <div class="detail-info-row">
+                    <div class="detail-info-item">
+                        <div class="label">닉네임</div>
+                        <div class="value" style="color:#fcd34d;">${escapeHtml(data.displayName || '알 수 없음')}</div>
+                    </div>
+                    <div class="detail-info-item">
+                        <div class="label">경고 횟수</div>
+                        <div class="value" style="color:${data.warns > 0 ? '#f87171' : '#4ade80'};">${data.warns}</div>
+                    </div>
+                    <div class="detail-info-item">
+                        <div class="label">사용 횟수</div>
+                        <div class="value" style="color:#60a5fa;">${data.commandHistory ? data.commandHistory.length : 0}회</div>
+                    </div>
+                    <div class="detail-info-item">
+                        <div class="label">패널티 남은 시간</div>
+                        <div class="value" style="color:#f87171;">${fmtRemaining(penaltyRemaining)}</div>
+                    </div>
+                </div>
+                <div style="font-family:monospace; font-size:0.72rem; color:var(--text-dim); margin-bottom:20px; word-break:break-all;">Channel: ${escapeHtml(data.channelId)}</div>
+            `;
+
+            // 명령어 사용 이력
+            html += '<div class="detail-section"><h4>📋 명령어 사용 이력 (Usage History)</h4>';
+            if (data.commandHistory && data.commandHistory.length > 0) {
+                const sorted = [...data.commandHistory].sort((a, b) => b - a);
+                html += '<ul class="detail-list">';
+                sorted.forEach(t => {
+                    const ago = Math.round((now - t) / 60000);
+                    html += `<li>
+                        <span class="detail-time">${fmtFullDate(t)}</span>
+                        <span style="color:var(--text-dim);">${ago}분 전</span>
+                    </li>`;
+                });
+                html += '</ul>';
+            } else {
+                html += '<p class="detail-empty">사용 이력이 없습니다.</p>';
+            }
+            html += '</div>';
+
+            // 검색 이력 (searchHistory)
+            html += '<div class="detail-section"><h4>🔍 검색 이력 (Search History)</h4>';
+            if (data.searchHistory && data.searchHistory.length > 0) {
+                const sorted = [...data.searchHistory].sort((a, b) => b.time - a.time);
+                html += '<ul class="detail-list">';
+                sorted.forEach(item => {
+                    const ago = Math.round((now - item.time) / 60000);
+                    html += `<li>
+                        <span class="detail-query">${escapeHtml(item.query)}</span>
+                        <span>
+                            <span class="detail-time">${fmtFullDate(item.time)}</span>
+                            <span style="color:var(--text-dim); margin-left:8px;">${ago}분 전</span>
+                        </span>
+                    </li>`;
+                });
+                html += '</ul>';
+            } else {
+                html += '<p class="detail-empty">검색 이력이 없습니다.</p>';
+            }
+            html += '</div>';
+
+            document.getElementById('user-detail-title').textContent =
+                `📊 ${data.displayName || '유저'} 상세 정보`;
+            content.innerHTML = html;
+        }
+
         // Bootstrap
         connectWS();
     </script>
 </body>
+
 </html>

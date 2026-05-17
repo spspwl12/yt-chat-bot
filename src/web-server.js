@@ -287,6 +287,31 @@ async function handleAction(client, req) {
             }
         }
     }
+    else if (action === 'getUserDetail') {
+        const { channelId } = payload;
+        if (spamGuardRef) {
+            const r = spamGuardRef.tracker.get(channelId);
+            if (r) {
+                const now = Date.now();
+                const history = (r.commandHistory || []).filter(t => now - t < spamGuardRef.penaltyDurationMs);
+                const searchHistory = r.searchHistory || [];
+                sendWSFrame(client, JSON.stringify({
+                    action: 'userDetail',
+                    payload: {
+                        channelId,
+                        displayName: r.displayName || null,
+                        warns: r.warns || 0,
+                        penaltyExpiresAt: r.penaltyExpiresAt || 0,
+                        lastWarnedAt: r.lastWarnedAt || 0,
+                        commandHistory: history,
+                        searchHistory: searchHistory
+                    }
+                }));
+            } else {
+                sendWSFrame(client, JSON.stringify({ action: 'userDetail', payload: null }));
+            }
+        }
+    }
     else if (action === 'spamDelete') {
         const { channelId } = payload;
         if(spamGuardRef) {
