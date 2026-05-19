@@ -669,7 +669,7 @@ function noticeChangeEpisode() {
                 // 채팅방에 '현재 방영 회차' 기본 안내 메시지 발송
                 const meta = videoMetaMap.get(info.name);
                 const rankSuffix = meta
-                    ? ` (조회수: ${toUnicodeNumber(meta.views_rank)}위, 댓글수: ${toUnicodeNumber(meta.comments_rank)}위)`
+                    ? ` (조회수: ${toUnicodeNumber(meta.views_rank)}위, ㅋㅋㅋ개수: ${toUnicodeNumber(meta.funny_rank)}위)`
                     : '';
                 sendChat(`📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 입니다.${rankSuffix}`,
                     function (attempt) {
