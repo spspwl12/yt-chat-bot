@@ -36,8 +36,8 @@ const COMMAND_GROUPS = {
     'timetable': ['!시간표', '!편성표'],
     'next': ['!다음', '!다음화', '!다음회'],
     'nextnext': ['!다다음', '!다다음화', '!다다음회'],
-    'first': ['!첫화', '!첫회', '!처음화', '!처음회'],
-    'last': ['!마지막', '!마지막화', '!마지막회', '!최종화', '!최종회'],
+    'first': ['!첫화', '!첫회', '!처음화', '!처음회', '!처음편', '!첫편'],
+    'last': ['!마지막', '!마지막화', '!마지막회', '!마지막편', '!최종화', '!최종회', '!최종편'],
     'date': ['!날짜'],
     'time': ['!시간', '!타임', '!남은시간']
 };
@@ -101,9 +101,12 @@ async function handleCommand(type, text, displayName, _input) {
         return null;
     }
 
-    // 메시지 기본 유효성 검증 (입력 텍스트 타입 확인 및 글자 수 제한)
-    if (!text || typeof text !== "string" ||
-        text.length < cfg.input.text_min_length || text.length > cfg.input.text_max_length)
+    // 메시지 기본 유효성 검증 (입력 텍스트 타입 확인)
+    if (!text || typeof text !== "string")
+        return null;
+
+    // 명령어가 최소 글자 길이를 충족하지 않는 경우 
+    if (text.length < cfg.input.text_min_length)
         return null;
 
     // 명령어 접두사('!') 여부 확인 — " ! 검색어"도 "!검색어"로 인식
@@ -152,6 +155,12 @@ async function handleCommand(type, text, displayName, _input) {
         return response;
     };
 
+    if (text.length > cfg.input.text_max_length) {
+        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+        return _emitLog(`⚠️ 문장이 길어요. ${cfg.input.text_max_length}자 ` +
+            `이내로 간단히 작성해 주세요. ${COOLDOWN_MSG}`);
+    }
+
     // 단순 봇 인사 명령어
     if (group === 'greeting') {
         if (!cfg.input.enable_greeting) {
@@ -164,8 +173,9 @@ async function handleCommand(type, text, displayName, _input) {
     // 봇 도움말/가이드 출력
     if (group === 'help') {
         setCooldown(cmd);
-        return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간, !시간표, !첫화, !마지막화, !날짜' +
-            'ℹ️ 이 프로그램은 비공식 봇이며, SBS와는 아무런 관련이 없습니다. ' +
+        return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간, !시간표, !첫화, !마지막화, !날짜 ' +
+            'ℹ️ !몇화 사용법: !몇화 64화, !몇화 31화 48화 64화 72화 121화, !몇화 괜히똥만쌌네 ' +
+            'ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 쿨타임이 적용됩니다. ' +
             'ℹ️ 명령은 2분마다 가능합니다. (도배 방지) ');
     }
 
@@ -240,6 +250,34 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     const query = args[0];
+
+    // ─── 복수 에피소드 번호 감지 ──────────────────────────────
+    // "1 29 30 50 66 77" 또는 "1화 10화 30화 44화 55화" 형태 감지
+    const multiTokens = query.trim().split(/[\s,]+/);
+    if (multiTokens.length >= 2) {
+        const parsedNums = [];
+        let allInRange = true;
+
+        for (const token of multiTokens) {
+            const m = token.match(/^(\d+)(화|회)?$/);
+            if (!m) {
+                allInRange = false;
+                break;
+            }
+            const num = parseInt(m[1], 10);
+            if (num < cfg.episode.start || num > cfg.episode.end) {
+                allInRange = false;
+                break;
+            }
+            parsedNums.push(num);
+        }
+
+        if (allInRange && parsedNums.length >= 2) {
+            setCooldown(cmd);
+            return printMultiEpisodeTimetable(rtn, parsedNums);
+        }
+        // 범위 밖의 숫자가 있으면 대사 검색으로 fall-through
+    }
 
     const numbers = query.match(/^(\d+)(\S)?/);
     const parseChapter = numbers ? parseInt(numbers[1], 10) : NaN;
@@ -669,7 +707,7 @@ function noticeChangeEpisode() {
                 // 채팅방에 '현재 방영 회차' 기본 안내 메시지 발송
                 const meta = videoMetaMap.get(info.name);
                 const rankSuffix = meta
-                    ? ` (조회수: ${toUnicodeNumber(meta.views_rank)}위, ㅋㅋㅋ개수: ${toUnicodeNumber(meta.funny_rank)}위)`
+                    ? ` (조회수: ${toUnicodeNumber(meta.views_rank)}위, ㅋㅋ개수: ${toUnicodeNumber(meta.funny_rank)}위)`
                     : '';
                 sendChat(`📢 현재 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 입니다.${rankSuffix}`,
                     function (attempt) {
@@ -798,6 +836,81 @@ function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) 
     }
 
     return str || null;
+}
+
+/**
+ * 복수 에피소드 번호를 시간표 형식으로 출력
+ * 입력: [1, 29, 30, 50] → "(현재회차)→[20일13:53]𝟷화→[20일14:55]𝟸𝟿화→..."
+ * 동일 회차 반복 시 → 이번/다음/다다음 사이클의 방영 시각을 순차 표시
+ * 가장 가까운 방영 순서대로 정렬, cfg.timetable.default_limit 글자 제한 적용
+ * @param {object} rtn - 현재 에피소드 진행 데이터
+ * @param {number[]} episodeNums - 요청된 에피소드 번호 배열
+ */
+function printMultiEpisodeTimetable(rtn, episodeNums) {
+    const limitLength = cfg.timetable.default_limit;
+    const currentInfo = videoInfo[rtn.index];
+
+    // 전체 사이클 시간(ms) 계산: 활성 에피소드들의 총 스트리밍 길이
+    let totalCycleMs = 0;
+    for (const ep of videoInfo) {
+        if (!ep.disable) totalCycleMs += (ep._streamDurationSec || ep._durationSec || 0);
+    }
+    totalCycleMs *= 1000;
+
+    // 동일 회차 반복 카운트 (같은 번호가 N번째 등장하면 (N-1)번째 사이클의 시각)
+    const seenCount = {};
+
+    // 각 요청 에피소드의 방영 예정 시각 계산
+    const entries = [];
+    for (const num of episodeNums) {
+        const info = videoInfo.find(e => e.alias == num);
+        if (!info) continue;
+
+        // 이 회차가 몇 번째 등장인지 카운트
+        seenCount[num] = (seenCount[num] || 0);
+        const cycleOffset = seenCount[num];
+        seenCount[num]++;
+
+        // 기본 방영 시각 + 사이클 오프셋
+        const baseFutureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
+        const futureDate = new Date(baseFutureDate.getTime() + cycleOffset * totalCycleMs);
+
+        entries.push({
+            alias: info.alias,
+            futureDate: futureDate,
+        });
+    }
+
+    if (entries.length === 0) return null;
+
+    // 가장 가까운 순서대로 정렬
+    entries.sort((a, b) => a.futureDate.getTime() - b.futureDate.getTime());
+
+    const makeMsg = (change) => {
+        // 현재 회차를 무조건 맨 앞에 앵커로 표시
+        const currentAlias = toUnicodeNumber(currentInfo.alias);
+        let str = `(${currentAlias}화)`;
+        let pdate = null;
+
+        // 요청된 회차들을 시간순으로 출력
+        for (const entry of entries) {
+            const hdr = `[${formatDate(entry.futureDate, pdate, true)}]`.replace(/ /g, '');
+            const unicodeAlias = toUnicodeNumber(entry.alias);
+            const candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
+            if (str.length + candidate.length >= limitLength) break;
+            str += candidate;
+            pdate = entry.futureDate;
+        }
+
+        return str;
+    };
+
+    return {
+        msg: makeMsg(retryPattern[0]),
+        proc: function (attempt) {
+            return makeMsg(retryPattern[attempt]);
+        }
+    };
 }
 
 /**
