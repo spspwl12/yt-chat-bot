@@ -3,7 +3,7 @@
 YouTube 라이브 스트리밍 채팅방에서 **회차 안내**, **대사 검색**, **시간표 조회** 등 다양한 명령어에 자동 응답하는 봇입니다.  
 pHash (Perceptual Hash) 기반 영상 핑거프린팅으로 **현재 방영 중인 회차를 자동 인식**하고, 편집(컷) 구간을 반영한 **정확한 시간 계산**을 수행합니다.
 
-> **npm install 없이** 순수 Node.js으로 동작하며, PM2로 관리됩니다.
+> 최소한의 npm 의존성(`canvas`, `fuse.js`, `hanspell`)만 사용하며, PM2로 관리됩니다.
 
 ---
 
@@ -17,23 +17,24 @@ pHash (Perceptual Hash) 기반 영상 핑거프린팅으로 **현재 방영 중�
 
 ### 📜 자막 기반 대사 검색 ( 선택 )
 - SBS 공식 사이트의 자막 데이터를 활용한 대사 검색
-- **9종 한국어 오타/구어체 자동 정규화** (경음↔평음, 격음↔평음, ㅐ↔ㅔ, ㅗ↔ㅜ, ㅘ↔ㅝ 등)
-- 오타 허용 및 유사도 기반 랭킹 (Jamo 분해 + 발음 정규화 + relaxed 비교 4중 레이어)
-- 자모/발음/relaxed 사전 캐싱으로 검색 속도 최적화
+- **3-Tier 퍼지 매칭**: 글자 완전 포함(Tier1, 100점) → 글자 편집거리(Tier2, ~85점) → 자모 편집거리(Tier3, ~60점)
+- 오타 허용 및 유사도 기반 랭킹 (Jamo 분해 + Substring Edit Distance + Bloom Filter 사전 필터링)
+- Int32Array 기반 자모/글자 ID 사전 변환 + Bloom Filter로 검색 속도 최적화
 - 검색된 대사의 등장 예정 시간 계산
 
 ### 🛡️ 도배 방지 & 자동 차단
-- 슬라이딩 윈도우 기반 도배 감지 (기본: 5분 / 1회 초과 시 경고)
-- 누적 경고 20회 도달 시 YouTube 채팅 자동 차단 (InnerTube API)
+- 슬라이딩 윈도우 기반 도배 감지 (기본: 3분 / 1회 초과 시 경고)
+- 누적 경고 200회 도달 시 YouTube 채팅 자동 차단 (InnerTube API)
 - 비속어 필터링
 - 대사 검색 오·남용 시 가중 페널티 부여
 
 ### 🖥️ 웹 대시보드 (컨트롤 패널)
 - `http://localhost:12345` 에 접속해 봇 상태 실시간 모니터링
-- **실시간 채팅 스트리밍** 및 사용자 원클릭 밴/차단
+- **실시간 채팅 스트리밍** (WebSocket) 및 사용자 원클릭 밴/차단
 - 대사 검색 로그 및 명령어 사용 내역 실시간 확인
 - 스팸(도배) 경고 목록 관리 및 봇 챗봇 응답 음소거(Mute) 기능 지원
 - 서버 설정 즉시 변경 (config-youtube.js 실시간 반영)
+- 편성표 조회 및 봇 재부팅 기능
 
 ### 🔐 InnerTube HTTP/2 API
 - YouTube InnerTube API 직접 호출 (**API 할당량 제한 없음**)
@@ -67,8 +68,8 @@ pHash (Perceptual Hash) 기반 영상 핑거프린팅으로 **현재 방영 중�
 ### 봇 실행
 
 ```bash
-# PM2로 실행
-pm2 start ecosystem.config.cjs
+# 의존성 설치
+npm install
 
 # 로그 확인
 pm2 logs yt-chat-bot
@@ -95,11 +96,11 @@ node src/index.js
 
 | 명령어 | 설명 | 출력 |
 |--------|------|------|
-| `!몇화` | 현재 방영 중인 회차 + 남은 시간 | `🎬 현재 회차는 "𝟸𝟻𝟾. ..." 이고 🕐 남은 시간은 00:09:08 초 입니다.` |
-| `!몇화 <숫자>` | 특정 회차의 방영 예정 시간 | `🔜 예정 회차는 "𝟸𝟻𝟾. ..." 이고 🕐 예정 시간은 21:23 분 입니다.` | 
-| `!몇화 <대사>` | 대사가 등장하는 회차 + 예정 시간 | `📜 요청하신 대사는 "𝟸𝟻𝟾. ..." 에 등장하며 🕐 등장 시간은 21:23 분 입니다.` |
-| `!다음화` | 다음 방영 예정 회차 | `👉🏻 다음 회차는 " ... " 이고 🕐 예정 시간은 21:23 분 입니다.` |
-| `!마지막화` | 마지막 회차 방영 예정 시간 | `🔜 예정 회차는 "𝟸𝟻𝟾. ..." 이고 🕐 예정 시간은 21:23 분 입니다.` |
+| `!몇화` | 현재 방영 중인 회차 + 남은 시간 | `🎬 현재 회차는 "𝟸𝟻𝟾. ..." 이고 🕒 남은 시간은 00:09:08 초 입니다.` |
+| `!몇화 <숫자>` | 특정 회차의 방영 예정 시간 | `🔜 예정 회차는 "𝟸𝟻𝟾. ..." 이고 🕒 예정 시간은 21:23 분 입니다.` | 
+| `!몇화 <대사>` | 대사가 등장하는 회차 + 예정 시간 | `📜 요청하신 대사는 "𝟸𝟻𝟾. ..." 에 등장하며 🕒 등장 시간은 21:23 분 입니다.` |
+| `!다음화` | 다음 방영 예정 회차 | `👉🏻 다음 회차는 " ... " 이고 🕒 예정 시간은 21:23 분 입니다.` |
+| `!마지막화` | 마지막 회차 방영 예정 시간 | `🔜 예정 회차는 "𝟸𝟻𝟾. ..." 이고 🕒 예정 시간은 21:23 분 입니다.` |
 | `!시간표` | 다음 회차부터의 방영 일정 | [09:08]회차제목1/회차제목2->[10:35]회차제목1/회차제목2 ... |
 
 > **별칭:** `!몇회`, `!몇편`, `!화차`, `!지금몇화` 등 다양한 동의어 지원
@@ -110,7 +111,10 @@ node src/index.js
 |--------|------|
 | `!안녕` / `!인사` / `!하이` | 인사 응답 |
 | `!도움` / `!명령어` | 명령어 목록 안내 |
-| `!건의 <내용>` | 개발자에게 피드백 전달 |
+| `!시간` / `!남은시간` | 현재 회차 + 남은 시간 단축 출력 |
+| `!날짜 <날짜/시간>` | 해당 날짜에 방영될 회차 조회 |
+| `!첫화` | 첫 회차 방영 예정 시간 |
+| `!다다음화` | 다다음 방영 예정 회차 |
 
 ---
 
@@ -121,23 +125,27 @@ node src/index.js
 ```js
 {
     yt: { video_id, send_delay, max_retries, verify_timeout },
-    spam: { spam_window_sec, spam_max_count, spam_warn_limit },
+    spam: { spam_window_sec, spam_max_count, spam_warn_limit, penalty_duration_hrs, penalty_add_sec },
     cooldown: { mode, time_min, error_offset_min },
-    input: { text_min_length, text_max_length, search_min_length, boundary_sec },
-    subtitle_score: { base, length_weight, min_threshold, ... },
+    input: { enable_greeting, text_min_length, text_max_length, enable_search, search_min_length,
+             duplicate_history_hours, duplicate_history_penalty, boundary_sec },
+    subtitle_score: { min_value, warn_base, warn_divisor, max_candidate_episodes },
     episode: { start, end },
-    sync: { stale_min, tolerance_sec, init_delay_ms, interval_ms },
-    notice: { check_interval_ms, sleep_count, delay_base_ms, ... },
-    timetable: { chat_limit, default_limit }
+    sync: { tolerance_sec, min_consecutive, init_delay_ms, segment_duration,
+            restart_delay_ms, max_restart_count },
+    notice: { check_interval_ms, sleep_count, delay_base_ms, delay_random_ms, tip_chance },
+    timetable: { default_limit }
 }
 ```
 
 | 카테고리 | 주요 설정 | 기본값 | 설명 |
 |----------|-----------|--------|------|
-| **쿨타임** | `cooldown.time_min` | `3` | 명령어 사용 간격 (분) |
+| **쿨타임** | `cooldown.time_min` | `2` | 명령어 사용 간격 (분) |
 | **쿨타임** | `cooldown.mode` | `"global"` | `"global"` 또는 `"per-command"` |
-| **스팸** | `spam.spam_warn_limit` | `20` | 경고 누적 후 자동 차단 |
-| **동기화** | `sync.interval_ms` | `60000` | 영상 핑거프린트 동기화 주기 |
+| **스팸** | `spam.spam_warn_limit` | `200` | 경고 누적 후 자동 차단 |
+| **스팸** | `spam.spam_window_sec` | `180` | 도배 감지 윈도우 (초, 3분) |
+| **동기화** | `sync.segment_duration` | `20` | 세그먼트 캡처 길이 (초) |
+| **동기화** | `sync.min_consecutive` | `4` | 연속 일치 판정 최소 샘플 수 |
 | **에피소드** | `episode.end` | `293` | 마지막 회차 번호 |
 | **경계** | `input.boundary_sec` | `20` | 에피소드 시작/종료 20초 전후 명령어 무시 |
 
@@ -146,8 +154,8 @@ node src/index.js
 ```js
 {
     ffmpeg: { ffmpegPath, ffprobePath, inputOptions },
-    ytdlp: { path, output },
-    searcher: { path, livemp4_path, lastquery_path, youtube_url, commandLine },
+    ytdlp: { path },
+    searcher: { path, segmentDir, lastquery_path, youtube_url, commandLine },
     extraction: { fps, width, height, crop: { enabled, x, y, w, h }, videoExtensions },
     phash: { resizeWidth, resizeHeight, dctSize, lowFreqSize, hashBits },
     matching: { hammingThreshold, topN, earlyExit },
@@ -196,11 +204,11 @@ chat-history.js  ←-----------  웹 대시보드 (web-server.js)  <--------
 | `src/video-matcher/search.js` | 매칭 결과 처리, 편집 시간(edit_time) 보정 통합 모듈 |
 | `src/video-matcher/live-downloader.js` | yt-dlp + ffmpeg 단일 파이프라인 (20초 스트림 분할) |
 | `src/video-matcher/live-searcher.js` | searcher.exe 데몬 매니저 (큐 기반 연속 검색 처리) |
-| `src/video-matcher/textsearcher.js` | 자막 유사도 검색 엔진 (Jamo 기반, 9종 오타 정규화, 사전 캐싱 최적화) |
+| `src/textsearcher.js` | 자막 유사도 검색 엔진 (3-Tier 퍼지 매칭: 글자 완전포함 → 글자 편집거리 → 자모 편집거리, Bloom Filter 최적화) |
 | `src/video-indexer/indexer.js` | 영상 디렉토리 → 핑거프린트 DB 생성 |
 | `src/video-indexer/searcher.js` | Node.js 기반 핑거프린트 검색기 (단일/멀티스레드) |
 | `src/spam-guard.js` | 슬라이딩 윈도우 도배 감지 + 자동 차단 |
-| `src/web-server.js` | 웹 대시보드 백엔드 (SSE 실시간 로그, 밴/차단/설정 관리) |
+| `src/web-server.js` | 웹 대시보드 백엔드 (WebSocket 실시간 로그, 밴/차단/설정 관리) |
 | `src/chat-history.js` | 대시보드용 최근 유튜브 채팅 버퍼 캐시 |
 | `src/event-bus.js` | 모듈 간 의존성을 낮추는 전역 이벤트 큐 (검색/명령어 로그 전송) |
 | `src/greeting.js` | 인사 응답 생성 |
@@ -236,17 +244,19 @@ youtube-chat-bot/
 │   ├── commands.js           # 명령어 핸들러
 │   ├── greeting.js           # 인사 응답
 │   ├── spam-guard.js         # 도배 방지
-│   ├── web-server.js         # 웹 대시보드 서버
+│   ├── web-server.js         # 웹 대시보드 서버 (WebSocket)
 │   ├── chat-history.js       # 실시간 채팅 버퍼 
 │   ├── event-bus.js          # 전역 이벤트 중계
+│   ├── textsearcher.js       # 자막 검색 엔진 (3-Tier 퍼지 매칭)
+│   ├── schedule_generator.js # 편성표 이미지 생성 (canvas)
+│   ├── schedule_poster.js    # 편성표 자동 게시 스케줄러
 │   ├── func.js               # 유틸리티 함수
 │   ├── path.js               # 경로 헬퍼
 │   ├── public/               # 웹 대시보드 프론트엔드 (HTML/CSS/JS)
 │   ├── video-matcher/        # 영상 매칭 모듈
 │   │   ├── search.js         #   시간 계산, 전체 파이프라인 총괄
 │   │   ├── live-downloader.js#   yt-dlp + ffmpeg 다운로드 파이프라인
-│   │   ├── live-searcher.js  #   searcher.exe 데몬 매니저
-│   │   └── textsearcher.js   #   자막 검색 엔진
+│   │   └── live-searcher.js  #   searcher.exe 데몬 매니저
 │   ├── video-indexer/        # 핑거프린트 생성 도구
 │   │   ├── indexer.js        #   영상 → 핑거프린트 변환
 │   │   ├── extractor.js      #   프레임 추출
@@ -264,13 +274,13 @@ youtube-chat-bot/
 │       ├── video-sub.json    #   자막 DB
 │       ├── lastquery.json    #   마지막 매칭 결과
 │       ├── youtube-banned.json #  차단 사용자 목록
+│       ├── bot-mute.json     #   봇 음소거 상태
 │       ├── session.json      #   YouTube 인증 쿠키
 │       ├── searcher.exe      #   pHash 검색 바이너리
 │       ├── ffmpeg.exe        #   FFmpeg
 │       ├── ffprobe.exe       #   FFprobe
 │       └── yt-dlp.exe        #   yt-dlp
-├── ecosystem.config.cjs      # PM2 설정
-├── package.json              # 의존성 0개
+├── package.json              # 의존성 (canvas, fuse.js, hanspell)
 └── README.md
 ```
 
