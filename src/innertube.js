@@ -21,6 +21,7 @@ var visitorData = null;
 var sendParams = null;
 var currentVideoId = null;
 var ownerChannelId = null;
+var myChannelId = null; // 봇 자신의 채널 ID
 var sendQueue = [];
 var queueRunning = false;
 
@@ -369,6 +370,43 @@ async function initSession(videoId, chatMode) {
 
     var visMatch = chatHtml.match(/"visitorData"\s*:\s*"([^"]+)"/);
     if (visMatch) visitorData = visMatch[1];
+
+    var myChanMatch = chatHtml.match(/"CHANNEL_ID"\s*:\s*"([^"]+)"/);
+    if (myChanMatch) {
+        myChannelId = myChanMatch[1];
+    } else {
+        // CHANNEL_ID가 없으면 account_menu API 호출하여 내 채널 확인
+        try {
+            console.log('📡 봇 채널 ID 확인 중 (account_menu)...');
+            var accUrl = '/youtubei/v1/account/account_menu?key=' + innertubeApiKey + '&prettyPrint=false';
+            var accRes = await h2Post(accUrl, authHeaders(), { context: makeContext() });
+            
+            function findMyChannel(obj) {
+                if (!obj || typeof obj !== 'object') return;
+                // account_menu 안에서 "내 채널" 혹은 "Your channel" 항목의 browseId 탐색
+                if (obj.navigationEndpoint && obj.navigationEndpoint.browseEndpoint && obj.navigationEndpoint.browseEndpoint.browseId) {
+                    var bid = obj.navigationEndpoint.browseEndpoint.browseId;
+                    if (bid.startsWith('UC')) {
+                        myChannelId = bid;
+                        return;
+                    }
+                }
+                for (var k in obj) {
+                    if (myChannelId) return;
+                    findMyChannel(obj[k]);
+                }
+            }
+            findMyChannel(accRes);
+        } catch (e) {
+            console.warn('⚠️ 봇 채널 ID 확인 실패:', e.message);
+        }
+    }
+
+    if (myChannelId) {
+        console.log('✅ 봇 채널 ID: ' + myChannelId);
+    } else {
+        console.log('⚠️ 봇 채널 ID를 찾지 못했습니다. 게시물 업로드 시 ownerChannelId를 대체로 사용합니다.');
+    }
 
     // 4. sendParams (protobuf — 만료 없음)
     sendParams = buildSendParams(ownerChannelId, videoId);
@@ -768,4 +806,192 @@ async function blockUser(contextMenuParams) {
     }
 }
 
-module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser };
+async function postCommunityText(text) {
+    if (!innertubeApiKey) {
+        console.error('❌ [Community] innertubeApiKey 없음');
+        return false;
+    }
+    var targetChannelId = myChannelId || ownerChannelId;
+    if (!targetChannelId) {
+        console.error('❌ [Community] 타겟 채널 ID 없음 (myChannelId, ownerChannelId 모두 없음)');
+        return false;
+    }
+
+    console.log(`📡 [Community] 게시물 업로드 대상 채널 ID: ${targetChannelId} (본인채널: ${myChannelId})`);
+
+    try {
+        var browseUrl = '/youtubei/v1/browse?key=' + innertubeApiKey + '&prettyPrint=false';
+        var channelReferer = ORIGIN + '/channel/' + targetChannelId;
+
+        // authHeaders()에 채널 페이지용 referer 오버라이드
+        function channelHeaders() {
+            var h = authHeaders();
+            h['referer'] = channelReferer;
+            return h;
+        }
+
+        // 1. 채널 메인 페이지 가져오기
+        var mainRes = await h2Post(browseUrl, channelHeaders(), {
+            context: makeContext(),
+            browseId: targetChannelId
+        });
+
+        // 2. 커뮤니티(게시물) 탭의 params 찾기
+        var communityEndpoint = null;
+        function findCommunityTab(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.tabRenderer && obj.tabRenderer.title) {
+                var title = obj.tabRenderer.title;
+                console.log('🔍 [Community Debug] 탭 발견:', title);
+                if (title === 'Community' || title === '커뮤니티' || title === 'Posts' || title === '게시물') {
+                    communityEndpoint = obj.tabRenderer.endpoint;
+                    return;
+                }
+            }
+            for (var k in obj) {
+                if (communityEndpoint) return;
+                findCommunityTab(obj[k]);
+            }
+        }
+        findCommunityTab(mainRes);
+
+        if (!communityEndpoint || !communityEndpoint.browseEndpoint) {
+            console.error('❌ [Community] 채널 내에서 커뮤니티 탭을 찾을 수 없습니다.');
+            return false;
+        }
+
+        // 3. 커뮤니티 탭 진입
+        var communityRefHeaders = channelHeaders();
+        communityRefHeaders['referer'] = ORIGIN + '/channel/' + targetChannelId + '/community';
+
+        var browseRes = await h2Post(browseUrl, communityRefHeaders, {
+            context: makeContext(),
+            browseId: communityEndpoint.browseEndpoint.browseId,
+            params: communityEndpoint.browseEndpoint.params
+        });
+
+        var createParams = null;
+        function findParam(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.createBackstagePostParams) {
+                createParams = obj.createBackstagePostParams;
+                return;
+            }
+            for (var k in obj) {
+                if (createParams) return;
+                findParam(obj[k]);
+            }
+        }
+        findParam(browseRes);
+
+        if (!createParams) {
+            console.error('❌ [Community] 커뮤니티 게시물 생성 권한(Params)을 찾을 수 없습니다.');
+            console.error('❌ [Community] browseRes keys:', JSON.stringify(Object.keys(browseRes || {})));
+            return false;
+        }
+
+        console.log('✅ [Community] createBackstagePostParams 획득 완료');
+
+        var postUrl = '/youtubei/v1/backstage/create_post?key=' + innertubeApiKey + '&prettyPrint=false';
+        var postData = {
+            context: makeContext(),
+            createBackstagePostParams: createParams,
+            commentText: text
+        };
+
+        console.log('📡 [Community] 전송 payload:', JSON.stringify(postData).slice(0, 500));
+
+        // 게시물 생성 요청 (빈 응답 디버깅을 위해 인라인 HTTP/2 호출)
+        var postRes = await new Promise(function (resolve, reject) {
+            var payload = JSON.stringify(postData);
+            var client = http2.connect(ORIGIN);
+            client.on('error', function (e) { client.close(); reject(e); });
+
+            var hdrs = Object.assign({
+                ':method': 'POST',
+                ':path': postUrl,
+                ':authority': 'www.youtube.com',
+                ':scheme': 'https',
+                'content-type': 'application/json',
+                'user-agent': UA,
+                'accept': '*/*',
+                'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+                'origin': ORIGIN,
+                'referer': ORIGIN + '/channel/' + targetChannelId + '/community',
+                'sec-ch-ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Windows"',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'same-origin',
+                'sec-fetch-site': 'same-origin',
+                'x-youtube-bootstrap-logged-in': 'true',
+                'x-youtube-client-name': '1',
+                'x-youtube-client-version': clientVersion || '2.20260213.01.00',
+            }, communityRefHeaders);
+
+            var req = client.request(hdrs);
+            req.write(payload);
+            req.end();
+
+            var body = '';
+            var status = 0;
+            req.on('response', function (h) {
+                status = h[':status'];
+                updateCookiesFromHeaders(h);
+            });
+            req.on('data', function (c) { body += c; });
+            req.on('end', function () {
+                client.close();
+                console.log('📡 [Community] 게시물 생성 응답 status:', status, 'body length:', body.length);
+                if (!body) {
+                    reject(new Error('게시물 생성 응답이 비어있음 (HTTP ' + status + ')'));
+                    return;
+                }
+                try { resolve(JSON.parse(body)); }
+                catch (e) {
+                    console.error('📡 [Community] 응답 파싱 실패, raw:', body.slice(0, 500));
+                    reject(new Error('게시물 생성 응답 파싱 실패 (HTTP ' + status + ')'));
+                }
+            });
+            req.on('error', function (e) { client.close(); reject(e); });
+        });
+
+        if (postRes.error) {
+            console.error('❌ [Community] 업로드 실패: ', postRes.error.message || JSON.stringify(postRes.error));
+            return false;
+        }
+
+        // 실제 게시물 생성 확인
+        console.log('📡 [Community] 응답 전문:', JSON.stringify(postRes, null, 2));
+
+        var postId = null;
+        function findPostId(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.backstagePostRenderer && obj.backstagePostRenderer.postId) {
+                postId = obj.backstagePostRenderer.postId;
+                return;
+            }
+            if (obj.postId) {
+                postId = obj.postId;
+                return;
+            }
+            for (var k in obj) {
+                if (postId) return;
+                findPostId(obj[k]);
+            }
+        }
+        findPostId(postRes);
+
+        if (postId) {
+            console.log('✅ [Community] 게시물 업로드 완료 (postId: ' + postId + ')');
+        } else {
+            console.log('⚠️ [Community] 응답 200이지만 postId를 찾을 수 없음 — 게시물이 생성되지 않았을 수 있음');
+        }
+        return true;
+    } catch (e) {
+        console.error('❌ [Community] 예외 발생: ' + e.message);
+        return false;
+    }
+}
+
+module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser, postCommunityText };

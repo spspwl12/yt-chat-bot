@@ -359,6 +359,11 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
         return null;
     }
 
+    const trackerInfo = _input.spamGuard && _input.spamGuard.tracker.get(_input.channelId);
+    if (trackerInfo && trackerInfo.searchBanned) {
+        return null;
+    }
+
     const searchInfo = searcher.search(query);
     if (searchInfo.length <= 0) {
         _input.warn = cfg.subtitle_score.warn_base; // 결과 없음 페널티

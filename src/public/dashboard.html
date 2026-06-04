@@ -1461,6 +1461,13 @@
                     else showToast('사용량 조절 실패: ' + (payload.error || ''), true);
                     break;
 
+                case 'allowSearch_result':
+                    if (payload.success) showToast('대사 검색 차단이 해제되었습니다.');
+                    break;
+                case 'banSearch_result':
+                    if (payload.success) showToast('해당 유저의 대사 검색을 차단했습니다.');
+                    break;
+
                 case 'spamDelete_result':
                     showToast('스패머 해제 완료');
                     break;
@@ -1510,24 +1517,48 @@
         function createChatElement(c) {
             const div = document.createElement('div');
             div.className = 'chat-item';
-            const canBan = !!c.contextMenu;
-            const ctxMenuEscaped = c.contextMenu ? escape(JSON.stringify(c.contextMenu)) : '';
-            div.innerHTML = `
-                <div>
-                    <span class="chat-author">${escapeHtml(c.displayName)}</span>
-                    <span class="chat-text">${escapeHtml(c.text)}</span>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn btn-ban" ${!canBan ? 'disabled title="No Context Menu"' : ''}
-                            onclick="execBan('${escapeHtml(c.displayName)}', '${c.channelId}', '${ctxMenuEscaped}')">
-                        유저 숨기기
-                    </button>
-                    <button class="btn btn-ban" style="background-color: var(--warning);"
-                            onclick="execSpamOnly('${escapeHtml(c.displayName)}', '${c.channelId}')">
-                        Spam 추가
-                    </button>
-                </div>
-            `;
+
+            const textDiv = document.createElement('div');
+            const authorSpan = document.createElement('span');
+            authorSpan.className = 'chat-author';
+            authorSpan.textContent = c.displayName;
+            const textSpan = document.createElement('span');
+            textSpan.className = 'chat-text';
+            textSpan.textContent = c.text;
+            textDiv.appendChild(authorSpan);
+            textDiv.appendChild(textSpan);
+
+            const btnDiv = document.createElement('div');
+            btnDiv.style.cssText = 'display:flex; gap:8px;';
+
+            const banBtn = document.createElement('button');
+            banBtn.className = 'btn btn-ban';
+            banBtn.textContent = '유저 숨기기';
+            if (!c.contextMenu) {
+                banBtn.disabled = true;
+                banBtn.title = 'No Context Menu';
+            } else {
+                banBtn.addEventListener('click', () => execBan(c.displayName, c.channelId, c.contextMenu));
+            }
+
+            const spamBtn = document.createElement('button');
+            spamBtn.className = 'btn btn-ban';
+            spamBtn.style.backgroundColor = 'var(--warning)';
+            spamBtn.textContent = 'Spam 추가';
+            spamBtn.addEventListener('click', () => execSpamOnly(c.displayName, c.channelId));
+
+            const searchBanBtn = document.createElement('button');
+            searchBanBtn.className = 'btn btn-ban';
+            searchBanBtn.style.backgroundColor = '#8b5cf6';
+            searchBanBtn.textContent = '대사 차단';
+            searchBanBtn.addEventListener('click', () => execBanSearch(c.displayName, c.channelId));
+
+            btnDiv.appendChild(banBtn);
+            btnDiv.appendChild(spamBtn);
+            btnDiv.appendChild(searchBanBtn);
+
+            div.appendChild(textDiv);
+            div.appendChild(btnDiv);
             return div;
         }
 
@@ -1581,15 +1612,19 @@
             spamWarnData.forEach((u, i) => {
                 const tr = document.createElement('tr');
                 const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
-                const usageBadge = u.commandCount != null ?
-                    `<span class="badge badge-blue">${u.commandCount}회</span>` :
-                    '<span style="color:var(--text-dim)">—</span>';
-                const warnBadge = u.count > 0 ?
-                    `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>` :
-                    `<span class="badge badge-green">0/${u.warnLimit || '?'}</span>`;
+
+                const usageBadge = u.commandCount != null
+                    ? `<span class="badge badge-blue">${u.commandCount}회</span>`
+                    : '<span style="color:var(--text-dim)">—</span>';
+                const warnBadge = u.count > 0
+                    ? `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>`
+                    : `<span class="badge badge-green">0/${u.warnLimit || '?'}</span>`;
+                const searchBadge = u.searchBanned
+                    ? '<span class="badge badge-red" style="margin-left:4px;">대사차단됨</span>'
+                    : '';
 
                 tr.innerHTML = `
-                    <td style="font-weight:600;">${escapeHtml(u.name)}</td>
+                    <td style="font-weight:600;">${escapeHtml(u.name)}${searchBadge}</td>
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
                     <td>
                         <div class="warn-adjust">
@@ -1607,12 +1642,34 @@
                     </td>
                     <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td style="white-space:nowrap;">
+                    <td style="white-space:nowrap;" data-action-idx="${i}">
                         <button class="btn btn-sm" style="background:var(--info); margin-right:4px;" onclick="showUserDetail('${u.channelId}')">상세</button>
-                        <button class="btn btn-ban btn-sm" onclick="execSpamOnly('${escapeHtml(u.name)}', '${u.channelId}')">Spam 추가</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
+
+                // 이스케이프 없이 DOM API로 버튼 추가
+                const actionCell = tr.querySelector(`[data-action-idx="${i}"]`);
+
+                const searchBtn = document.createElement('button');
+                searchBtn.className = 'btn btn-sm';
+                searchBtn.style.marginRight = '4px';
+                if (u.searchBanned) {
+                    searchBtn.style.background = 'var(--secondary)';
+                    searchBtn.textContent = '검색 허용';
+                    searchBtn.addEventListener('click', () => execAllowSearch(u.channelId));
+                } else {
+                    searchBtn.style.background = '#8b5cf6';
+                    searchBtn.textContent = '검색 차단';
+                    searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
+                }
+                actionCell.appendChild(searchBtn);
+
+                const spamBtn = document.createElement('button');
+                spamBtn.className = 'btn btn-ban btn-sm';
+                spamBtn.textContent = 'Spam 추가';
+                spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
+                actionCell.appendChild(spamBtn);
             });
         }
 
@@ -1761,13 +1818,11 @@
             });
         }
 
-        // ── Actions ──
-        function execBan(name, channelId, contextMenuStr) {
+        function execBan(name, channelId, contextMenu) {
             if (!confirm(`[${name}] 유저를 숨기시겠습니까? (유튜브 유저숨기기 + 스팸가드 동시 적용)`)) return;
-            const contextMenuParams = contextMenuStr ? JSON.parse(unescape(contextMenuStr)) : null;
             ws.send(JSON.stringify({
                 action: 'ban',
-                payload: { channelId, displayName: name, contextMenuParams }
+                payload: { channelId, displayName: name, contextMenuParams: contextMenu || null }
             }));
         }
 
@@ -1776,6 +1831,22 @@
             ws.send(JSON.stringify({
                 action: 'spamAdd',
                 payload: { channelId, displayName: name, reason: '채팅 탭에서 빠른 추가' }
+            }));
+        }
+
+        function execBanSearch(name, channelId) {
+            if (!confirm(`[${name}] 유저의 대사 검색을 차단하시겠습니까?`)) return;
+            ws.send(JSON.stringify({
+                action: 'banSearch',
+                payload: { channelId, displayName: name }
+            }));
+        }
+
+        function execAllowSearch(channelId) {
+            if (!confirm(`이 유저의 대사 검색 차단을 해제하시겠습니까?`)) return;
+            ws.send(JSON.stringify({
+                action: 'allowSearch',
+                payload: { channelId }
             }));
         }
 

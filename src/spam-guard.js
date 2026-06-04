@@ -257,7 +257,7 @@ class SpamGuard {
                     // searchHistory는 별도 만료 시간 적용 불가 (commands.js에서 관리)
                     // 유효한 데이터만 로드 (경고, 이력, 또는 검색 기록이 있는 경우)
                     if (entry.warns > 0 || (entry.commandHistory && entry.commandHistory.length > 0) ||
-                        (entry.searchHistory && entry.searchHistory.length > 0)) {
+                        (entry.searchHistory && entry.searchHistory.length > 0) || entry.searchBanned) {
                         map.set(channelId, entry);
                     }
                 }
@@ -277,13 +277,14 @@ class SpamGuard {
             // 유효한 데이터만 저장
             const history = (entry.commandHistory || []).filter(t => now - t < this.penaltyDurationMs);
             const searchHistory = entry.searchHistory || [];
-            if (entry.warns > 0 || history.length > 0 || searchHistory.length > 0) {
+            if (entry.warns > 0 || history.length > 0 || searchHistory.length > 0 || entry.searchBanned) {
                 obj[channelId] = {
                     warns: entry.warns || 0,
                     commandHistory: history,
                     penaltyExpiresAt: entry.penaltyExpiresAt || 0,
                     displayName: entry.displayName || null,
-                    lastWarnedAt: entry.lastWarnedAt || 0
+                    lastWarnedAt: entry.lastWarnedAt || 0,
+                    searchBanned: entry.searchBanned || false
                 };
                 if (searchHistory.length > 0) {
                     obj[channelId].searchHistory = searchHistory;
@@ -324,6 +325,31 @@ class SpamGuard {
         }
         r.searchHistory = history;
         this._saveTrackerDebounced();
+    }
+
+    /**
+     * 대사 검색 차단
+     */
+    banSearch(channelId, displayName) {
+        let r = this.tracker.get(channelId);
+        if (!r) {
+            r = { warns: 0, commandHistory: [], penaltyExpiresAt: 0 };
+            this.tracker.set(channelId, r);
+        }
+        if (displayName) r.displayName = displayName;
+        r.searchBanned = true;
+        this._saveTrackerDebounced();
+    }
+
+    /**
+     * 대사 검색 허용
+     */
+    allowSearch(channelId) {
+        let r = this.tracker.get(channelId);
+        if (r) {
+            r.searchBanned = false;
+            this._saveTrackerDebounced();
+        }
     }
 }
 

@@ -16,6 +16,7 @@ const { SpamGuard } = require('./spam-guard.js');
 const cfg = require('./data/config-youtube.js');
 const { startServer, broadcastChat, broadcastSpam } = require('./web-server.js');
 const chatHistory = require('./chat-history.js');
+const { startSchedulePoster } = require('./schedule_poster.js');
 
 const spamGuard = new SpamGuard({
     windowSec: cfg.spam.spam_window_sec || 10,
@@ -48,6 +49,9 @@ async function main() {
     }
 
     initCommand();
+    if (cfg.schedule_poster && cfg.schedule_poster.enable_poster) {
+        startSchedulePoster();
+    }
     let isFirstFetch = true;
 
     // 대시보드 웹 서버 백그라운드 시작 (getEpisodeInfo 전달)

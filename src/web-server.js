@@ -17,14 +17,14 @@ const MUTE_FILE = path.join(__dirname, 'data', 'bot-mute.json');
 let botMuted = false;
 try {
     botMuted = JSON.parse(fs.readFileSync(MUTE_FILE, 'utf8')).muted === true;
-} catch {}
+} catch { }
 
 function isBotMuted() {
     return botMuted;
 }
 
 function saveMuteState() {
-    try { fs.writeFileSync(MUTE_FILE, JSON.stringify({ muted: botMuted }), 'utf8'); } catch {}
+    try { fs.writeFileSync(MUTE_FILE, JSON.stringify({ muted: botMuted }), 'utf8'); } catch { }
 }
 
 // ═══════════════════════════════════════
@@ -79,7 +79,7 @@ function sendWSFrame(socket, text) {
         header[1] = 127;
         header.writeBigUInt64BE(BigInt(length), 2);
     }
-    
+
     socket.write(Buffer.concat([header, payload]));
 }
 
@@ -131,16 +131,17 @@ function broadcastSpam() {
         for (const [channelId, data] of spamGuardRef.tracker.entries()) {
             if (spamGuardRef.banned.has(channelId)) continue;
             const info = spamGuardRef.getTrackerInfo(channelId);
-            if (!info || info.commandCount <= 0) continue;
+            if (!info || (info.commandCount <= 0 && data.warns <= 0 && !data.searchBanned)) continue;
             spammers.push({
                 channelId,
                 count: data.warns,
                 warnLimit: spamGuardRef.warnLimit,
                 name: (info && info.displayName) || data.displayName || '이름 불명',
                 block: false,
-                reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
+                reason: data.searchBanned ? '검색 차단됨' : (data.warns > 0 ? '경고 누적' : '명령어 사용'),
                 remainingMs: info.remainingMs,
-                commandCount: info.commandCount
+                commandCount: info.commandCount,
+                searchBanned: data.searchBanned
             });
         }
         // 밴된 유저 추가
@@ -162,7 +163,7 @@ function processClientMessage(client, message) {
     try {
         const parsed = JSON.parse(message);
         handleAction(client, parsed);
-    } catch(e) {
+    } catch (e) {
         console.error("WS Parse error", e);
     }
 }
@@ -180,17 +181,17 @@ async function handleAction(client, req) {
             totalTime = search_lib.videoInfo[epInfo.index]._streamDurationSec || 0;
         }
 
-        sendWSFrame(client, JSON.stringify({ 
-            action: 'state', 
-            payload: { 
+        sendWSFrame(client, JSON.stringify({
+            action: 'state',
+            payload: {
                 episodeInfo: epInfo,
                 totalEpisodes: totalEpisodes || totalEpCount,
                 totalTime: totalTime,
                 videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null,
                 botMuted: botMuted
-            } 
+            }
         }));
-    } 
+    }
     else if (action === 'setMute') {
         botMuted = payload;
         saveMuteState();
@@ -205,16 +206,17 @@ async function handleAction(client, req) {
             for (const [channelId, data] of spamGuardRef.tracker.entries()) {
                 if (spamGuardRef.banned.has(channelId)) continue;
                 const info = spamGuardRef.getTrackerInfo(channelId);
-                if (!info || info.commandCount <= 0) continue;
+                if (!info || (info.commandCount <= 0 && data.warns <= 0 && !data.searchBanned)) continue;
                 spammers.push({
                     channelId,
                     count: data.warns,
                     warnLimit: spamGuardRef.warnLimit,
                     name: (info && info.displayName) || data.displayName || '이름 불명',
                     block: false,
-                    reason: data.warns > 0 ? '경고 누적' : '명령어 사용',
+                    reason: data.searchBanned ? '검색 차단됨' : (data.warns > 0 ? '경고 누적' : '명령어 사용'),
                     remainingMs: info.remainingMs,
-                    commandCount: info.commandCount
+                    commandCount: info.commandCount,
+                    searchBanned: data.searchBanned
                 });
             }
             for (const [channelId, data] of spamGuardRef.banned.entries()) {
@@ -225,9 +227,9 @@ async function handleAction(client, req) {
     }
     else if (action === 'ban') {
         const { channelId, displayName, contextMenuParams } = payload;
-        
+
         console.log(`[WebAdmin🛠️] 유튜브 유저 차단 시도: ${displayName || channelId}`);
-        if(contextMenuParams) {
+        if (contextMenuParams) {
             // 실패하더라도 스팸가드에는 무조건 등록하기 위해 return 받지 않음
             blockUser(contextMenuParams).catch(e => console.error("blockUser 오류:", e));
         }
@@ -241,10 +243,22 @@ async function handleAction(client, req) {
     }
     else if (action === 'spamAdd') {
         const { channelId, displayName, reason } = payload;
-        if(spamGuardRef) {
+        if (spamGuardRef) {
             spamGuardRef.manualBan(channelId, displayName, reason);
         }
         sendWSFrame(client, JSON.stringify({ action: 'spamAdd_result', payload: { success: true } }));
+        broadcastSpam();
+    }
+    else if (action === 'banSearch') {
+        const { channelId, displayName } = payload;
+        if (spamGuardRef) spamGuardRef.banSearch(channelId, displayName);
+        sendWSFrame(client, JSON.stringify({ action: 'banSearch_result', payload: { success: true } }));
+        broadcastSpam();
+    }
+    else if (action === 'allowSearch') {
+        const { channelId } = payload;
+        if (spamGuardRef) spamGuardRef.allowSearch(channelId);
+        sendWSFrame(client, JSON.stringify({ action: 'allowSearch_result', payload: { success: true } }));
         broadcastSpam();
     }
     else if (action === 'adjustWarn') {
@@ -314,7 +328,7 @@ async function handleAction(client, req) {
     }
     else if (action === 'spamDelete') {
         const { channelId } = payload;
-        if(spamGuardRef) {
+        if (spamGuardRef) {
             spamGuardRef.removeBan(channelId);
         }
         sendWSFrame(client, JSON.stringify({ action: 'spamDelete_result', payload: { success: true } }));
@@ -328,13 +342,13 @@ async function handleAction(client, req) {
     else if (action === 'saveConfig') {
         const { target, content } = payload;
         try {
-            if(target === 'youtube') {
+            if (target === 'youtube') {
                 fs.writeFileSync(path.join(__dirname, 'data', 'config-youtube.js'), content, 'utf8');
             } else if (target === 'search') {
                 fs.writeFileSync(path.join(__dirname, 'data', 'config-search.js'), content, 'utf8');
             }
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: true } }));
-        } catch(e) {
+        } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: false, error: e.message } }));
         }
     }
@@ -343,7 +357,7 @@ async function handleAction(client, req) {
         try {
             const viText = fs.readFileSync(path.join(__dirname, 'data', 'video-info.json'), 'utf8');
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: viText }));
-        } catch(e) {
+        } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: '[]' }));
         }
     }
@@ -354,7 +368,7 @@ async function handleAction(client, req) {
             JSON.parse(content);
             fs.writeFileSync(path.join(__dirname, 'data', 'video-info.json'), content, 'utf8');
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
-        } catch(e) {
+        } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
         }
     }
@@ -385,7 +399,7 @@ async function handleAction(client, req) {
         const n = search_lib.videoInfo.length;
         const schedule = [];
         let currentIdx = epInfo.index % n;
-        
+
         let count = 0;
         let cIdx = currentIdx;
         while (count < n && schedule.length < 150) { // Limit to full cycle or 150 max
@@ -402,7 +416,7 @@ async function handleAction(client, req) {
             cIdx = (cIdx + 1) % n;
             count++;
         }
-        
+
         sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: schedule }));
     }
 }
@@ -439,22 +453,22 @@ function startServer(port, spamGuard, getEpisodeInfo) {
             const hash = crypto.createHash('sha1')
                 .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
                 .digest('base64');
-            
+
             socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
-                         'Upgrade: websocket\r\n' +
-                         'Connection: Upgrade\r\n' +
-                         `Sec-WebSocket-Accept: ${hash}\r\n\r\n`);
-            
+                'Upgrade: websocket\r\n' +
+                'Connection: Upgrade\r\n' +
+                `Sec-WebSocket-Accept: ${hash}\r\n\r\n`);
+
             clientConnected(socket);
-            
+
             let buffer = Buffer.alloc(0);
             socket.on('data', chunk => {
                 buffer = Buffer.concat([buffer, chunk]);
                 // 프레임들을 처리
-                while(true) {
+                while (true) {
                     const parsed = parseWSFrame(buffer);
                     if (!parsed) break;
-                    
+
                     if (parsed.data) {
                         // 정상적인 텍스트 메시지
                         processClientMessage(socket, parsed.data);
@@ -474,7 +488,7 @@ function startServer(port, spamGuard, getEpisodeInfo) {
         socket.readyState = 'OPEN';
         clients.add(socket);
     }
-    
+
     function clientDisconnected(socket) {
         socket.readyState = 'CLOSED';
         clients.delete(socket);
