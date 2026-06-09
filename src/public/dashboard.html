@@ -1014,6 +1014,26 @@
             font-weight: 700;
             margin-top: 2px;
         }
+
+        /* ── Context Menu ── */
+        .menu-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            padding: 8px 16px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+        .menu-btn:hover {
+            background: rgba(139, 92, 246, 0.2);
+        }
+        .menu-btn.active {
+            background: rgba(139, 92, 246, 0.4);
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -1101,7 +1121,8 @@
                     <input type="text" id="spam-name" class="form-input" placeholder="Display Name (Optional)">
                     <input type="text" id="spam-channel" class="form-input" placeholder="Channel ID (Required)">
                     <input type="text" id="spam-reason" class="form-input" placeholder="Reason">
-                    <button class="btn" id="btn-add-spam">Add to Spammers</button>
+                    <button class="btn" id="btn-add-spam">스팸 추가</button>
+                    <button class="btn" id="btn-add-search-ban" style="background-color:#8b5cf6;">검색 차단</button>
                 </div>
             </div>
 
@@ -1544,13 +1565,13 @@
             const spamBtn = document.createElement('button');
             spamBtn.className = 'btn btn-ban';
             spamBtn.style.backgroundColor = 'var(--warning)';
-            spamBtn.textContent = 'Spam 추가';
+            spamBtn.textContent = '스팸 추가';
             spamBtn.addEventListener('click', () => execSpamOnly(c.displayName, c.channelId));
 
             const searchBanBtn = document.createElement('button');
             searchBanBtn.className = 'btn btn-ban';
             searchBanBtn.style.backgroundColor = '#8b5cf6';
-            searchBanBtn.textContent = '대사 차단';
+            searchBanBtn.textContent = '검색 차단';
             searchBanBtn.addEventListener('click', () => execBanSearch(c.displayName, c.channelId));
 
             btnDiv.appendChild(banBtn);
@@ -1628,16 +1649,16 @@
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
                     <td>
                         <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustUsage('${u.channelId}', -1)" title="사용량 -1">−</button>
+                            <button class="warn-adjust-btn warn-minus" onclick="adjustUsage('${u.channelId}', -1)" title="사용량 감소">−</button>
                             ${usageBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustUsage('${u.channelId}', 1)" title="사용량 +1">+</button>
+                            <button class="warn-adjust-btn warn-plus" onclick="adjustUsage('${u.channelId}', 1)" title="사용량 증가">+</button>
                         </div>
                     </td>
                     <td>
                         <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustWarn('${u.channelId}', -1)" title="경고 -1">−</button>
+                            <button class="warn-adjust-btn warn-minus" onclick="adjustWarn('${u.channelId}', -1)" title="경고 감소">−</button>
                             ${warnBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustWarn('${u.channelId}', 1)" title="경고 +1">+</button>
+                            <button class="warn-adjust-btn warn-plus" onclick="adjustWarn('${u.channelId}', 1)" title="경고 증가">+</button>
                         </div>
                     </td>
                     <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
@@ -1667,7 +1688,7 @@
 
                 const spamBtn = document.createElement('button');
                 spamBtn.className = 'btn btn-ban btn-sm';
-                spamBtn.textContent = 'Spam 추가';
+                spamBtn.textContent = '스팸 추가';
                 spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
                 actionCell.appendChild(spamBtn);
             });
@@ -1676,16 +1697,41 @@
         function renderSpamBanTable() {
             const tbody = document.getElementById('spam-ban-tbody');
             tbody.innerHTML = '';
-            spamBanData.forEach(u => {
+            spamBanData.forEach((u, i) => {
                 const tr = document.createElement('tr');
+                const searchBadge = u.searchBanned
+                    ? '<span class="badge badge-red" style="margin-left:4px;">대사차단됨</span>'
+                    : '';
                 tr.innerHTML = `
-                    <td style="font-weight:600;">${escapeHtml(u.name)}</td>
+                    <td style="font-weight:600;">${escapeHtml(u.name)}${searchBadge}</td>
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
                     <td style="color:var(--text-dim); font-size:0.8rem;">${u.bannedAt || '—'}</td>
-                    <td><button class="btn btn-ban btn-sm" onclick="execDeleteSpam('${u.channelId}')">Remove</button></td>
+                    <td style="white-space:nowrap;" data-ban-action-idx="${i}"></td>
                 `;
                 tbody.appendChild(tr);
+
+                const actionCell = tr.querySelector(`[data-ban-action-idx="${i}"]`);
+
+                const searchBtn = document.createElement('button');
+                searchBtn.className = 'btn btn-sm';
+                searchBtn.style.marginRight = '4px';
+                if (u.searchBanned) {
+                    searchBtn.style.background = 'var(--secondary)';
+                    searchBtn.textContent = '검색 허용';
+                    searchBtn.addEventListener('click', () => execAllowSearch(u.channelId));
+                } else {
+                    searchBtn.style.background = '#8b5cf6';
+                    searchBtn.textContent = '검색 차단';
+                    searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
+                }
+                actionCell.appendChild(searchBtn);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn btn-ban btn-sm';
+                removeBtn.textContent = 'Remove';
+                removeBtn.addEventListener('click', () => execDeleteSpam(u.channelId));
+                actionCell.appendChild(removeBtn);
             });
         }
 
@@ -1702,6 +1748,18 @@
 
         function renderSpam(spammers) {
             spamWarnData = spammers.filter(u => !u.block);
+            spamWarnData.sort((a, b) => {
+                if (a.searchBanned && !b.searchBanned) return 1;
+                if (!a.searchBanned && b.searchBanned) return -1;
+                
+                const aWarns = a.count || 0;
+                const bWarns = b.count || 0;
+                if (aWarns !== bWarns) return bWarns - aWarns;
+
+                const aUsage = a.commandCount || 0;
+                const bUsage = b.commandCount || 0;
+                return bUsage - aUsage;
+            });
             spamBanData = spammers.filter(u => u.block);
             spamReceivedAt = Date.now();
 
@@ -1874,13 +1932,47 @@
             ws.send(JSON.stringify({ action: 'spamDelete', payload: { channelId } }));
         }
 
-        function adjustWarn(channelId, delta) {
+        let currentIncrement = 1;
+
+        document.addEventListener('contextmenu', function(e) {
+            const btn = e.target.closest('.warn-adjust-btn');
+            if (btn) {
+                e.preventDefault();
+                const menu = document.getElementById('increment-context-menu');
+                menu.style.display = 'flex';
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+                
+                menu.querySelectorAll('.menu-btn').forEach(b => {
+                    b.classList.toggle('active', parseInt(b.dataset.val) === currentIncrement);
+                });
+            } else {
+                const menu = document.getElementById('increment-context-menu');
+                if (menu) menu.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('increment-context-menu');
+            if (!menu) return;
+            if (e.target.closest('.menu-btn')) {
+                currentIncrement = parseInt(e.target.closest('.menu-btn').dataset.val);
+                showToast(`증감 단위가 ${currentIncrement}로 설정되었습니다.`);
+                menu.style.display = 'none';
+            } else if (!e.target.closest('#increment-context-menu')) {
+                menu.style.display = 'none';
+            }
+        });
+
+        function adjustWarn(channelId, sign) {
+            const delta = sign * currentIncrement;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ action: 'adjustWarn', payload: { channelId, delta } }));
             }
         }
 
-        function adjustUsage(channelId, delta) {
+        function adjustUsage(channelId, sign) {
+            const delta = sign * currentIncrement;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ action: 'adjustUsage', payload: { channelId, delta } }));
             }
@@ -1901,6 +1993,19 @@
                 action: 'spamAdd',
                 payload: { channelId, displayName, reason }
             }));
+
+            document.getElementById('spam-channel').value = '';
+            document.getElementById('spam-name').value = '';
+            document.getElementById('spam-reason').value = '';
+        });
+
+        document.getElementById('btn-add-search-ban').addEventListener('click', () => {
+            const channelId = document.getElementById('spam-channel').value.trim();
+            const displayName = document.getElementById('spam-name').value.trim() || 'Unknown';
+
+            if (!channelId) return showToast('Channel ID는 필수입니다.', true);
+
+            execBanSearch(displayName, channelId);
 
             document.getElementById('spam-channel').value = '';
             document.getElementById('spam-name').value = '';
@@ -2043,6 +2148,14 @@
         // Bootstrap
         connectWS();
     </script>
+
+    <div id="increment-context-menu" class="glass" style="display: none; position: fixed; z-index: 10000; border-radius: 8px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-direction: column; gap: 2px;">
+        <div style="padding: 6px 12px; font-size: 0.75rem; color: var(--text-dim); border-bottom: 1px solid var(--surface-border); margin-bottom: 2px; text-align: center;">증감 단위</div>
+        <button class="menu-btn" data-val="1">1</button>
+        <button class="menu-btn" data-val="10">10</button>
+        <button class="menu-btn" data-val="100">100</button>
+        <button class="menu-btn" data-val="1000">1000</button>
+    </div>
 </body>
 
 </html>

@@ -340,6 +340,11 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
         return `⚠️ 대사 검색 기능이 비활성화되어 있습니다. ${COOLDOWN_MSG}`;
     }
 
+    const trackerInfo = _input.spamGuard && _input.spamGuard.tracker.get(_input.channelId);
+    if (trackerInfo && trackerInfo.searchBanned) {
+        return null;
+    }
+
     if (query.length < cfg.input.search_min_length) {
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. ${COOLDOWN_MSG}`;
@@ -356,11 +361,6 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
 
     if (_input.ban) {
         _input.warn = cfg.subtitle_score.warn_base;
-        return null;
-    }
-
-    const trackerInfo = _input.spamGuard && _input.spamGuard.tracker.get(_input.channelId);
-    if (trackerInfo && trackerInfo.searchBanned) {
         return null;
     }
 
