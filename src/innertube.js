@@ -9,8 +9,8 @@ const http2 = require('node:http2');
 const crypto = require('crypto');
 const fs = require('fs');
 const path2 = require('./path.js');
-const cookies = require('./data/session.json');
-const cfg = require('./data/config-youtube.js');
+const cookies = require('../data/session.json');
+const cfg = require('../data/config-youtube.js');
 
 const ORIGIN = 'https://www.youtube.com';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -107,7 +107,7 @@ function updateCookiesFromHeaders(headers) {
 
 function saveCookiesToConfig() {
     try {
-        const p = path2.findPath('./data/session.json');
+        const p = path2.findPath('../data/session.json');
         cookies.cookie = getCookieString();
         fs.writeFileSync(p, JSON.stringify(cookies, null, 4), 'utf-8');
     } catch (e) { /* 실패해도 메모리 쿠키 유지 */ }

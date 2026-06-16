@@ -11,7 +11,7 @@ const path = require('path');
 const search_lib = require('./video-matcher/search.js');
 const { getEpisodeInfo } = require('./commands.js');
 const { formatDate, roundUpTime } = require('./func.js');
-const cfg = require('./data/config-youtube.js');
+const cfg = require('../data/config-youtube.js');
 
 const videoInfo = search_lib.videoInfo;
 const EPISODE_START = cfg.episode.start;   // 1

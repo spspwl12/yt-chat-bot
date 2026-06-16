@@ -3,8 +3,7 @@ tokens.json
 banned.json
 src/data/session.json
 node_modules
-src/data/config-youtube.js
 /misc/
-src/data/session.json
-src/data/bot-mute.json
-src/data/lastquery.json
+data/session.json
+data/bot-mute.json
+data/lastquery.json

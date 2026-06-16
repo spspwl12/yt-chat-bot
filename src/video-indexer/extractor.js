@@ -4,7 +4,7 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const config = require('../data/config-search.js');
+const config = require('../../data/config-search.js');
 
 // --- FFmpeg 실행 파일 경로 설정 ---
 if (config.ffmpeg.ffmpegPath) {

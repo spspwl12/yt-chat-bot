@@ -1,21 +1,21 @@
 module.exports = {
     ffmpeg: {
-        ffmpegPath: "./data/ffmpeg.exe",   // FFmpeg 실행 파일 경로
-        ffprobePath: "./data/ffprobe.exe", // FFprobe 실행 파일 경로 (영상 정보 분석용)
+        ffmpegPath: "../data/ffmpeg.exe",   // FFmpeg 실행 파일 경로
+        ffprobePath: "../data/ffprobe.exe", // FFprobe 실행 파일 경로 (영상 정보 분석용)
         inputOptions: []                   // 추가 입력 옵션
     },
     ytdlp: {
-        path: "./data/yt-dlp.exe"                    // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
+        path: "../data/yt-dlp.exe"                    // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
     },
     searcher: {
-        path: "./data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로
-        segmentDir: "./data/seg",                                   // 세그먼트 파일 저장 디렉토리
-        lastquery_path: "./data/lastquery.json",                   // 가장 최근의 영상/에피소드 정보를 저장하는 파일
+        path: "../data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로
+        segmentDir: "../data/seg",                                   // 세그먼트 파일 저장 디렉토리
+        lastquery_path: "../data/lastquery.json",                   // 가장 최근의 영상/에피소드 정보를 저장하는 파일
         youtube_url: "https://www.youtube.com/watch?v=4fa2e2bF0nI", // 트래킹할 유튜브 라이브 채널 주소
         commandLine: [                                              // 검색 엔진(searcher.exe)에 전달할 인자 배열
-            "./data/video-fingerprints.json",                         // DB파일 경로
+            "../data/video-fingerprints.json",                         // DB파일 경로
             "30",                                                     // 처리시간(초) 등
-            "./data/config.json",                                     // 설정파일 경로 (※주의: C++ searcher가 만약 json만 읽는다면 이 부분 변경이 필요할 수 있습니다)
+            "../data/config.json",                                     // 설정파일 경로 (※주의: C++ searcher가 만약 json만 읽는다면 이 부분 변경이 필요할 수 있습니다)
             "16"                                                      // 프레임수 등
         ]
     },
@@ -59,7 +59,7 @@ module.exports = {
         maxConcurrentVideos: 2  // 동시 분석할 최대 영상 개수
     },
     paths: {
-        fingerprintDb: "./data/video-fingerprints.json", // 영상 DB(핑거프린트) 파일 데이터 저장/로드 경로
-        tempDir: "./data/temp_frames"                    // 중간 이미지/프레임 저장용 임시 폴더 위치
+        fingerprintDb: "../data/video-fingerprints.json", // 영상 DB(핑거프린트) 파일 데이터 저장/로드 경로
+        tempDir: "../data/temp_frames"                    // 중간 이미지/프레임 저장용 임시 폴더 위치
     }
 };

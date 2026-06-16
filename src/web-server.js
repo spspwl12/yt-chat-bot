@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const chatHistory = require('./chat-history.js');
 const { banUser, blockUser } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
-const cfgYoutube = require('./data/config-youtube.js');
+const cfgYoutube = require('../data/config-youtube.js');
 const eventBus = require('./event-bus.js');
 
 let spamGuardRef = null;

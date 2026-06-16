@@ -2,8 +2,8 @@ const fs = require('fs');
 const { sendChat, banUser } = require('./innertube.js');
 const path2 = require('./path.js');
 const path = require('path');
-const BANNED_PATH = path2.findPath('./data/youtube-banned.json');
-const TRACKER_PATH = path2.findPath('./data/youtube-tracker.json') || path.join(__dirname, 'data', 'youtube-tracker.json');
+const BANNED_PATH = path2.findPath('../data/youtube-banned.json');
+const TRACKER_PATH = path2.findPath('../data/youtube-tracker.json') || path.join(__dirname, '../data', 'youtube-tracker.json');
 
 class SpamGuard {
     constructor(opts) {

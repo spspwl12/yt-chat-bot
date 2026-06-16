@@ -3,25 +3,25 @@ const TextSearchEngine = require('./textsearcher.js');
 const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
-const schCfg = require('./data/config-search.js');
-const subtitles = require('./data/video-sub.json');
+const schCfg = require('../data/config-search.js');
+const subtitles = require('../data/video-sub.json');
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
 const { sendChat } = require('./innertube.js');
 const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
     toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate } = require('./func.js');
 
-const profanitySet = require('./data/profanity-list.js');
+const profanitySet = require('../data/profanity-list.js');
 const eventBus = require('./event-bus.js');
 const videoInfo = search_lib.videoInfo;
-const videoMetadata = require('./data/video-metadata.json');
+const videoMetadata = require('../data/video-metadata.json');
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const searcher = new TextSearchEngine(subtitles);
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 const COOLDOWN_MSG = "(쿨타임 2분)";
 
 // ─── 설정 로드 (data/config-youtube.json) ─────────────────────
-const cfg = require('./data/config-youtube.js');
+const cfg = require('../data/config-youtube.js');
 // ──────────────────────────────────────────────────────────
 
 let delayChatTime = 0;                 // global 모드용

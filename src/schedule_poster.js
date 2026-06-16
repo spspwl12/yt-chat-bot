@@ -3,7 +3,7 @@ const { postCommunityText } = require('./innertube.js');
 const { getEpisodeInfo } = require('./commands.js');
 const fs = require('fs');
 const path = require('path');
-const cfg = require('./data/config-youtube.js');
+const cfg = require('../data/config-youtube.js');
 
 const EPISODE_END = cfg.episode.end;
 const STATE_FILE = path.join(__dirname, 'data', 'schedule_state.json');
