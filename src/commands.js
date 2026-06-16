@@ -831,8 +831,11 @@ function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) 
             const candidate = insertSpaces((str ? "→" : "") + hdr + e.shorten, change);
 
             // 누적된 시간표 문자열의 총 길이가 채팅 제한치(limitLength)를 넘으면 그만 붙이고 즉시 반환
-            if (str.length + candidate.length >= limitLength)
+            if (str.length + candidate.length >= limitLength) {
+                if (Math.random() < 0.5)
+                    str += " (프로필에서 전체 시간표 확인이 가능합니다.)";
                 return str;
+            }
 
             str += candidate;
             pdate = fdate;
