@@ -9,6 +9,14 @@ const http2 = require('node:http2');
 const crypto = require('crypto');
 const fs = require('fs');
 const path2 = require('./path.js');
+const path = require('path');
+
+// session.json 자동 생성: 파일이 없으면 기본값으로 생성
+const sessionPath = path.resolve(__dirname, '../data/session.json');
+if (!fs.existsSync(sessionPath)) {
+    console.log('📝 data/session.json 파일이 없어 새로 생성합니다.');
+    fs.writeFileSync(sessionPath, JSON.stringify({ cookie: "" }, null, 4), 'utf-8');
+}
 const cookies = require('../data/session.json');
 const cfg = require('../data/config-youtube.js');
 
