@@ -59,6 +59,26 @@ async function main() {
     const { startServer, broadcastSpam, isBotMuted } = require('./web-server.js');
     startServer(12345, spamGuard, getEpisodeInfo);
 
+    const eventBus = require('./event-bus.js');
+    eventBus.on('simulate_chat', async (text) => {
+        console.log(`[디버그 채팅] 입력: ${text}`);
+        const msg = {
+            channelId: 'debug_channel_id',
+            displayName: 'WebAdmin',
+            text: text,
+            isChatOwner: false,
+            isModerator: false
+        };
+        const chkInput = { warn: 0, ban: 0, channelId: msg.channelId, spamGuard };
+        const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
+        if (resp) {
+            const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
+            p.then(ok => {
+                if (ok && chkInput.onSuccess) chkInput.onSuccess();
+            });
+        }
+    });
+
     while (running) {
         try {
             const result = await fetchChat(continuation);

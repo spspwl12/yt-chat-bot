@@ -1,4 +1,5 @@
 const search_lib = require('./video-matcher/search.js');
+const { searchEpisodeByAI } = require('./ai.js');
 const TextSearchEngine = require('./textsearcher.js');
 const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
@@ -181,7 +182,7 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
     if (group === 'episode') {
-        return _emitLog(handleEpisodeCommand(rtn, cmd, args, _input));
+        return _emitLog(await handleEpisodeCommand(rtn, cmd, args, _input));
     }
 
     // 곧 방영될 회차 리스트 목록 요약(시간표) 출력
@@ -242,7 +243,7 @@ async function handleCommand(type, text, displayName, _input) {
     return null;
 }
 
-function handleEpisodeCommand(rtn, cmd, args, _input) {
+async function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 별도 인자가 없으면(예: '!몇화') 현재 실시간으로 방영 중인 회차와 남은 시간 반환
     if (!args || args.length <= 0) {
         setCooldown(cmd);
@@ -365,12 +366,6 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     const searchInfo = searcher.search(query);
-    if (searchInfo.length <= 0) {
-        _input.warn = cfg.subtitle_score.warn_base; // 결과 없음 페널티
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-        return `⚠️ 대사를 정확히 입력하세요. ${COOLDOWN_MSG}`;
-    }
-
     if (searchInfo && searchInfo.length > 0) {
         // 점수가 같을 경우, 검색된 단어의 출현 빈도(매칭된 대사 수)가 높은 에피소드를 우선 채택하도록 정렬
         searchInfo.sort((a, b) => {
@@ -506,7 +501,22 @@ function handleEpisodeCommand(rtn, cmd, args, _input) {
         }
     }
 
-    // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시
+    // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시 → AI 폴백 시도
+    const episodeNum2 = await searchEpisodeByAI(query, cfg.ai, cfg.episode.start, cfg.episode.end);
+    if (episodeNum2 !== null) {
+        console.log(`🤖 AI: "${query}" → ${episodeNum2}화`);
+        setCooldown(cmd);
+        const result = printNumEpisode(rtn, episodeNum2);
+        if (result) {
+            const aiPrefix = '🤖 AI: ';
+            if (typeof result === 'string') return `${aiPrefix} ${result}`;
+            return {
+                msg: `${aiPrefix} ${result.msg}`,
+                proc: function (attempt) { return `${aiPrefix} ${result.proc(attempt)}`; }
+            };
+        }
+    }
+
     _input.warn = cfg.subtitle_score.warn_base;
     setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
     return `⚠️ 대사를 정확히 입력하세요. ${COOLDOWN_MSG}`;

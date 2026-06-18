@@ -1095,6 +1095,11 @@
                     </p>
                 </div>
             </div>
+            <div style="display:flex; gap:12px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--surface-border);">
+                <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600;">🛠️ 디버깅:</span>
+                <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)" onkeydown="if(event.key==='Enter') sendSimulatedChat()">
+                <button class="btn" onclick="sendSimulatedChat()">가상 입력</button>
+            </div>
             <div style="display:flex; gap:12px; margin-top: 20px;">
                 <button class="btn" id="btn-refresh-state">Force Refresh</button>
                 <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
@@ -1330,6 +1335,19 @@
 
         hamburger.addEventListener('click', openSidebar);
         overlay.addEventListener('click', closeSidebar);
+
+        function sendSimulatedChat() {
+            const input = document.getElementById('debug-chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'simulate_chat', payload: text }));
+                input.value = '';
+                showToast(`가상 입력 전송: ${text}`);
+            } else {
+                showToast('WebSocket 연결이 끊겨있습니다.', true);
+            }
+        }
 
         // ── UI Interactions ──
         document.querySelectorAll('.nav-btn').forEach(btn => {

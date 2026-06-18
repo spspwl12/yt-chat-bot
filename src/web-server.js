@@ -13,7 +13,7 @@ let spamGuardRef = null;
 let getEpisodeInfoRef = null;
 let clients = new Set();
 
-const MUTE_FILE = path.join(__dirname, 'data', 'bot-mute.json');
+const MUTE_FILE = path.join(__dirname, '../data', 'bot-mute.json');
 let botMuted = false;
 try {
     botMuted = JSON.parse(fs.readFileSync(MUTE_FILE, 'utf8')).muted === true;
@@ -335,17 +335,17 @@ async function handleAction(client, req) {
         broadcastSpam();
     }
     else if (action === 'getConfig') {
-        const cfgYoutubeText = fs.readFileSync(path.join(__dirname, 'data', 'config-youtube.js'), 'utf8');
-        const cfgSearchText = fs.readFileSync(path.join(__dirname, 'data', 'config-search.js'), 'utf8');
+        const cfgYoutubeText = fs.readFileSync(path.join(__dirname, '../data', 'config-youtube.js'), 'utf8');
+        const cfgSearchText = fs.readFileSync(path.join(__dirname, '../data', 'config-search.js'), 'utf8');
         sendWSFrame(client, JSON.stringify({ action: 'config_data', payload: { youtube: cfgYoutubeText, search: cfgSearchText } }));
     }
     else if (action === 'saveConfig') {
         const { target, content } = payload;
         try {
             if (target === 'youtube') {
-                fs.writeFileSync(path.join(__dirname, 'data', 'config-youtube.js'), content, 'utf8');
+                fs.writeFileSync(path.join(__dirname, '../data', 'config-youtube.js'), content, 'utf8');
             } else if (target === 'search') {
-                fs.writeFileSync(path.join(__dirname, 'data', 'config-search.js'), content, 'utf8');
+                fs.writeFileSync(path.join(__dirname, '../data', 'config-search.js'), content, 'utf8');
             }
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: true } }));
         } catch (e) {
@@ -355,7 +355,7 @@ async function handleAction(client, req) {
     // ── 새 기능: video-info.json 편집 ──
     else if (action === 'getVideoInfo') {
         try {
-            const viText = fs.readFileSync(path.join(__dirname, 'data', 'video-info.json'), 'utf8');
+            const viText = fs.readFileSync(path.join(__dirname, '../data', 'video-info.json'), 'utf8');
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: viText }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: '[]' }));
@@ -366,7 +366,7 @@ async function handleAction(client, req) {
         try {
             // JSON 유효성 검증
             JSON.parse(content);
-            fs.writeFileSync(path.join(__dirname, 'data', 'video-info.json'), content, 'utf8');
+            fs.writeFileSync(path.join(__dirname, '../data', 'video-info.json'), content, 'utf8');
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
@@ -379,6 +379,11 @@ async function handleAction(client, req) {
         setTimeout(() => {
             process.exit(0);
         }, 1000);
+    }
+    // ── 새 기능: 대시보드에서 가상 채팅 보내기 (디버깅) ──
+    else if (action === 'simulate_chat') {
+        eventBus.emit('simulate_chat', payload);
+        sendWSFrame(client, JSON.stringify({ action: 'simulate_chat_result', payload: { success: true } }));
     }
     // ── 새 기능: 검색 로그 ──
     else if (action === 'getSearchLogs') {
