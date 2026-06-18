@@ -6,7 +6,7 @@ const path = require('path');
 const cfg = require('../data/config-youtube.js');
 
 const EPISODE_END = cfg.episode.end;
-const STATE_FILE = path.join(__dirname, 'data', 'schedule_state.json');
+const STATE_FILE = path.join(__dirname, '../data', 'schedule_state.json');
 
 // ─── 스케줄러 설정 (config-youtube.js → schedule_poster 섹션에서 로드) ───
 const _sp = cfg.schedule_poster || {};
