@@ -64,4 +64,18 @@ module.exports = {
     timetable: {
         default_limit: 130,         // 시간표 기본 글자 제한
     },
+    // ─── 스케줄 포스터 (schedule_poster.js) ────────────────────────────
+    schedule_poster: {
+        enable_poster: false,            // 전체 시간표 자동 업로드 켜기/끄기
+        initial_delay_sec: 60,          // 봇 시작 후 첫 편성표 게시까지 대기 시간 (초)
+        cycle_transition_delay_min: 5,  // 사이클 전환 감지 후 새 편성표 게시까지 대기 시간 (분)
+    },
+    // ─── AI 설정 (대사 검색 폴백) ────────────────────────────────────
+    ai: {
+        enable: true,                   // AI 폴백 기능 사용 여부
+        url: "http://url:port/q?n={query}",  // GET 요청 URL ({query}는 query_template 결과로 치환)
+        query_template: `웹 검색해서 웬만해선 그들을 막을 수 없다 시트콤 "{query}" 몇화`,  // {query}는 사용자 입력으로 치환 후 URL에 삽입
+        response_path: "response",   // 응답 JSON에서 실제 문자열이 들어있는 경로 (예: "data.answer", "result.text")
+        timeout_ms: 60000,              // AI API 요청 타임아웃 (ms)
+    },
 };
