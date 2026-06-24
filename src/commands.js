@@ -502,19 +502,31 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시 → AI 폴백 시도
-    const episodeNum2 = await searchEpisodeByAI(query, cfg.ai, cfg.episode.start, cfg.episode.end);
-    if (episodeNum2 !== null) {
-        console.log(`🤖 AI: "${query}" → ${episodeNum2}화`);
-        setCooldown(cmd);
-        const result = printNumEpisode(rtn, episodeNum2);
-        if (result) {
-            const aiPrefix = '🤖 AI: ';
-            if (typeof result === 'string') return `${aiPrefix} ${result}`;
-            return {
-                msg: `${aiPrefix} ${result.msg}`,
-                proc: function (attempt) { return `${aiPrefix} ${result.proc(attempt)}`; }
-            };
-        }
+    if (cfg.ai && cfg.ai.enable) {
+        sendChat(`⚠️ 대사를 찾을 수 없습니다. 입력한 내용이 줄거리일 수 있어 AI 확인 후 답변드리겠습니다.`);
+
+        searchEpisodeByAI(query, cfg.ai, cfg.episode.start, cfg.episode.end)
+            .then(episodeNum2 => {
+                if (episodeNum2 !== null) {
+                    console.log(`🤖 AI: "${query}" → ${episodeNum2}화`);
+                    setCooldown(cmd);
+                    const result = printNumEpisode(rtn, episodeNum2);
+                    if (result) {
+                        if (typeof result === 'string')
+                            return sendChat(`🤖 ${result}`);
+                        return sendChat(`🤖 ${result.msg}`);
+                    }
+                }
+
+                sendChat(`⚠️ 검색에 실패했습니다. ${COOLDOWN_MSG}`);
+            })
+            .catch(err => {
+                console.error('AI 검색 중 오류 발생:', err);
+            });
+
+        _input.warn = cfg.subtitle_score.warn_base * 5;
+        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+        return null;
     }
 
     _input.warn = cfg.subtitle_score.warn_base;
