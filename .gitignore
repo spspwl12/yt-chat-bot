@@ -3,7 +3,7 @@ tokens.json
 banned.json
 src/data/session.json
 node_modules
-/misc/
 data/session.json
 data/bot-mute.json
 data/lastquery.json
+*.mp4
