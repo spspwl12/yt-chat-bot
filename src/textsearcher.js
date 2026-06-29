@@ -152,7 +152,7 @@ class KoreanSubSearchEngine {
         this.sentences = [];
         for (const key in data) {
             for (const sub of data[key]) {
-                const cleanText = sub.text.replace(/[^가-힣a-zA-Z0-9]/g, '');
+                const cleanText = sub.text.toLowerCase().replace(/[^가-힣a-z0-9]/g, '');
                 if (!cleanText) continue;
                 const jamo = getJamoIds(cleanText);
                 const charIds = getCharIds(cleanText);
@@ -177,7 +177,7 @@ class KoreanSubSearchEngine {
     }
 
     search(query) {
-        const cleanQ = query.replace(/[^가-힣a-zA-Z0-9\s]/g, '').trim();
+        const cleanQ = query.toLowerCase().replace(/[^가-힣a-z0-9\s]/g, '').trim();
         if (!cleanQ) return [];
 
         const qNoSpace = cleanQ.replace(/\s+/g, '');
