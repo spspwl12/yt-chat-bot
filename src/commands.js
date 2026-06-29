@@ -1063,6 +1063,22 @@ function initCommand() {
     process.on('exit', cleanup);
 }
 
+let musicFreq = null;
+function getMusicFreq() {
+    if (musicFreq) return musicFreq;
+    musicFreq = new Map();
+    for (const epKey in musics) {
+        const uniqueSongs = new Set();
+        for (const m of musics[epKey]) {
+            if (m && m.text) uniqueSongs.add(m.text);
+        }
+        for (const text of uniqueSongs) {
+            musicFreq.set(text, (musicFreq.get(text) || 0) + 1);
+        }
+    }
+    return musicFreq;
+}
+
 async function handleMusicCommand(rtn, cmd, args, _input) {
     if (cfg.music && !cfg.music.enable) {
         setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
@@ -1097,7 +1113,20 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
         }
 
         if (foundList.length > 0) {
-            foundList.sort((a, b) => a.diff - b.diff);
+            const enablePenalty = cfg.music && cfg.music.frequent_penalty_enable !== false;
+            const freqThreshold = (cfg.music && cfg.music.frequent_threshold) ? cfg.music.frequent_threshold : 20;
+
+            foundList.sort((a, b) => {
+                let aPenalty = 0;
+                let bPenalty = 0;
+                if (enablePenalty) {
+                    const freqMap = getMusicFreq();
+                    if ((freqMap.get(a.text) || 0) >= freqThreshold) aPenalty = 1;
+                    if ((freqMap.get(b.text) || 0) >= freqThreshold) bPenalty = 1;
+                }
+                if (aPenalty !== bPenalty) return aPenalty - bPenalty;
+                return a.diff - b.diff;
+            });
 
             let msg = foundList.map(item => {
                 if (item.diff === 0) {
