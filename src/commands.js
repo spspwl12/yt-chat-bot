@@ -1184,20 +1184,38 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
 
             if (result.score > minScore) {
                 const key = result.key;
-                const mObj = musics[key][matched[0] - 1];
                 const subInfo = videoInfo.find(e => e.name === key);
+                if (!subInfo) continue;
 
-                if (mObj && subInfo) {
-                    const subTime = fromHHMMSS(mObj.start);
-                    let outOfbounds = subInfo.disable;
-                    if (!outOfbounds && subInfo._editParsed) {
+                // matched에 여러 인덱스가 올 수 있으므로 (결합 매칭)
+                // 편집 구간에 걸리지 않는 곡을 우선 선택
+                let bestMObj = null;
+                let bestOutOfbounds = true;
+                for (const idx of matched) {
+                    const candidate = musics[key][idx - 1];
+                    if (!candidate) continue;
+                    const t = fromHHMMSS(candidate.start);
+                    let oob = !!subInfo.disable;
+                    if (!oob && subInfo._editParsed) {
                         for (const et of subInfo._editParsed) {
-                            if (subTime >= et.s && subTime <= et.e) {
-                                outOfbounds = true;
+                            if (t >= et.s && t <= et.e) {
+                                oob = true;
                                 break;
                             }
                         }
                     }
+                    if (!oob) {
+                        bestMObj = candidate;
+                        bestOutOfbounds = false;
+                        break;
+                    }
+                    if (!bestMObj) {
+                        bestMObj = candidate;
+                    }
+                }
+
+                if (bestMObj && subInfo) {
+                    const subTime = fromHHMMSS(bestMObj.start);
 
                     const unicodenum = toUnicodeNumber(subInfo.alias);
                     const rawHwa = `${unicodenum}화`;
@@ -1206,7 +1224,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
                     const timestr = formatDate(futureDate);
                     const emoji = getClockEmoji(timestr);
 
-                    const timeMsg = outOfbounds ?
+                    const timeMsg = bestOutOfbounds ?
                         `스트리밍X` :
                         `${emoji} ${timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
 
