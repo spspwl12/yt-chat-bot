@@ -6,6 +6,7 @@ const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
 const schCfg = require('../data/config-search.js');
 const subtitles = require('../data/video-sub.json');
+const musics = require('../data/video-music.json');
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
 const { sendChat } = require('./innertube.js');
@@ -18,6 +19,7 @@ const videoInfo = search_lib.videoInfo;
 const videoMetadata = require('../data/video-metadata.json');
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const searcher = new TextSearchEngine(subtitles);
+const musicSearcher = new TextSearchEngine(musics);
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 const COOLDOWN_MSG = "(쿨타임 2분)";
 
@@ -34,6 +36,7 @@ const COMMAND_GROUPS = {
     'greeting': ['!안녕', '!인사', '!하이', '!헬로', '!ㅎㅇ', '!gd', '!반가워', '!방가'],
     'help': ['!도움', '!안내', '!소개', '!헬프', '!가이드', '!도움말', '!사용법', '!설명서', '!명령어', '!commands', '!command'],
     'episode': ['!대사', '!몇회', '!몇화', '!몆화', '!몆회', '!몇편', '!편수', '!화차', '!지금몇화', '!지금몇회', '!지금몇편', '!회차', '!ㅁㅎ'],
+    'music': ['!음악', '!노래'],
     'timetable': ['!시간표', '!편성표', '!방영표', '!방송표', '!상영표'],
     'next': ['!다음', '!다음화', '!다음회', '!다음편', '!다음회차'],
     'nextnext': ['!다다음', '!다다음화', '!다다음회', '!다다음편', '!다다음회차'],
@@ -183,6 +186,11 @@ async function handleCommand(type, text, displayName, _input) {
     // 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
     if (group === 'episode') {
         return _emitLog(await handleEpisodeCommand(rtn, cmd, args, _input));
+    }
+
+    // 음악/노래 검색 명령어
+    if (group === 'music') {
+        return _emitLog(await handleMusicCommand(rtn, cmd, args, _input));
     }
 
     // 곧 방영될 회차 리스트 목록 요약(시간표) 출력
@@ -1053,6 +1061,146 @@ function initCommand() {
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
     process.on('exit', cleanup);
+}
+
+async function handleMusicCommand(rtn, cmd, args, _input) {
+    if (cfg.music && !cfg.music.enable) {
+        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+        return `⚠️ 음악 검색 기능이 비활성화되어 있습니다. ${COOLDOWN_MSG}`;
+    }
+
+    if (!args || args.length === 0) {
+        setCooldown(cmd);
+        if (!rtn || rtn.index === undefined) {
+            return null;
+        }
+        const epInfo = videoInfo[rtn.index];
+        const epKey = epInfo.name;
+        const epMusics = musics[epKey] || [];
+
+        const foundList = [];
+        const historySec = (cfg.music && cfg.music.history_sec !== undefined) ? cfg.music.history_sec : 180;
+        const historyMin = Math.floor(historySec / 60);
+
+        for (let i = epMusics.length - 1; i >= 0; i--) {
+            const m = epMusics[i];
+            const startSec = fromHHMMSS(m.start);
+            const endSec = fromHHMMSS(m.end);
+
+            if (rtn.now >= startSec && rtn.now <= endSec) {
+                foundList.push({ diff: 0, text: m.text });
+            } else if (startSec < rtn.now && rtn.now - startSec <= historySec) {
+                let d = Math.floor((rtn.now - startSec) / 60);
+                if (d === 0) d = 1;
+                foundList.push({ diff: d, text: m.text });
+            }
+        }
+
+        if (foundList.length > 0) {
+            foundList.sort((a, b) => a.diff - b.diff);
+
+            let msg = foundList.map(item => {
+                if (item.diff === 0) {
+                    return `🎵(현재) ${item.text}`;
+                } else {
+                    return `🎵(${item.diff}분 전) ${item.text}`;
+                }
+            }).join(' ');
+
+            if (cfg.music && cfg.music.max_length && msg.length > cfg.music.max_length) {
+                msg = msg.substring(0, cfg.music.max_length);
+            }
+
+            return {
+                msg: `${msg} ${COOLDOWN_MSG}`,
+                proc: () => `${msg} ${COOLDOWN_MSG}`
+            };
+        } else {
+            return {
+                msg: `⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다. ${COOLDOWN_MSG}`,
+                proc: () => `⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다. ${COOLDOWN_MSG}`
+            };
+        }
+    }
+
+    const query = args.join(' ');
+
+    const searchInfo = musicSearcher.search(query);
+    if (searchInfo && searchInfo.length > 0) {
+        searchInfo.sort((a, b) => b.score - a.score);
+
+        const validResults = [];
+        const removeDup = searchInfo.filter(
+            (item, index, self) => index === self.findIndex(obj => obj.key === item.key)
+        );
+
+        const epsList = [];
+        const detailsList = [];
+
+        for (const result of removeDup) {
+            if (validResults.length >= 3) break;
+
+            const matched = result.matchedIndices;
+            if (!matched || matched.length === 0) continue;
+
+            if (result.score > cfg.subtitle_score.min_value) {
+                const key = result.key;
+                const mObj = musics[key][matched[0] - 1];
+                const subInfo = videoInfo.find(e => e.name === key);
+
+                if (mObj && subInfo) {
+                    const subTime = fromHHMMSS(mObj.start);
+                    let outOfbounds = subInfo.disable;
+                    if (!outOfbounds && subInfo._editParsed) {
+                        for (const et of subInfo._editParsed) {
+                            if (subTime >= et.s && subTime <= et.e) {
+                                outOfbounds = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    const unicodenum = toUnicodeNumber(subInfo.alias);
+                    const rawHwa = `${unicodenum}화`;
+
+                    const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subTime));
+                    const timestr = formatDate(futureDate);
+                    const emoji = getClockEmoji(timestr);
+
+                    const timeMsg = outOfbounds ?
+                        `스트리밍X` :
+                        `${emoji} ${timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
+
+                    epsList.push(rawHwa);
+                    detailsList.push(`${rawHwa}(${timeMsg.replace(/ /g, '')})`);
+                    validResults.push(result);
+                }
+            }
+        }
+
+        if (validResults.length > 0) {
+            setCooldown(cmd);
+            _input.warn = cfg.subtitle_score.warn_base;
+
+            const epsStr = epsList.join(', ');
+            const detailsStr = detailsList.join(', ');
+
+            const makeMsg = (attempt) => {
+                const msg = `🎵 입력하신 노래가 등장하는 회차는 ${epsStr}${retryPattern[attempt] || ''} 가 있습니다. ${detailsStr}`;
+                return `${msg} ${COOLDOWN_MSG}`;
+            };
+
+            return {
+                msg: makeMsg(0),
+                proc: (attempt) => makeMsg(attempt)
+            };
+        }
+    }
+
+    return {
+        msg: `⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요. ${COOLDOWN_MSG}`,
+        proc: () => `⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요. ${COOLDOWN_MSG}`
+    };
 }
 
 module.exports = { initCommand, handleCommand, getEpisodeInfo };
