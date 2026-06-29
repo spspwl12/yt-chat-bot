@@ -1115,25 +1115,36 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
         if (foundList.length > 0) {
             const enablePenalty = cfg.music && cfg.music.frequent_penalty_enable !== false;
             const freqThreshold = (cfg.music && cfg.music.frequent_threshold) ? cfg.music.frequent_threshold : 20;
+            const freqMap = enablePenalty ? getMusicFreq() : null;
 
-            foundList.sort((a, b) => {
-                let aPenalty = 0;
-                let bPenalty = 0;
-                if (enablePenalty) {
-                    const freqMap = getMusicFreq();
-                    if ((freqMap.get(a.text) || 0) >= freqThreshold) aPenalty = 1;
-                    if ((freqMap.get(b.text) || 0) >= freqThreshold) bPenalty = 1;
+            foundList.forEach(item => {
+                item.penalty = 0;
+                if (enablePenalty && (freqMap.get(item.text) || 0) >= freqThreshold) {
+                    item.penalty = 1;
                 }
-                if (aPenalty !== bPenalty) return aPenalty - bPenalty;
+            });
+
+            // 우선순위에 따라 정렬 (페널티 없으면 앞, 최근 곡일수록 앞)
+            foundList.sort((a, b) => {
+                if (a.penalty !== b.penalty) return a.penalty - b.penalty;
                 return a.diff - b.diff;
             });
 
-            let msg = foundList.map(item => {
-                if (item.diff === 0) {
-                    return `🎵(현재) ${item.text}`;
-                } else {
-                    return `🎵(${item.diff}분 전) ${item.text}`;
+            // max_length 초과 시 우선순위가 낮은(배열의 뒤쪽) 곡부터 제거
+            if (cfg.music && cfg.music.max_length) {
+                while (foundList.length > 1) {
+                    let tempStr = foundList.map(item => item.diff === 0 ? `🎵(현재) ${item.text}` : `🎵(${item.diff}분 전) ${item.text}`).join(' ');
+                    if (tempStr.length <= cfg.music.max_length) break;
+                    foundList.pop();
                 }
+            }
+
+            // 출력할 살아남은 곡들을 다시 최신순(현재 -> 1분 전 -> 3분 전)으로 정렬
+            foundList.sort((a, b) => a.diff - b.diff);
+
+            let msg = foundList.map(item => {
+                if (item.diff === 0) return `🎵(현재) ${item.text}`;
+                return `🎵(${item.diff}분 전) ${item.text}`;
             }).join(' ');
 
             if (cfg.music && cfg.music.max_length && msg.length > cfg.music.max_length) {
@@ -1163,16 +1174,15 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
             (item, index, self) => index === self.findIndex(obj => obj.key === item.key)
         );
 
-        const epsList = [];
         const detailsList = [];
 
-        for (const result of removeDup) {
-            if (validResults.length >= 3) break;
+        const minScore = (cfg.music && cfg.music.min_score !== undefined) ? cfg.music.min_score : cfg.subtitle_score.min_value;
 
+        for (const result of removeDup) {
             const matched = result.matchedIndices;
             if (!matched || matched.length === 0) continue;
 
-            if (result.score > cfg.subtitle_score.min_value) {
+            if (result.score > minScore) {
                 const key = result.key;
                 const mObj = musics[key][matched[0] - 1];
                 const subInfo = videoInfo.find(e => e.name === key);
@@ -1200,9 +1210,11 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
                         `스트리밍X` :
                         `${emoji} ${timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
 
-                    epsList.push(rawHwa);
-                    detailsList.push(`${rawHwa}(${timeMsg.replace(/ /g, '')})`);
-                    validResults.push(result);
+                    validResults.push({
+                        aliasInt: parseInt(subInfo.alias, 10) || 0,
+                        rawHwa,
+                        timeMsg: timeMsg.replace(/ /g, '')
+                    });
                 }
             }
         }
@@ -1211,12 +1223,30 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
             setCooldown(cmd);
             _input.warn = cfg.subtitle_score.warn_base;
 
-            const epsStr = epsList.join(', ');
-            const detailsStr = detailsList.join(', ');
+            validResults.sort((a, b) => a.aliasInt - b.aliasInt);
+            const detailsList = validResults.map(r => `${r.rawHwa}(${r.timeMsg})`);
+
+            let detailsStr = detailsList.join(', ');
+            if (cfg.music && cfg.music.max_length) {
+                let testMsg = `🎵 입력하신 노래가 등장하는 회차는 ${detailsStr} 가 있습니다.`;
+                if (testMsg.length > cfg.music.max_length && detailsList.length > 1) {
+                    while (detailsList.length > 1) {
+                        detailsList.pop();
+                        detailsStr = detailsList.join(', ') + '...';
+                        testMsg = `🎵 입력하신 노래가 등장하는 회차는 ${detailsStr} 가 있습니다.`;
+                        if (testMsg.length <= cfg.music.max_length) break;
+                    }
+                }
+                // If even 1 item is too long, we just substring
+                if (testMsg.length > cfg.music.max_length) {
+                    detailsStr = detailsStr.substring(0, cfg.music.max_length - 20) + '...';
+                }
+            }
 
             const makeMsg = (attempt) => {
-                const msg = `🎵 입력하신 노래가 등장하는 회차는 ${epsStr}${retryPattern[attempt] || ''} 가 있습니다. ${detailsStr}`;
-                return `${msg} ${COOLDOWN_MSG}`;
+                const spaces = " ".repeat(attempt);
+                const msg = `🎵 입력하신 노래가 등장하는 회차는 ${detailsStr} 가 있습니다.`;
+                return `${msg}${spaces} ${COOLDOWN_MSG}`;
             };
 
             return {
