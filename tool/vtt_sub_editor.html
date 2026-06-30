@@ -5,507 +5,445 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VTT 자막 편집기</title>
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <style>
+        :root {
+            --bg-color: #09090b;
+            --glass-bg: rgba(24, 24, 27, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            
+            --text-main: #fafafa;
+            --text-muted: #a1a1aa;
+            
+            --panel-radius: 16px;
+            --btn-radius: 8px;
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            min-height: 100vh
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.08), transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.05), transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 30px 20px;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 20px
         }
 
         h1 {
             text-align: center;
-            padding: 20px;
-            color: #00d4ff;
-            font-size: 24px
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--panel-radius);
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
 
         .top-controls {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 20px;
             flex-wrap: wrap;
-            align-items: center
+            align-items: center;
+            margin-bottom: 24px;
+            justify-content: space-between;
         }
 
-        .top-controls label {
-            background: #16213e;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            border: 2px dashed #00d4ff;
-            color: #00d4ff;
-            font-weight: bold;
-            transition: all .3s
+        .controls-left, .controls-right {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
-        .top-controls label:hover {
-            background: #0f3460
-        }
-
-        .top-controls input[type=file] {
-            display: none
-        }
-
-        .top-controls button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
+        .btn {
+            padding: 10px 18px;
+            border-radius: var(--btn-radius);
             font-size: 14px;
-            transition: all .3s
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            letter-spacing: -0.2px;
         }
 
-        .btn-export {
-            background: #00d4ff;
-            color: #1a1a2e
+        .btn:active {
+            transform: scale(0.97);
         }
 
-        .btn-export:hover {
-            background: #00b4d8
+        input[type="file"] {
+            display: none;
         }
 
-        .btn-new {
-            background: #e94560;
-            color: #fff
+        .btn-primary {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary);
         }
 
-        .btn-new:hover {
-            background: #c81e45
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+            box-shadow: 0 4px 15px var(--primary-glow);
         }
 
-        .btn-add {
-            background: #0cca4a;
-            color: #fff
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border-color: var(--glass-border);
         }
 
-        .btn-add:hover {
-            background: #0a9e3a
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
         .main-layout {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px
-        }
-
-        .video-section {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 15px;
-            position: relative
+            gap: 24px;
         }
 
         .video-section video {
             width: 100%;
             border-radius: 8px;
             background: #000;
-            max-height: 450px
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+            max-height: 500px;
         }
 
         .custom-controls {
-            background: #0a1628;
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin-top: 8px;
+            margin-top: 20px;
             display: flex;
             flex-direction: column;
-            gap: 8px
+            gap: 16px;
         }
 
         .custom-seekbar {
             width: 100%;
             height: 6px;
             -webkit-appearance: none;
-            appearance: none;
-            background: #1a2a4a;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
             outline: none;
             cursor: pointer;
-            transition: height .15s
+            transition: height 0.1s;
         }
-
+        
         .custom-seekbar:hover {
-            height: 10px
+            height: 8px;
         }
 
         .custom-seekbar::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: #00d4ff;
+            background: var(--primary);
             cursor: pointer;
-            box-shadow: 0 0 6px rgba(0, 212, 255, .5);
-            transition: transform .15s
+            box-shadow: 0 0 10px var(--primary-glow);
+            transition: transform 0.1s;
         }
 
         .custom-seekbar:hover::-webkit-slider-thumb {
-            transform: scale(1.3)
-        }
-
-        .custom-seekbar::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #00d4ff;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 6px rgba(0, 212, 255, .5)
-        }
-
-        .custom-seekbar::-moz-range-track {
-            background: #1a2a4a;
-            border-radius: 3px;
-            height: 6px
+            transform: scale(1.2);
         }
 
         .controls-row {
             display: flex;
             align-items: center;
-            gap: 8px
-        }
-
-        .ctrl-btn {
-            background: #0f3460;
-            color: #00d4ff;
-            border: 1px solid #00d4ff;
-            border-radius: 6px;
-            padding: 6px 14px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            transition: all .2s;
-            display: flex;
-            align-items: center;
-            gap: 4px
-        }
-
-        .ctrl-btn:hover {
-            background: #00d4ff;
-            color: #1a1a2e
-        }
-
-        .ctrl-btn.active {
-            background: #00d4ff;
-            color: #1a1a2e
+            gap: 12px;
         }
 
         .time-display {
-            color: #00d4ff;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 13px;
             margin-left: auto;
-            letter-spacing: 0.5px
-        }
-
-        .video-info {
-            margin-top: 10px;
+            font-family: 'SF Mono', Consolas, monospace;
             font-size: 13px;
-            color: #aaa
-        }
-
-        .subtitle-section {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 15px;
-            max-height: 600px;
-            display: flex;
-            flex-direction: column
-        }
-
-        .subtitle-section h2 {
-            color: #00d4ff;
-            margin-bottom: 10px;
-            font-size: 18px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center
-        }
-
-        .subtitle-list {
-            flex: 1;
-            overflow-y: auto;
-            padding-right: 5px
-        }
-
-        .subtitle-list::-webkit-scrollbar {
-            width: 6px
-        }
-
-        .subtitle-list::-webkit-scrollbar-thumb {
-            background: #00d4ff;
-            border-radius: 3px
-        }
-
-        .cue-item {
-            background: #0f3460;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-left: 4px solid #00d4ff;
-            transition: all .3s;
-            position: relative
-        }
-
-        .cue-item.active {
-            border-left-color: #e94560;
-            background: #1a1a4e;
-            box-shadow: 0 0 15px rgba(233, 69, 96, .3)
-        }
-
-        .cue-item .cue-header {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-            align-items: center;
-            flex-wrap: wrap
-        }
-
-        .cue-item input[type=text] {
-            background: #16213e;
-            border: 1px solid #333;
-            color: #e0e0e0;
-            padding: 5px 8px;
-            border-radius: 4px;
-            font-size: 13px;
-            width: 110px
-        }
-
-        .cue-item input[type=text]:focus {
-            border-color: #00d4ff;
-            outline: none
-        }
-
-        .cue-item textarea {
-            width: 100%;
-            background: #16213e;
-            border: 1px solid #333;
-            color: #e0e0e0;
-            padding: 8px;
-            border-radius: 4px;
-            font-size: 13px;
-            resize: vertical;
-            min-height: 40px
-        }
-
-        .cue-item textarea:focus {
-            border-color: #00d4ff;
-            outline: none
-        }
-
-        .cue-item .btn-del {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #e94560;
-            color: #fff;
-            border: none;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            cursor: pointer;
-            font-size: 14px;
-            line-height: 24px;
-            text-align: center
-        }
-
-        .cue-item .btn-del:hover {
-            background: #ff2e4d
-        }
-
-        .cue-item .btn-goto {
-            background: #00d4ff;
-            color: #1a1a2e;
-            border: none;
-            border-radius: 4px;
-            padding: 3px 8px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: bold
-        }
-
-        .cue-item .btn-goto:hover {
-            background: #00b4d8
-        }
-
-        .time-label {
-            font-size: 11px;
-            color: #aaa
-        }
-
-        .preview-bar {
-            background: #0f3460;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 20px;
-            text-align: center;
-            font-size: 20px;
-            color: #fff;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1.5
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
         }
 
         .video-nav {
             display: flex;
             justify-content: center;
             gap: 8px;
-            margin-top: 10px
+            margin-top: 15px;
         }
 
-        .video-nav button {
-            background: #0f3460;
-            color: #00d4ff;
-            border: 1px solid #00d4ff;
+        .video-info {
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .preview-bar {
+            margin-top: 24px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: var(--btn-radius);
+            text-align: center;
+            font-size: 20px;
+            min-height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--glass-border);
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .subtitle-section {
+            display: flex;
+            flex-direction: column;
+            max-height: 750px;
+        }
+
+        .subtitle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .subtitle-header h2 {
+            font-size: 18px;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .sync-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px;
+            border-radius: var(--btn-radius);
+            border: 1px solid var(--glass-border);
+            flex-wrap: wrap;
+        }
+
+        .sync-controls label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .sync-controls select {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid var(--glass-border);
             border-radius: 6px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 16px;
-            transition: all .2s;
-            min-width: 50px
+            padding: 6px 10px;
+            outline: none;
+            font-size: 13px;
         }
 
-        .video-nav button:hover {
-            background: #00d4ff;
-            color: #1a1a2e
+        .subtitle-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .btn-current {
-            background: #e94560;
+        .subtitle-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .subtitle-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .subtitle-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .subtitle-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .cue-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            border-left: 4px solid rgba(255,255,255,0.1);
+            border-radius: var(--btn-radius);
+            padding: 16px;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .cue-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: rgba(255,255,255,0.3);
+        }
+
+        .cue-item.active {
+            border-left-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+        }
+
+        .cue-item.selected {
+            border-left-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .cue-header {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .time-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 4px;
+            margin-left: 4px;
+        }
+
+        .time-input {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--glass-border);
             color: #fff;
-            border: none;
-            border-radius: 4px;
-            padding: 3px 8px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: bold
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 13px;
+            width: 105px;
+            text-align: center;
         }
 
-        .btn-current:hover {
-            background: #ff2e4d
+        .btn-tiny {
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .btn-icon {
+            padding: 5px 8px;
+            font-size: 11px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .btn-del {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .btn-del:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .cue-item textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+        }
+
+        .cue-item textarea:focus,
+        .time-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .btn-add-bottom {
+            margin-top: 20px;
+            width: 100%;
+            padding: 16px;
+            font-size: 15px;
+        }
+
+        .no-sub {
+            color: var(--text-muted);
+            font-style: italic;
+            font-size: 14px;
         }
 
         @keyframes cueHighlight {
             0% {
-                background: #00d4ff33;
-                border-left-color: #0cca4a;
-                box-shadow: 0 0 20px rgba(12, 202, 74, .4);
+                background: rgba(99, 102, 241, 0.2);
+                border-left-color: var(--primary);
             }
-
             100% {
-                background: #0f3460;
-                border-left-color: #00d4ff;
-                box-shadow: none;
+                background: rgba(255, 255, 255, 0.02);
+                border-left-color: rgba(255,255,255,0.1);
             }
         }
 
         .cue-item.highlight {
-            animation: cueHighlight 1s ease-out forwards
+            animation: cueHighlight 1s ease-out forwards;
         }
 
-        .btn-add-bottom {
-            width: 100%;
-            padding: 12px;
-            margin-top: 10px;
-            background: #0cca4a;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            transition: all .3s
-        }
-
-        .btn-add-bottom:hover {
-            background: #0a9e3a
-        }
-
-        .sync-controls {
-            background: #0f3460;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap
-        }
-
-        .sync-controls label {
-            color: #aaa;
-            font-size: 12px;
-            font-weight: bold
-        }
-
-        .sync-controls select {
-            background: #16213e;
-            color: #e0e0e0;
-            border: 1px solid #333;
-            border-radius: 4px;
-            padding: 5px 8px;
-            font-size: 12px;
-            cursor: pointer
-        }
-
-        .sync-controls select:focus {
-            border-color: #00d4ff;
-            outline: none
-        }
-
-        .sync-btn {
-            background: #16213e;
-            color: #00d4ff;
-            border: 1px solid #00d4ff;
-            border-radius: 4px;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 12px;
-            transition: all .2s
-        }
-
-        .sync-btn:hover {
-            background: #00d4ff;
-            color: #1a1a2e
-        }
-
-        .cue-item.selected {
-            border-left-color: #f0c040;
-            background: #1a1a3e;
-            box-shadow: 0 0 10px rgba(240, 192, 64, .2)
-        }
-
-        .no-sub {
-            color: #555;
-            font-style: italic;
-            font-size: 14px
-        }
-
-        @media(max-width:900px) {
+        @media(max-width: 1024px) {
             .main-layout {
-                grid-template-columns: 1fr
+                grid-template-columns: 1fr;
             }
-
-            .video-section video {
-                max-height: 300px
+            .top-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .controls-left, .controls-right {
+                justify-content: center;
             }
         }
     </style>
@@ -514,58 +452,84 @@
 <body>
     <div class="container">
         <h1>VTT 자막 편집기</h1>
-        <div class="top-controls"><label for="videoInput">동영상 불러오기<input type="file" id="videoInput"
-                    accept="video/*,.ts,.mp4,.mkv,.avi,.webm,.mov,.flv,.wmv,.m4v,.3gp"></label><label for="vttInput">VTT
-                자막 불러오기<input type="file" id="vttInput" accept=".vtt"></label><button class="btn-new"
-                onclick="clearAll()">초기화</button><button class="btn-export" onclick="exportVTT()">VTT 내보내기</button>
+
+        <div class="top-controls glass-panel">
+            <div class="controls-left">
+                <label for="videoInput" class="btn btn-secondary">
+                    🎬 로컬 동영상
+                    <input type="file" id="videoInput" accept="video/*,.ts,.mp4,.mkv,.avi,.webm,.mov,.flv,.wmv,.m4v,.3gp">
+                </label>
+                <button class="btn btn-secondary" onclick="promptVideoUrl()">🌐 URL 동영상</button>
+                
+                <label for="vttInput" class="btn btn-secondary" style="margin-left: 10px;">
+                    📝 자막(VTT) 불러오기
+                    <input type="file" id="vttInput" accept=".vtt">
+                </label>
+            </div>
+            
+            <div class="controls-right">
+                <button class="btn btn-primary" onclick="exportVTT()">💾 VTT 내보내기</button>
+            </div>
         </div>
+
         <div class="main-layout">
-            <div class="video-section"><video id="videoPlayer" crossorigin="anonymous">
+            <div class="video-section glass-panel">
+                <video id="videoPlayer" crossorigin="anonymous">
                     <track id="subtitleTrack" kind="subtitles" srclang="ko" label="Korean" default>
                 </video>
                 <div class="custom-controls">
                     <input type="range" class="custom-seekbar" id="seekBar" min="0" max="100" step="0.001" value="0">
                     <div class="controls-row">
-                        <button class="ctrl-btn" id="btnPlay" onclick="togglePlay()" title="재생/일시정지">&#9654; 재생</button>
-                        <button class="ctrl-btn" id="btnStop" onclick="stopVideo()" title="정지">&#9632; 정지</button>
+                        <button class="btn btn-primary" id="btnPlay" onclick="togglePlay()" title="재생/일시정지">▶ 재생</button>
+                        <button class="btn btn-secondary" id="btnStop" onclick="stopVideo()" title="정지">■ 정지</button>
                         <span class="time-display" id="timeDisplay">00:00:00.000 / 00:00:00.000</span>
                     </div>
                 </div>
                 <div class="video-nav">
-                    <button onclick="seekVideo(-1)" title="1초 뒤로">&lt;&lt;</button>
-                    <button onclick="seekVideo(-0.1)" title="0.1초 뒤로">&lt;</button>
-                    <button onclick="seekVideo(0.1)" title="0.1초 앞으로">&gt;</button>
-                    <button onclick="seekVideo(1)" title="1초 앞으로">&gt;&gt;</button>
+                    <button class="btn btn-secondary btn-tiny" id="btnPrevUrl" onclick="navigateUrlVideo(-1)" style="display:none; margin-right:auto;" title="이전 동영상">&lt; 이전 영상</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="seekVideo(-1)" title="1초 뒤로">&lt;&lt; 1초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="seekVideo(-0.1)" title="0.1초 뒤로">&lt; 0.1초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="seekVideo(0.1)" title="0.1초 앞으로">0.1초 &gt;</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="seekVideo(1)" title="1초 앞으로">1초 &gt;&gt;</button>
+                    <button class="btn btn-secondary btn-tiny" id="btnNextUrl" onclick="navigateUrlVideo(1)" style="display:none; margin-left:auto;" title="다음 동영상">다음 영상 &gt;</button>
                 </div>
                 <div class="video-info" id="videoInfo">동영상을 불러와주세요</div>
                 <div class="preview-bar" id="previewBar"><span class="no-sub">자막 미리보기 영역</span></div>
             </div>
-            <div class="subtitle-section">
-                <h2>자막 목록 <span id="cueCount" style="font-size:13px;color:#aaa"></span></h2>
+
+            <div class="subtitle-section glass-panel">
+                <div class="subtitle-header">
+                    <h2>자막 목록 <span id="cueCount" style="font-size:14px;color:var(--text-muted);font-weight:normal;"></span></h2>
+                </div>
                 <div class="sync-controls">
-                    <label>싱크 조절</label>
+                    <label>싱크 일괄 조절:</label>
                     <select id="syncMode">
                         <option value="all">전체 자막</option>
                         <option value="fromSelected">선택 자막부터 끝까지</option>
                         <option value="selectedOnly">선택된 자막만</option>
                     </select>
-                    <button class="sync-btn" onclick="adjustSync(-0.5)">-0.5초</button>
-                    <button class="sync-btn" onclick="adjustSync(-0.1)">-0.1초</button>
-                    <button class="sync-btn" onclick="adjustSync(0.1)">+0.1초</button>
-                    <button class="sync-btn" onclick="adjustSync(0.5)">+0.5초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="adjustSync(-0.5)">-0.5초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="adjustSync(-0.1)">-0.1초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="adjustSync(0.1)">+0.1초</button>
+                    <button class="btn btn-secondary btn-tiny" onclick="adjustSync(0.5)">+0.5초</button>
                 </div>
                 <div class="subtitle-list" id="subtitleList">
                     <p class="no-sub">VTT 파일을 불러오거나 자막을 추가하세요</p>
                 </div>
-                <button class="btn-add-bottom" onclick="addCue()">+ 자막 추가</button>
+                <button class="btn btn-primary btn-add-bottom" onclick="addCue()">+ 새 자막 추가</button>
             </div>
         </div>
     </div>
-    <script>let cues = [];
+
+    <script>
+        let cues = [];
         let currentBlobUrl = null;
+        let loadedVideoName = '';
         let loadedVttFileName = '';
+        let videoUrl = '';
         let selectedCueIdx = -1;
-        const video = document.getElementById('videoPlayer');
+
+        let video = document.getElementById('videoPlayer');
         const subtitleList = document.getElementById('subtitleList');
         const previewBar = document.getElementById('previewBar');
         const cueCount = document.getElementById('cueCount');
@@ -573,29 +537,247 @@
         const seekBar = document.getElementById('seekBar');
         const btnPlay = document.getElementById('btnPlay');
         const timeDisplay = document.getElementById('timeDisplay');
+
+        let isUserScrollingSubtitle = false;
+        let subtitleScrollTimeout;
+
+        subtitleList.addEventListener('wheel', function() {
+            isUserScrollingSubtitle = true;
+            clearTimeout(subtitleScrollTimeout);
+            subtitleScrollTimeout = setTimeout(() => { isUserScrollingSubtitle = false; }, 2000);
+        });
+        subtitleList.addEventListener('touchmove', function() {
+            isUserScrollingSubtitle = true;
+            clearTimeout(subtitleScrollTimeout);
+            subtitleScrollTimeout = setTimeout(() => { isUserScrollingSubtitle = false; }, 2000);
+        });
+        subtitleList.addEventListener('mouseenter', function() {
+            isUserScrollingSubtitle = true;
+        });
+        subtitleList.addEventListener('mouseleave', function() {
+            isUserScrollingSubtitle = false;
+        });
+
+        // 로컬스토리지 관련 함수
+        function saveState() {
+            const state = {
+                cues,
+                loadedVideoName,
+                loadedVttFileName,
+                videoUrl
+            };
+            try {
+                localStorage.setItem('vttEditorState', JSON.stringify(state));
+            } catch (e) {
+                console.warn('로컬스토리지 저장 실패', e);
+            }
+        }
+
+        function loadState() {
+            try {
+                const stateStr = localStorage.getItem('vttEditorState');
+                if (stateStr) {
+                    const state = JSON.parse(stateStr);
+                    if (state.cues) cues = state.cues;
+                    if (state.loadedVideoName) {
+                        loadedVideoName = state.loadedVideoName;
+                        videoInfo.textContent = '이전 동영상: ' + loadedVideoName;
+                    }
+                    if (state.loadedVttFileName) {
+                        loadedVttFileName = state.loadedVttFileName;
+                    }
+                    if (state.videoUrl) {
+                        videoUrl = state.videoUrl;
+                        video.src = videoUrl;
+                        videoInfo.textContent = 'URL: ' + videoUrl;
+                        checkUrlNavigation(videoUrl);
+                    }
+                    renderCues();
+                    applyTrack();
+                }
+            } catch (e) {
+                console.warn('로컬스토리지 불러오기 실패', e);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadState);
+
+        // 로컬 동영상 처리
         document.getElementById('videoInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
             if (currentBlobUrl) {
-                URL.revokeObjectURL(currentBlobUrl)
+                URL.revokeObjectURL(currentBlobUrl);
             }
             currentBlobUrl = URL.createObjectURL(file);
             video.src = currentBlobUrl;
             video.load();
-            videoInfo.textContent = '파일: ' + file.name + ' (' + formatBytes(file.size) + ')';
-            applyTrack()
+            
+            loadedVideoName = file.name;
+            videoUrl = ''; // 로컬 파일 로드 시 url 초기화
+            
+            videoInfo.textContent = '파일: ' + loadedVideoName + ' (' + formatBytes(file.size) + ')';
+            applyTrack();
+            saveState();
+            checkUrlNavigation(''); // URL이 아니므로 네비게이션 버튼 숨김
         });
+
+        // URL 동영상 입력창 띄우기
+        function promptVideoUrl() {
+            const url = prompt("동영상 URL을 입력하세요:", videoUrl);
+            if(url !== null && url.trim() !== '') {
+                loadVideoFromUrl(url.trim());
+            }
+        }
+
+        function extractFilename(url) {
+            if (!url) return 'URL Video';
+            try {
+                const urlObj = new URL(url, window.location.href);
+                for (const [key, value] of urlObj.searchParams) {
+                    if (value.match(/\.(mp4|mkv|webm|ogg|mov|avi|ts|vtt)$/i)) {
+                        const lastSlash = value.lastIndexOf('/');
+                        return lastSlash !== -1 ? value.substring(lastSlash + 1) : value;
+                    }
+                }
+            } catch (e) {}
+
+            let decoded = url;
+            try { decoded = decodeURI(url); } catch(e) {}
+            
+            const qIdx = decoded.indexOf('?');
+            let pathPart = decoded;
+            let queryPart = '';
+            if (qIdx !== -1) {
+                pathPart = decoded.substring(0, qIdx);
+                queryPart = decoded.substring(qIdx);
+            }
+            
+            const queryMatch = queryPart.match(/[^/=&?]+\.(mp4|mkv|webm|ogg|mov|avi|ts|vtt)(?=[&?#]|$)/i);
+            if (queryMatch) return queryMatch[0];
+            
+            const hIdx = pathPart.indexOf('#');
+            if (hIdx !== -1) pathPart = pathPart.substring(0, hIdx);
+            
+            const lastSlash = pathPart.lastIndexOf('/');
+            if (lastSlash !== -1) {
+                return pathPart.substring(lastSlash + 1) || 'URL Video';
+            }
+            return pathPart || url;
+        }
+
+        // URL 동영상 처리
+        async function loadVideoFromUrl(targetUrl, autoplay = false) {
+            if(!targetUrl) return;
+            video.src = targetUrl;
+            video.load();
+            if (autoplay) {
+                video.play().catch(e => console.warn('Autoplay failed:', e));
+                btnPlay.innerHTML = '⏸ 일시정지';
+            }
+            videoUrl = targetUrl;
+            cues = [];
+            loadedVttFileName = '';
+            renderCues();
+            
+            let filename = extractFilename(targetUrl);
+            
+            loadedVideoName = filename;
+            videoInfo.textContent = 'URL: ' + videoUrl;
+
+            // Attempt to load VTT
+            const lastDotIdx = targetUrl.lastIndexOf('.');
+            if (lastDotIdx !== -1) {
+                const vttUrl = targetUrl.substring(0, lastDotIdx) + '.vtt';
+                try {
+                    const response = await fetch(vttUrl);
+                    if (response.ok) {
+                        const text = await response.text();
+                        parseVTT(text);
+                        const dotIdx = filename.lastIndexOf('.');
+                        const baseName = dotIdx !== -1 ? filename.substring(0, dotIdx) : filename;
+                        loadedVttFileName = baseName + '.vtt';
+                        renderCues();
+                    }
+                } catch (e) {
+                    console.log("VTT load failed or doesn't exist:", e);
+                }
+            }
+
+            applyTrack();
+            saveState();
+            checkUrlNavigation(targetUrl);
+        }
+
+        function checkUrlNavigation(url) {
+            const btnPrev = document.getElementById('btnPrevUrl');
+            const btnNext = document.getElementById('btnNextUrl');
+            if(!btnPrev || !btnNext) return;
+            
+            if (!url) {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+                return;
+            }
+
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            const lastDotIdx = filename.lastIndexOf('.');
+            const baseName = lastDotIdx !== -1 ? filename.substring(0, lastDotIdx) : filename;
+            const match = baseName.match(/\d+/);
+            
+            if (match) {
+                btnPrev.style.display = 'inline-flex';
+                btnNext.style.display = 'inline-flex';
+            } else {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+            }
+        }
+
+        function navigateUrlVideo(direction) {
+            const currentUrl = videoUrl;
+            if(!currentUrl) return;
+            
+            const lastSlashIdx = currentUrl.lastIndexOf('/');
+            const pathPrefix = currentUrl.substring(0, lastSlashIdx + 1);
+            const filename = currentUrl.substring(lastSlashIdx + 1);
+            
+            const lastDotIdx = filename.lastIndexOf('.');
+            const baseName = lastDotIdx !== -1 ? filename.substring(0, lastDotIdx) : filename;
+            const extension = lastDotIdx !== -1 ? filename.substring(lastDotIdx) : '';
+            
+            const matches = [...baseName.matchAll(/\d+/g)];
+            if(matches.length === 0) return;
+            
+            const lastMatch = matches[matches.length - 1];
+            const numStr = lastMatch[0];
+            const numIdx = lastMatch.index;
+            
+            const numValue = parseInt(numStr, 10);
+            const newNumValue = numValue + direction;
+            if(newNumValue < 0) return;
+            
+            const paddedNewNum = String(newNumValue).padStart(numStr.length, '0');
+            const newBaseName = baseName.substring(0, numIdx) + paddedNewNum + baseName.substring(numIdx + numStr.length);
+            const newUrl = pathPrefix + newBaseName + extension;
+            
+            loadVideoFromUrl(newUrl, true);
+        }
+
+        // 로컬 VTT 처리
         document.getElementById('vttInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
             loadedVttFileName = file.name;
+            
             const reader = new FileReader();
             reader.onload = function (ev) {
                 parseVTT(ev.target.result);
                 renderCues();
-                applyTrack()
+                applyTrack();
+                saveState();
             };
-            reader.readAsText(file)
+            reader.readAsText(file);
         });
 
         function parseVTT(text) {
@@ -603,7 +785,7 @@
             const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
             let i = 0;
             if (lines[0] && lines[0].trim().startsWith('WEBVTT')) {
-                i = 1
+                i = 1;
             }
             while (i < lines.length && lines[i].trim() === '') i++;
             while (i < lines.length) {
@@ -612,7 +794,7 @@
                 let id = '';
                 if (i < lines.length && lines[i].indexOf('-->') === -1) {
                     id = lines[i].trim();
-                    i++
+                    i++;
                 }
                 if (i < lines.length && lines[i].indexOf('-->') !== -1) {
                     const timeParts = lines[i].split('-->');
@@ -622,16 +804,16 @@
                     let textLines = [];
                     while (i < lines.length && lines[i].trim() !== '') {
                         textLines.push(lines[i]);
-                        i++
+                        i++;
                     }
                     cues.push({
                         id: id || ('cue-' + cues.length),
                         start: startTime,
                         end: endTime,
                         text: textLines.join('\n')
-                    })
+                    });
                 } else {
-                    i++
+                    i++;
                 }
             }
         }
@@ -640,28 +822,67 @@
             if (cues.length === 0) {
                 subtitleList.innerHTML = '<p class="no-sub">VTT 파일을 불러오거나 자막을 추가하세요</p>';
                 cueCount.textContent = '';
-                return
+                return;
             }
             cueCount.textContent = '(' + cues.length + '개)';
             let html = '';
             cues.forEach(function (c, idx) {
                 const selClass = idx === selectedCueIdx ? ' selected' : '';
-                html += '<div class="cue-item' + selClass + '" id="cueItem' + idx + '" data-idx="' + idx + '" onclick="selectCue(' + idx + ', event)">' + '<button class="btn-del" onclick="deleteCue(' + idx + ')" title="삭제">&times;</button>' + '<div class="cue-header">' + '<span class="time-label">시작</span>' + '<input type="text" id="startTime' + idx + '" value="' + escapeHtml(c.start) + '" onchange="updateCue(' + idx + ',\'start\',this.value)" placeholder="00:00:00.000">' + '<button class="btn-current" onclick="setCurrentTime(' + idx + ',\'start\')">현재</button>' + '<span class="time-label">종료</span>' + '<input type="text" id="endTime' + idx + '" value="' + escapeHtml(c.end) + '" onchange="updateCue(' + idx + ',\'end\',this.value)" placeholder="00:00:00.000">' + '<button class="btn-current" onclick="setCurrentTime(' + idx + ',\'end\')">현재</button>' + '<button class="btn-goto" onclick="goToCue(' + idx + ')">이동</button>' + '</div>' + '<textarea rows="2" onchange="updateCue(' + idx + ',\'text\',this.value)" placeholder="자막 텍스트 입력...">' + escapeHtml(c.text) + '</textarea>' + '</div>'
+                html += `
+                <div class="cue-item${selClass}" id="cueItem${idx}" data-idx="${idx}" onclick="selectCue(${idx}, event)">
+                    <button class="btn-del" onclick="deleteCue(${idx})" title="삭제">&times;</button>
+                    <div class="cue-header">
+                        <button class="btn btn-secondary btn-tiny" onclick="goToCue(${idx})">이동</button>
+                        
+                        <span class="time-label">시작</span>
+                        <input type="text" class="time-input" id="startTime${idx}" value="${escapeHtml(c.start)}" onchange="updateCue(${idx},'start',this.value)" placeholder="00:00:00.000">
+                        <button class="btn btn-secondary btn-icon" onclick="adjustCueTime(${idx}, 'start', -0.1)" title="0.1초 당기기">&lt;</button>
+                        <button class="btn btn-secondary btn-tiny" onclick="setCurrentTime(${idx},'start')" title="현재 영상 시간으로">현재</button>
+                        <button class="btn btn-secondary btn-icon" onclick="adjustCueTime(${idx}, 'start', 0.1)" title="0.1초 늦추기">&gt;</button>
+                        
+                        <span class="time-label">종료</span>
+                        <input type="text" class="time-input" id="endTime${idx}" value="${escapeHtml(c.end)}" onchange="updateCue(${idx},'end',this.value)" placeholder="00:00:00.000">
+                        <button class="btn btn-secondary btn-icon" onclick="adjustCueTime(${idx}, 'end', -0.1)" title="0.1초 당기기">&lt;</button>
+                        <button class="btn btn-secondary btn-tiny" onclick="setCurrentTime(${idx},'end')" title="현재 영상 시간으로">현재</button>
+                        <button class="btn btn-secondary btn-icon" onclick="adjustCueTime(${idx}, 'end', 0.1)" title="0.1초 늦추기">&gt;</button>
+                    </div>
+                    <textarea rows="2" onchange="updateCue(${idx},'text',this.value)" placeholder="자막 텍스트 입력...">${escapeHtml(c.text)}</textarea>
+                </div>`;
             });
-            subtitleList.innerHTML = html
+            subtitleList.innerHTML = html;
         }
 
         function updateCue(idx, field, value) {
             if (cues[idx]) {
                 cues[idx][field] = value;
-                applyTrack()
+                applyTrack();
+                saveState();
+            }
+        }
+
+        function adjustCueTime(idx, field, offset) {
+            if (cues[idx]) {
+                const currentSec = vttTimeToSeconds(cues[idx][field]);
+                const newSec = Math.max(0, currentSec + offset);
+                const newStr = secondsToVTTTime(newSec);
+                cues[idx][field] = newStr;
+                
+                const inputId = field === 'start' ? 'startTime' + idx : 'endTime' + idx;
+                const inputEl = document.getElementById(inputId);
+                if(inputEl) inputEl.value = newStr;
+                
+                if (video) video.currentTime = newSec;
+                
+                applyTrack();
+                saveState();
             }
         }
 
         function deleteCue(idx) {
             cues.splice(idx, 1);
             renderCues();
-            applyTrack()
+            applyTrack();
+            saveState();
         }
 
         function addCue() {
@@ -685,6 +906,8 @@
             cues.splice(insertIdx, 0, newCue);
             renderCues();
             applyTrack();
+            saveState();
+
             const newEl = document.getElementById('cueItem' + insertIdx);
             if (newEl) {
                 newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -693,13 +916,6 @@
                 if (textarea) textarea.focus();
                 setTimeout(function () { newEl.classList.remove('highlight'); }, 1000);
             }
-        }
-
-        function clearAll() {
-            cues = [];
-            renderCues();
-            applyTrack();
-            previewBar.innerHTML = '<span class="no-sub">자막 미리보기 영역</span>'
         }
 
         function timeToMs(timeStr) {
@@ -716,59 +932,76 @@
         function exportVTT() {
             if (cues.length === 0) {
                 alert('내보낼 자막이 없습니다.');
-                return
+                return;
             }
             let vtt = 'WEBVTT\n\n';
             cues.sort((a, b) => timeToMs(a.start) - timeToMs(b.start));
             cues.forEach(function (c, idx) {
                 vtt += (idx + 1) + '\n';
                 vtt += c.start + ' --> ' + c.end + '\n';
-                vtt += c.text + '\n\n'
+                vtt += c.text + '\n\n';
             });
-            const blob = new Blob([vtt], {
-                type: 'text/vtt;charset=utf-8'
-            });
+            const blob = new Blob([vtt], { type: 'text/vtt;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = loadedVttFileName || 'subtitles.vtt';
+            
+            let finalName = loadedVttFileName;
+            if (!finalName && loadedVideoName) {
+                const dotIdx = loadedVideoName.lastIndexOf('.');
+                const baseName = dotIdx !== -1 ? loadedVideoName.substring(0, dotIdx) : loadedVideoName;
+                finalName = baseName + '.vtt';
+            }
+            if (!finalName) finalName = 'subtitles.vtt';
+            a.download = finalName;
+            
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(url)
+            URL.revokeObjectURL(url);
         }
 
         function applyTrack() {
-            const track = document.getElementById('subtitleTrack');
-            if (track) {
-                track.parentNode.removeChild(track)
+            let oldTrack = document.getElementById('subtitleTrack');
+            if (oldTrack) {
+                if (oldTrack.track) oldTrack.track.mode = 'hidden';
+                oldTrack.remove();
             }
+            
+            if (video.textTracks) {
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    video.textTracks[i].mode = 'hidden';
+                }
+            }
+            
             if (cues.length === 0) return;
+
             let vtt = 'WEBVTT\n\n';
             cues.forEach(function (c, idx) {
                 vtt += (idx + 1) + '\n';
                 vtt += c.start + ' --> ' + c.end + '\n';
-                vtt += c.text + '\n\n'
+                vtt += c.text + '\n\n';
             });
-            const blob = new Blob([vtt], {
-                type: 'text/vtt'
-            });
+            const blob = new Blob([vtt], { type: 'text/vtt' });
             const url = URL.createObjectURL(blob);
-            const newTrack = document.createElement('track');
-            newTrack.id = 'subtitleTrack';
-            newTrack.kind = 'subtitles';
-            newTrack.srclang = 'ko';
-            newTrack.label = 'Korean';
-            newTrack.default = true;
-            newTrack.src = url;
-            video.appendChild(newTrack);
-            setTimeout(function () {
-                if (video.textTracks.length > 0) {
-                    for (let i = 0; i < video.textTracks.length; i++) {
-                        video.textTracks[i].mode = 'showing'
-                    }
+            
+            const track = document.createElement('track');
+            track.id = 'subtitleTrack';
+            track.kind = 'subtitles';
+            track.srclang = 'ko';
+            track.label = 'Korean';
+            track.default = true;
+            track.src = url;
+            video.appendChild(track);
+            
+            track.onload = function() {
+                if (track.track) track.track.mode = 'showing';
+            };
+            setTimeout(() => {
+                if (track.track && track.track.mode !== 'showing') {
+                    track.track.mode = 'showing';
                 }
-            }, 100)
+            }, 50);
         }
 
         function goToCue(idx) {
@@ -777,14 +1010,14 @@
                 const seconds = vttTimeToSeconds(c.start);
                 if (!isNaN(seconds)) {
                     video.currentTime = seconds;
-                    video.play()
+                    video.play();
                 }
             }
         }
 
         function seekVideo(offset) {
             if (video.readyState > 0) {
-                video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + offset))
+                video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + offset));
             }
         }
 
@@ -819,6 +1052,7 @@
             }
             renderCues();
             applyTrack();
+            saveState();
         }
 
         function setCurrentTime(idx, field) {
@@ -827,43 +1061,51 @@
             const inputId = field === 'start' ? 'startTime' + idx : 'endTime' + idx;
             const inputEl = document.getElementById(inputId);
             if (inputEl) inputEl.value = timeStr;
-            applyTrack()
+            applyTrack();
+            saveState();
         }
-        video.addEventListener('timeupdate', function () {
-            const t = video.currentTime;
-            const d = video.duration || 0;
-            seekBar.value = d > 0 ? (t / d) * 100 : 0;
-            timeDisplay.textContent = secondsToVTTTime(t) + ' / ' + secondsToVTTTime(d);
-            let found = false;
-            cues.forEach(function (c, idx) {
-                const s = vttTimeToSeconds(c.start);
-                const e = vttTimeToSeconds(c.end);
-                const el = document.getElementById('cueItem' + idx);
-                if (t >= s && t <= e) {
-                    if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-                    previewBar.innerHTML = '<span>' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</span>';
-                    found = true
-                } else {
-                    if (el) el.classList.remove('active')
+
+        function bindVideoEvents() {
+            video.addEventListener('timeupdate', function () {
+                const t = video.currentTime;
+                const d = video.duration || 0;
+                seekBar.value = d > 0 ? (t / d) * 100 : 0;
+                timeDisplay.textContent = secondsToVTTTime(t) + ' / ' + secondsToVTTTime(d);
+                let found = false;
+                cues.forEach(function (c, idx) {
+                    const s = vttTimeToSeconds(c.start);
+                    const e = vttTimeToSeconds(c.end);
+                    const el = document.getElementById('cueItem' + idx);
+                    if (t >= s && t <= e) {
+                        if (el) { 
+                            el.classList.add('active'); 
+                            if (!isUserScrollingSubtitle) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); 
+                            }
+                        }
+                        previewBar.innerHTML = '<span>' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</span>';
+                        found = true;
+                    } else {
+                        if (el) el.classList.remove('active');
+                    }
+                });
+                if (!found) {
+                    previewBar.innerHTML = '<span class="no-sub">—</span>';
                 }
             });
-            if (!found) {
-                previewBar.innerHTML = '<span class="no-sub">—</span>'
-            }
-        });
 
-        video.addEventListener('play', function () {
-            btnPlay.innerHTML = '&#9646;&#9646; 일시정지';
-            btnPlay.classList.add('active');
-        });
-        video.addEventListener('pause', function () {
-            btnPlay.innerHTML = '&#9654; 재생';
-            btnPlay.classList.remove('active');
-        });
-        video.addEventListener('loadedmetadata', function () {
-            seekBar.value = 0;
-            timeDisplay.textContent = '00:00:00.000 / ' + secondsToVTTTime(video.duration);
-        });
+            video.addEventListener('play', function () {
+                btnPlay.innerHTML = '⏸ 일시정지';
+            });
+            video.addEventListener('pause', function () {
+                btnPlay.innerHTML = '▶ 재생';
+            });
+            video.addEventListener('loadedmetadata', function () {
+                seekBar.value = 0;
+                timeDisplay.textContent = '00:00:00.000 / ' + secondsToVTTTime(video.duration);
+            });
+        }
+        bindVideoEvents();
 
         seekBar.addEventListener('input', function () {
             if (video.duration) {
@@ -887,40 +1129,39 @@
         function vttTimeToSeconds(timeStr) {
             if (!timeStr) return 0;
             const parts = timeStr.trim().split(':');
-            let h = 0,
-                m = 0,
-                s = 0;
+            let h = 0, m = 0, s = 0;
             if (parts.length === 3) {
                 h = parseFloat(parts[0]);
                 m = parseFloat(parts[1]);
-                s = parseFloat(parts[2])
+                s = parseFloat(parts[2]);
             } else if (parts.length === 2) {
                 m = parseFloat(parts[0]);
-                s = parseFloat(parts[1])
+                s = parseFloat(parts[1]);
             }
-            return h * 3600 + m * 60 + s
+            return h * 3600 + m * 60 + s;
         }
 
         function secondsToVTTTime(totalSec) {
+            if (isNaN(totalSec) || !isFinite(totalSec)) totalSec = 0;
             const h = Math.floor(totalSec / 3600);
             const m = Math.floor((totalSec % 3600) / 60);
             const s = (totalSec % 60).toFixed(3);
-            return pad2(h) + ':' + pad2(m) + ':' + padSec(s)
+            return pad2(h) + ':' + pad2(m) + ':' + padSec(s);
         }
 
         function pad2(n) {
-            return n < 10 ? '0' + n : '' + n
+            return n < 10 ? '0' + n : '' + n;
         }
 
         function padSec(s) {
             const parts = ('' + s).split('.');
             const intPart = parts[0].length < 2 ? '0' + parts[0] : parts[0];
             const decPart = parts[1] ? (parts[1] + '000').substring(0, 3) : '000';
-            return intPart + '.' + decPart
+            return intPart + '.' + decPart;
         }
 
         function escapeHtml(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         function formatBytes(bytes) {
@@ -928,7 +1169,7 @@
             const k = 1024;
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     </script>
 </body>
