@@ -485,7 +485,7 @@
                         
                         <div class="volume-control" style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
                             <span id="volumeIcon" style="font-size: 14px; cursor: pointer;" onclick="toggleMute()" title="음소거">🔊</span>
-                            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="custom-seekbar" style="width: 80px;" title="볼륨 조절">
+                            <input type="range" id="volumeSlider" min="0" max="100" step="0.1" value="75" class="custom-seekbar" style="width: 140px;" title="볼륨 조절 (우측 1/4은 증폭)">
                         </div>
 
                         <span class="time-display" id="timeDisplay">00:00:00.000 / 00:00:00.000</span>
@@ -546,7 +546,87 @@
         const volumeSlider = document.getElementById('volumeSlider');
         const volumeIcon = document.getElementById('volumeIcon');
         let previousVolume = 1;
+        let audioCtx = null;
+        let gainNode = null;
+        let mediaSource = null;
 
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                mediaSource = audioCtx.createMediaElementSource(video);
+                gainNode = audioCtx.createGain();
+                mediaSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+            } catch (e) {
+                console.warn('AudioContext 초기화 실패:', e);
+                audioCtx = null;
+                gainNode = null;
+            }
+        }
+
+        function sliderToVolume(sliderVal) {
+            const val = parseFloat(sliderVal);
+            if (val <= 75) {
+                return val / 75;
+            } else {
+                return 1 + ((val - 75) / 25) * 2;
+            }
+        }
+
+        function volumeToSlider(vol) {
+            if (vol <= 1) {
+                return vol * 75;
+            } else {
+                return 75 + ((vol - 1) / 2) * 25;
+            }
+        }
+
+        function applyVolume(v) {
+            v = parseFloat(v);
+            if (v > 1) {
+                if (!audioCtx) initAudio();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(e => console.warn('Audio resume failed', e));
+                }
+            }
+            
+            if (gainNode) {
+                gainNode.gain.value = v;
+                video.volume = 1;
+                video.muted = (v === 0);
+            } else {
+                video.volume = Math.min(1, v);
+                video.muted = (v === 0);
+            }
+            
+            if (volumeSlider) {
+                volumeSlider.value = volumeToSlider(v);
+            }
+            
+            updateVolumeUI(v, video.muted);
+        }
+
+        function updateVolumeUI(v, isMuted) {
+            if (volumeIcon) {
+                if (isMuted || v === 0) {
+                    volumeIcon.textContent = '🔈';
+                } else if (v < 0.5) {
+                    volumeIcon.textContent = '🔉';
+                } else {
+                    volumeIcon.textContent = '🔊';
+                }
+            }
+            if (volumeSlider) {
+                const sliderVal = volumeToSlider(v);
+                if (v <= 1) {
+                    volumeSlider.style.background = `linear-gradient(to right, var(--primary) ${sliderVal}%, rgba(255, 255, 255, 0.1) ${sliderVal}%)`;
+                } else {
+                    volumeSlider.style.background = `linear-gradient(to right, var(--primary) 75%, #f97316 75%, #f97316 ${sliderVal}%, rgba(255, 255, 255, 0.1) ${sliderVal}%)`;
+                }
+            }
+        }
         let isUserScrollingSubtitle = false;
         let subtitleScrollTimeout;
 
@@ -573,7 +653,9 @@
                 cues,
                 loadedVideoName,
                 loadedVttFileName,
-                videoUrl
+                videoUrl,
+                videoVolume: volumeSlider ? sliderToVolume(volumeSlider.value) : video.volume,
+                videoMuted: video.muted
             };
             try {
                 localStorage.setItem('vttEditorState', JSON.stringify(state));
@@ -601,6 +683,21 @@
                         videoInfo.textContent = 'URL: ' + videoUrl;
                         checkUrlNavigation(videoUrl);
                     }
+                    if (state.videoVolume !== undefined) {
+                        previousVolume = state.videoVolume;
+                    }
+                    if (state.videoMuted !== undefined) {
+                        video.muted = state.videoMuted;
+                    }
+                    
+                    const initV = (state.videoMuted && state.videoVolume !== undefined) ? 0 : (state.videoVolume !== undefined ? state.videoVolume : 1);
+                    if (volumeSlider) {
+                        applyVolume(initV);
+                        if (state.videoMuted && state.videoVolume !== undefined) {
+                            previousVolume = state.videoVolume;
+                        }
+                    }
+                    
                     renderCues();
                     applyTrack();
                 }
@@ -1105,6 +1202,9 @@
 
             video.addEventListener('play', function () {
                 btnPlay.innerHTML = '⏸ 일시정지';
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(e => {});
+                }
             });
             video.addEventListener('pause', function () {
                 btnPlay.innerHTML = '▶ 재생';
@@ -1115,17 +1215,10 @@
             });
             
             video.addEventListener('volumechange', function () {
-                if (volumeSlider) {
-                    volumeSlider.value = video.muted ? 0 : video.volume;
-                }
-                if (volumeIcon) {
-                    if (video.muted || video.volume === 0) {
-                        volumeIcon.textContent = '🔈';
-                    } else if (video.volume < 0.5) {
-                        volumeIcon.textContent = '🔉';
-                    } else {
-                        volumeIcon.textContent = '🔊';
-                    }
+                if (!gainNode && volumeSlider) {
+                    const v = video.muted ? 0 : video.volume;
+                    volumeSlider.value = volumeToSlider(v);
+                    updateVolumeUI(v, video.muted);
                 }
             });
         }
@@ -1133,19 +1226,25 @@
 
         if (volumeSlider) {
             volumeSlider.addEventListener('input', function () {
-                video.volume = volumeSlider.value;
-                video.muted = (video.volume == 0);
+                const v = sliderToVolume(volumeSlider.value);
+                applyVolume(v);
+                saveState();
             });
+            // 초기 스타일 적용을 위한 호출
+            updateVolumeUI(sliderToVolume(volumeSlider.value), video.muted);
         }
 
         function toggleMute() {
-            if (video.muted || video.volume === 0) {
+            const currentV = volumeSlider ? sliderToVolume(volumeSlider.value) : video.volume;
+            if (video.muted || currentV === 0) {
                 video.muted = false;
-                video.volume = previousVolume > 0 ? previousVolume : 1;
+                const restoreV = previousVolume > 0 ? previousVolume : 1;
+                applyVolume(restoreV);
             } else {
-                previousVolume = video.volume;
-                video.muted = true;
+                previousVolume = currentV;
+                applyVolume(0);
             }
+            saveState();
         }
 
         seekBar.addEventListener('input', function () {
@@ -1155,6 +1254,9 @@
         });
 
         function togglePlay() {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(e => {});
+            }
             if (video.paused || video.ended) {
                 video.play();
             } else {
