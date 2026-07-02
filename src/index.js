@@ -74,8 +74,15 @@ async function main() {
         if (resp) {
             const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
             p.then(ok => {
+                if (chkInput.logData) {
+                    if (!ok) chkInput.logData.response = null;
+                    eventBus.emit('command_used', chkInput.logData);
+                }
                 if (ok && chkInput.onSuccess) chkInput.onSuccess();
             });
+        } else if (chkInput.logData) {
+            chkInput.logData.response = null;
+            eventBus.emit('command_used', chkInput.logData);
         }
     });
 
@@ -122,15 +129,24 @@ async function main() {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
                     if (banned) {
                         broadcastSpam();
-                        handleCommand(0);
                         continue;
+                    }
+                    if (chkInput.triggerCooldown) {
+                        chkInput.triggerCooldown();
                     }
                     const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
                     p.then(ok => {
+                        if (chkInput.logData) {
+                            if (!ok) chkInput.logData.response = null;
+                            eventBus.emit('command_used', chkInput.logData);
+                        }
                         if (ok && chkInput.onSuccess) {
                             chkInput.onSuccess();
                         }
                     });
+                } else if (chkInput.logData) {
+                    chkInput.logData.response = null;
+                    eventBus.emit('command_used', chkInput.logData);
                 }
                 if (chkInput.warn > 0) {
                     spamGuard.addPenalty(msg.channelId, msg.displayName, chkInput.warn);

@@ -8,34 +8,48 @@ module.exports = {
     },
     // ─── 스팸 설정 ──────────────────────────────────────────
     spam: {
-        spam_window_sec: 180,       // 봇 경고 해제 시간 s 단위  ( 180 : 3분 )
+        spam_window_sec: 120,       // 봇 경고 해제 시간 s 단위  ( 180 : 3분 )
         spam_max_count: 1,          // 봇이 몇번 경고를 참을건지 ( 이 횟수가 넘어가면 경고시작 )
-        spam_warn_limit: 200,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
+        spam_warn_limit: 10000,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
         penalty_duration_hrs: 24,   // 명령어 입력 기록 유지 시간 (기본 12시간)
-        penalty_add_sec: 180         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
+        penalty_add_sec: 180,         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
+        group_warns: {              // 명령어 그룹별 부여할 기본 Warns (경고/도배 패널티 수치)
+            "greeting, help": 10,
+            "episode, time, date": 0,
+            "next, nextnext, first, last": 0,
+            "timetable": 10,
+            "music": 1
+        }
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
     cooldown: {
-        mode: "global",        // 'global' = 전체 명령어 공유 쿨타임, 'per-command' = 명령어 그룹별 개별 쿨타임
-        time_min: 2,                // 쿨타임 시간 (분)
+        mode: "per-command",        // 'global' = 전체 명령어 공유 쿨타임, 'per-command' = 명령어 그룹별 개별 쿨타임
+        time_min: 2,                // 기본 쿨타임 시간 (분)
         error_offset_min: 1,        // 에러 발생 시 쿨타임 차감량 (분) → 실질 대기 = time_min - error_offset_min
+        group_times: {              // 명령어 그룹별 개별 쿨타임 (모드가 per-command일 때 적용)
+            "greeting, help": 10,
+            "episode, time, date": 2,
+            "next, nextnext, first, last": 2,
+            "timetable": 10,
+            "music": 1
+        }
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
-        enable_greeting: false,         // 봇 인사 기능 사용 여부
-        text_min_length: 3,             // 명령어 텍스트 최소 길이
-        text_max_length: 50,            // 명령어 텍스트 최대 길이
-        enable_search: true,            // 대사 검색 기능 사용 여부
-        search_min_length: 2,           // 대사 검색 시 최소 글자 수
+        enable_greeting: false,     // 봇 인사 기능 사용 여부
+        enable_search: true,      // 대사 검색 기능 사용 여부
+        text_min_length: 3,         // 명령어 텍스트 최소 길이
+        text_max_length: 50,        // 명령어 텍스트 최대 길이
+        search_min_length: 2,       // 대사 검색 시 최소 글자 수
         duplicate_history_hours: 24,    // 지정된 시간(시간 단위) 이내 동일 검색어 재사용 시 차단 (0이면 사용 안함)
-        duplicate_history_penalty: 1,  // 중복 검색 시 부여할 강력한 경고 패널티 점수
-        boundary_sec: 20,               // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
+        duplicate_history_penalty: 1,  // 중복 검색 시 부여할 경고 패널티 점수      
+        boundary_sec: 20,           // 에피소드 시작/종료 경계 (초) — 이 범위 내에서는 명령어 무시
     },
     // ─── 대사 검색 민감도 ────────────────────────────────────────
     subtitle_score: {
-        min_value: 20,              // 출력 최솟값
-        warn_base: 5,               // 경고 기본값 (_input.warn에 설정)
-        warn_divisor: 7.5,            // 경고 점수 나눗값 (warn_base + (base - score) / warn_divisor)
+        min_value: 30,              // 출력 최솟값
+        warn_base: 10,               // 경고 기본값 (_input.warn에 설정)
+        warn_divisor: 0.2,            // 경고 점수 나눗값 (warn_base + (base - score) / warn_divisor)
         max_candidate_episodes: 5,  // 후보 에피소드 최대 표시 개수
     },
     // ─── 음악 명령어 설정 ────────────────────────────────────────

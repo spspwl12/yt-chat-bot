@@ -58,18 +58,46 @@ function getCommandGroup(cmd) {
     return cmd;
 }
 
+function getCooldownConfig(group) {
+    if (cfg.cooldown.group_times) {
+        for (const [keys, time] of Object.entries(cfg.cooldown.group_times)) {
+            const groupList = keys.split(',').map(k => k.trim());
+            if (groupList.includes(group)) {
+                return { key: keys, time: time };
+            }
+        }
+    }
+    return { key: group, time: cfg.cooldown.time_min };
+}
+
+function getWarnsValue(group) {
+    if (cfg.spam && cfg.spam.group_warns) {
+        for (const [keys, value] of Object.entries(cfg.spam.group_warns)) {
+            const groupList = keys.split(',').map(k => k.trim());
+            if (groupList.includes(group)) {
+                return value;
+            }
+        }
+    }
+    return null;
+}
+
 /**
  * 특정 명령어가 현재 쿨타임(사용 제한) 상태인지 확인
  * @param {string} cmd - 확인 대상 명령어
  * @returns {boolean} 쿨타임 중이면 true, 사용 가능하면 false 반환
  */
 function isCooldown(cmd) {
-    const cooldownMs = 1000 * 60 * cfg.cooldown.time_min;
     if (cfg.cooldown.mode === 'global') {
-        return Date.now() - delayChatTime <= cooldownMs;
+        const globalCooldownMs = 1000 * 60 * cfg.cooldown.time_min;
+        return Date.now() - delayChatTime <= globalCooldownMs;
     }
+    
     const group = getCommandGroup(cmd);
-    const lastTime = delayChatTimeMap.get(group) || 0;
+    const config = getCooldownConfig(group);
+    const cooldownMs = 1000 * 60 * config.time;
+    
+    const lastTime = delayChatTimeMap.get(config.key) || 0;
     return Date.now() - lastTime <= cooldownMs;
 }
 
@@ -78,12 +106,28 @@ function isCooldown(cmd) {
  * @param {string} cmd - 사용한 명령어
  * @param {number} offsetMs - 쿨타임 시간에 더하거나 뺄 밀리초 (예외/오류 시 실질 대기시간 경감을 위해 사용)
  */
-function setCooldown(cmd, offsetMs = 0) {
+function setCooldown(cmd, offsetMs = 0, _input = null) {
+    if (_input) {
+        _input.triggerCooldown = () => {
+            const now = Date.now() + offsetMs;
+            if (cfg.cooldown.mode === 'global') {
+                delayChatTime = now;
+            } else {
+                const group = getCommandGroup(cmd);
+                const config = getCooldownConfig(group);
+                delayChatTimeMap.set(config.key, now);
+            }
+        };
+        return;
+    }
+
     const now = Date.now() + offsetMs;
     if (cfg.cooldown.mode === 'global') {
         delayChatTime = now;
     } else {
-        delayChatTimeMap.set(getCommandGroup(cmd), now);
+        const group = getCommandGroup(cmd);
+        const config = getCooldownConfig(group);
+        delayChatTimeMap.set(config.key, now);
     }
 }
 
@@ -113,26 +157,35 @@ async function handleCommand(type, text, displayName, _input) {
     if (text.length < cfg.input.text_min_length)
         return null;
 
-    // 명령어 접두사('!') 여부 확인 — " ! 검색어"도 "!검색어"로 인식
+    // 1. 가장 먼저, 밴 당했거나 경고를 누적한 사용자는 즉시 차단
+    if (_input && _input.ban) {
+        return null;
+    }
+
+    // 2. 명령어 접두사 확인
     text = text.replace(/^\s*!\s*/, '!');
     if (!text.startsWith('!'))
         return null;
 
-    // 공백을 기준으로 명령어(cmd)와 전달 인자(args) 문자열 파싱 분리
+    // 3. 파싱 및 그룹 매핑
     const parts = text.trim().split(/ (.+)/);
     const cmd = parts[0];
     const args = parts.slice(1);
+    const group = getCommandGroup(cmd);
 
-    // 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
+    // 4. 무효한 명령어면 조기 반환
+    if (group === cmd)
+        return null;
+
+    // 5. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크 (밴 사용자가 여기서 막혀서 쿨타임이 꼬이는 문제 방지)
     if (isCooldown(cmd))
         return null;
 
-    // 유사어나 동의어(alias)를 통합 그룹 식별자(group)로 묶어 변환 처리
-    const group = getCommandGroup(cmd);
-
-    // 시스템에 등록되지 않은 무효한 명령어 그룹이면 조기에 무시
-    if (group === cmd)
-        return null;
+    // 6. 경고(Warns) 수치 기본 할당
+    const customWarn = getWarnsValue(group);
+    if (_input) {
+        _input.warn = customWarn !== null ? customWarn : 1;
+    }
 
     const rtn = getEpisodeInfo();
 
@@ -145,9 +198,9 @@ async function handleCommand(type, text, displayName, _input) {
     if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec)
         return null;
 
-    // ★ 명령어 사용 로그 발행
+    // ★ 명령어 사용 로그 메타데이터 저장 (index.js에서 실제 전송 후 이벤트 발행)
     const _emitLog = (response) => {
-        eventBus.emit('command_used', {
+        _input.logData = {
             time: Date.now(),
             user: displayName,
             cmd: cmd,
@@ -155,12 +208,11 @@ async function handleCommand(type, text, displayName, _input) {
             args: args.length > 0 ? args[0] : null,
             response: typeof response === 'string' ? response.slice(0, 120) :
                 (response && response.msg ? response.msg.slice(0, 120) : null),
-        });
+        };
         return response;
     };
 
     if (text.length > cfg.input.text_max_length) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return _emitLog(`⚠️ 문장이 길어요. ${cfg.input.text_max_length}자 ` +
             `이내로 간단히 작성해 주세요. ${COOLDOWN_MSG}`);
     }
@@ -170,13 +222,13 @@ async function handleCommand(type, text, displayName, _input) {
         if (!cfg.input.enable_greeting) {
             return null;
         }
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return _emitLog(greeting_lib(displayName));
     }
 
     // 봇 도움말/가이드 출력
     if (group === 'help') {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간표, !첫화, !마지막화, !날짜, !음악 ' +
             'ℹ️ !몇화 사용법: !몇화 64화, !몇화 31화 48화 64화 72화 121화, !몇화 괜히똥만쌌네 ' +
             'ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 쿨타임이 적용됩니다. ' +
@@ -195,7 +247,7 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 곧 방영될 회차 리스트 목록 요약(시간표) 출력
     if (group === 'timetable') {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return _emitLog({
             msg: printTimeTable(rtn, retryPattern[0]),
             proc: function (attempt) {
@@ -216,7 +268,7 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 현재 에피소드 및 남은 시간 단축 출력 (!시간)
     if (group === 'time') {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         const info = videoInfo[rtn.index];
         const unicodenum = toUnicodeNumber(info.alias);
         const timestr = toHHMMSS(rtn.end - rtn.now);
@@ -233,19 +285,19 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 전 대역 첫 회차 방영 예정일 조회
     if (group === 'first') {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return _emitLog(printNumEpisode(rtn, cfg.episode.start));
     }
 
     // 전 대역 마지막 회차 방영 예정일 조회
     if (group === 'last') {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return _emitLog(printNumEpisode(rtn, cfg.episode.end));
     }
 
     // 날짜 지정 회차 조회
     if (group === 'date') {
-        return _emitLog(handleDateCommand(rtn, cmd, args));
+        return _emitLog(handleDateCommand(rtn, cmd, args, _input));
     }
 
     return null;
@@ -254,7 +306,7 @@ async function handleCommand(type, text, displayName, _input) {
 async function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 별도 인자가 없으면(예: '!몇화') 현재 실시간으로 방영 중인 회차와 남은 시간 반환
     if (!args || args.length <= 0) {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return printNowEpisode(rtn);
     }
 
@@ -282,7 +334,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
         }
 
         if (allInRange && parsedNums.length >= 2) {
-            setCooldown(cmd);
+            setCooldown(cmd, 0, _input);
             return printMultiEpisodeTimetable(rtn, parsedNums);
         }
         // 범위 밖의 숫자가 있으면 대사 검색으로 fall-through
@@ -320,7 +372,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
 
     // 숫자가 입력된 경우(예: '!몇화 200화') 해당 숫자의 에피소드 방영 예정 시간 계산 조회
     if (isChapter) {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         return printNumEpisode(rtn, parseChapter);
     }
 
@@ -336,7 +388,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
             );
 
             if (titleMatched) {
-                setCooldown(cmd);
+                setCooldown(cmd, 0, _input);
                 return printNumEpisode(rtn, titleMatched.alias);
             }
         }
@@ -345,7 +397,6 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 숫자 형식이 아닌 일반 텍스트가 인자로 넘어왔다고 가정하여 
     // 내부 자막 데이터세트를 기반으로 '대사 검색' 알고리즘 수행
     if (cfg.input.enable_search === false) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 대사 검색 기능이 비활성화되어 있습니다. ${COOLDOWN_MSG}`;
     }
 
@@ -355,7 +406,6 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     if (query.length < cfg.input.search_min_length) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. ${COOLDOWN_MSG}`;
     }
 
@@ -363,14 +413,8 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     const searchText = filterText(query);
     for (const word of profanitySet) {
         if (searchText.includes(word)) {
-            setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
-            return `⚠️ 대사에 욕설이 포함되어 있습니다. ${COOLDOWN_MSG}`;
+                return `⚠️ 대사에 욕설이 포함되어 있습니다. ${COOLDOWN_MSG}`;
         }
-    }
-
-    if (_input.ban) {
-        _input.warn = cfg.subtitle_score.warn_base;
-        return null;
     }
 
     const searchInfo = searcher.search(query);
@@ -435,10 +479,10 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
 
         if (validResults.length > 0) {
             // 부하/스팸 방지를 위해 1위 결과물의 점수에 역비례하게 페널티 차등 책정
-            _input.warn = cfg.subtitle_score.warn_base +
+            _input.warn = baseWarn +
                 parseInt((100 - validResults[0].score) / cfg.subtitle_score.warn_divisor);
 
-            setCooldown(cmd);
+            setCooldown(cmd, 0, _input);
 
             const isDefinitive = validResults[0].score >= 100 ||
                 validResults.length === 1 ||
@@ -517,7 +561,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
             .then(episodeNum2 => {
                 if (episodeNum2 !== null) {
                     console.log(`🤖 AI: "${query}" → ${episodeNum2}화`);
-                    setCooldown(cmd);
+                    setCooldown(cmd, 0, _input);
                     const result = printNumEpisode(rtn, episodeNum2);
                     if (result) {
                         if (typeof result === 'string')
@@ -532,26 +576,23 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
                 console.error('AI 검색 중 오류 발생:', err);
             });
 
-        _input.warn = cfg.subtitle_score.warn_base * 5;
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+        _input.warn = baseWarn * 5;
         return null;
     }
 
-    _input.warn = cfg.subtitle_score.warn_base;
-    setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
+    _input.warn = baseWarn;
+    _input.warn = baseWarn;
     return `⚠️ 대사를 정확히 입력하세요. ${COOLDOWN_MSG}`;
 }
 
-function handleDateCommand(rtn, cmd, args) {
+function handleDateCommand(rtn, cmd, args, _input) {
     if (!args || args.length === 0) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 날짜나 시간을 입력하세요. (예: !날짜 19시 30분, !날짜 11/12) ${COOLDOWN_MSG}`;
     }
 
     const dtStr = args.join(' ');
     const dtParsed = parseKoreanDate(dtStr);
     if (!dtParsed) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 날짜 형식을 인식하지 못했습니다. ${COOLDOWN_MSG}`;
     }
 
@@ -559,12 +600,10 @@ function handleDateCommand(rtn, cmd, args) {
     const limitFutureTime = nowTime + (1000 * 60 * 60 * 24 * 90); // 약 3개월(90일)
 
     if (dtParsed.endDate.getTime() < nowTime) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 과거 날짜나 시간은 조회할 수 없습니다. ${COOLDOWN_MSG}`;
     }
 
     if (dtParsed.startDate.getTime() > limitFutureTime) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 너무 먼 미래의 날짜는 조회할 수 없습니다. (최대 3개월 이내) ${COOLDOWN_MSG}`;
     }
 
@@ -620,12 +659,12 @@ function handleDateCommand(rtn, cmd, args) {
             }
 
             const overlapStr = overlaps.join(" 및 ");
-            setCooldown(cmd);
+            setCooldown(cmd, 0, _input);
             return `🗓️ [${reqDateStr}] 해당 날짜에 ${overlapStr} 이(가) 방영될 예정이고 🕒 남은 시간은 ${timestr} 초 입니다. ${COOLDOWN_MSG}`;
         }
     };
 
-    setCooldown(cmd);
+    setCooldown(cmd, 0, _input);
     return {
         msg: makeDateMsg(0),
         proc: function (att) {
@@ -785,8 +824,9 @@ function noticeChangeEpisode() {
  * @param {object} rtn - 계산 기준이 될 현재 에피소드 진행 데이터
  * @param {number} skipCount - 건너뛸 에피소드 수 (1=다음, 2=다다음)
  * @param {string} label - 출력될 텍스트 라벨 (예: "다음", "다다음")
+ * @param {object} _input - 로깅 및 쿨타임 트리거 콜백 객체
  */
-function printFutureEpisode(rtn, cmd, skipCount, label) {
+function printFutureEpisode(rtn, cmd, skipCount, label, _input) {
     const n = videoInfo.length;
     let currentIdx = (rtn.index + 1) % n;
     let info = null;
@@ -806,7 +846,6 @@ function printFutureEpisode(rtn, cmd, skipCount, label) {
     }
 
     if (info === null) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ ${label} 회차 정보를 확인할 수 없습니다.`;
     }
 
@@ -816,7 +855,7 @@ function printFutureEpisode(rtn, cmd, skipCount, label) {
     const timestr = formatDate(futureDate);
     const emoji = getClockEmoji(timestr);
 
-    setCooldown(cmd);
+    setCooldown(cmd, 0, _input);
     return {
         msg: `👉🏻 ${label} 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
             `${emoji} 예정 시간은 ${timestr} 분 입니다. ${COOLDOWN_MSG}`,
@@ -1081,12 +1120,11 @@ function getMusicFreq() {
 
 async function handleMusicCommand(rtn, cmd, args, _input) {
     if (cfg.music && !cfg.music.enable) {
-        setCooldown(cmd, -(1000 * 60 * cfg.cooldown.error_offset_min));
         return `⚠️ 음악 검색 기능이 비활성화되어 있습니다. ${COOLDOWN_MSG}`;
     }
 
     if (!args || args.length === 0) {
-        setCooldown(cmd);
+        setCooldown(cmd, 0, _input);
         if (!rtn || rtn.index === undefined) {
             return null;
         }
@@ -1238,8 +1276,8 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
         }
 
         if (validResults.length > 0) {
-            setCooldown(cmd);
-            _input.warn = cfg.subtitle_score.warn_base;
+            setCooldown(cmd, 0, _input);
+            _input.warn = _input.warn; // 이미 handleCommand에서 할당된 warn값 유지
 
             validResults.sort((a, b) => a.aliasInt - b.aliasInt);
             const detailsList = validResults.map(r => `${r.rawHwa}(${r.timeMsg})`);
@@ -1280,4 +1318,34 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
     };
 }
 
-module.exports = { initCommand, handleCommand, getEpisodeInfo };
+function getCooldownState() {
+    const now = Date.now();
+    const globalCooldownMs = 1000 * 60 * cfg.cooldown.time_min;
+    
+    const state = {
+        mode: cfg.cooldown.mode,
+        global: {
+            lastTime: delayChatTime,
+            cooldownMs: globalCooldownMs,
+            remainingMs: Math.max(0, globalCooldownMs - (now - delayChatTime))
+        },
+        groups: {}
+    };
+
+    if (cfg.cooldown.mode === 'per-command') {
+        for (const group of Object.keys(COMMAND_GROUPS)) {
+            const config = getCooldownConfig(group);
+            
+            const cooldownMs = 1000 * 60 * config.time;
+            const lastTime = delayChatTimeMap.get(config.key) || 0;
+            state.groups[group] = {
+                cooldownMs: cooldownMs,
+                lastTime: lastTime,
+                remainingMs: Math.max(0, cooldownMs - (now - lastTime))
+            };
+        }
+    }
+    return state;
+}
+
+module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState };

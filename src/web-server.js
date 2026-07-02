@@ -8,6 +8,7 @@ const { banUser, blockUser } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
 const cfgYoutube = require('../data/config-youtube.js');
 const eventBus = require('./event-bus.js');
+const commandsLib = require('./commands.js');
 
 let spamGuardRef = null;
 let getEpisodeInfoRef = null;
@@ -188,7 +189,8 @@ async function handleAction(client, req) {
                 totalEpisodes: totalEpisodes || totalEpCount,
                 totalTime: totalTime,
                 videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null,
-                botMuted: botMuted
+                botMuted: botMuted,
+                cooldownState: commandsLib.getCooldownState()
             }
         }));
     }

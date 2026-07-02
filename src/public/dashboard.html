@@ -1095,13 +1095,17 @@
                     </p>
                 </div>
             </div>
+            <div id="cooldown-monitor-section" style="display: none; margin-top: 10px; margin-bottom: 20px;">
+                <h3 style="font-size: 1rem; color: var(--text-dim); margin-bottom: 12px;">⏳ Command Cooldowns</h3>
+                <div class="status-grid" id="cooldown-grid" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
+                </div>
+            </div>
             <div style="display:flex; gap:12px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--surface-border);">
                 <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600;">🛠️ 디버깅:</span>
                 <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)" onkeydown="if(event.key==='Enter') sendSimulatedChat()">
                 <button class="btn" onclick="sendSimulatedChat()">가상 입력</button>
             </div>
             <div style="display:flex; gap:12px; margin-top: 20px;">
-                <button class="btn" id="btn-refresh-state">Force Refresh</button>
                 <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
                     OFF</button>
                 <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot
@@ -1459,6 +1463,9 @@
                     if (payload.botMuted !== undefined) {
                         updateMuteBtn(payload.botMuted);
                     }
+                    if (payload.cooldownState) {
+                        renderCooldowns(payload.cooldownState);
+                    }
                     break;
                 case 'mute_state':
                     updateMuteBtn(payload);
@@ -1549,6 +1556,47 @@
                 case 'userDetail':
                     renderUserDetail(payload);
                     break;
+            }
+        }
+
+        // ── Cooldown Render ──
+        function renderCooldowns(state) {
+            const section = document.getElementById('cooldown-monitor-section');
+            const grid = document.getElementById('cooldown-grid');
+            
+            section.style.display = 'block';
+            grid.innerHTML = '';
+            
+            const entries = state.mode === 'global' 
+                ? [['Global (전체)', state.global]] 
+                : Object.entries(state.groups);
+
+            for (const [group, info] of entries) {
+                const card = document.createElement('div');
+                card.className = 'status-card glass';
+                card.style.padding = '12px';
+                
+                const title = document.createElement('h3');
+                title.innerText = group;
+                
+                const timeStr = document.createElement('p');
+                timeStr.style.fontSize = '1.2rem';
+                
+                if (info.remainingMs > 0) {
+                    timeStr.innerText = secToTime(info.remainingMs / 1000);
+                    timeStr.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+                    timeStr.style.webkitBackgroundClip = 'text';
+                    timeStr.style.webkitTextFillColor = 'transparent';
+                } else {
+                    timeStr.innerText = 'Ready';
+                    timeStr.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+                    timeStr.style.webkitBackgroundClip = 'text';
+                    timeStr.style.webkitTextFillColor = 'transparent';
+                }
+                
+                card.appendChild(title);
+                card.appendChild(timeStr);
+                grid.appendChild(card);
             }
         }
 
@@ -1995,10 +2043,6 @@
                 ws.send(JSON.stringify({ action: 'adjustUsage', payload: { channelId, delta } }));
             }
         }
-
-        document.getElementById('btn-refresh-state').addEventListener('click', () => {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'getState' }));
-        });
 
         document.getElementById('btn-add-spam').addEventListener('click', () => {
             const channelId = document.getElementById('spam-channel').value.trim();
