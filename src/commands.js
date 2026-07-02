@@ -167,10 +167,7 @@ async function handleCommand(type, text, displayName, _input) {
     if (text.length < cfg.input.text_min_length)
         return null;
 
-    // 1. 가장 먼저, 밴 당했거나 경고를 누적한 사용자는 즉시 차단
-    if (_input && _input.ban) {
-        return null;
-    }
+
 
     // 2. 명령어 접두사 확인
     text = text.replace(/^\s*!\s*/, '!');
@@ -187,11 +184,17 @@ async function handleCommand(type, text, displayName, _input) {
     if (group === cmd)
         return null;
 
-    // 5. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크 (밴 사용자가 여기서 막혀서 쿨타임이 꼬이는 문제 방지)
+    // 5. 유효한 명령어임이 판별되었으므로 밴/경고 유저 차단 (index.js가 패널티를 갱신할 수 있도록 flag 설정)
+    if (_input && _input.ban) {
+        _input.blockedCommand = true;
+        return null;
+    }
+
+    // 6. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
     if (isCooldown(cmd))
         return null;
 
-    // 6. 경고(Warns) 수치 기본 할당
+    // 7. 경고(Warns) 수치 기본 할당
     const customWarn = getWarnsValue(group);
     if (_input) {
         _input.warn = customWarn !== null ? customWarn : 1;
@@ -241,8 +244,7 @@ async function handleCommand(type, text, displayName, _input) {
         setCooldown(cmd, 0, _input);
         return _emitLog('ℹ️ 명령어: !몇화, !다음화, !다다음화, !시간표, !첫화, !마지막화, !날짜, !음악 ' +
             'ℹ️ !몇화 사용법: !몇화 64화, !몇화 31화 48화 64화 72화 121화, !몇화 괜히똥만쌌네 ' +
-            'ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 쿨타임이 적용됩니다. ' +
-            'ℹ️ 명령은 2분마다 가능합니다. (도배 방지) ');
+            'ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 쿨타임이 적용됩니다. ');
     }
 
     // 방영/회차/대사 정보 조회 명령어 (가장 복합적인 로직)
@@ -259,9 +261,9 @@ async function handleCommand(type, text, displayName, _input) {
     if (group === 'timetable') {
         setCooldown(cmd, 0, _input);
         return _emitLog({
-            msg: printTimeTable(rtn, retryPattern[0]),
+            msg: printTimeTable(rtn, retryPattern[0], cmd),
             proc: function (attempt) {
-                return printTimeTable(rtn, retryPattern[attempt]);
+                return printTimeTable(rtn, retryPattern[attempt], cmd);
             }
         });
     }
@@ -427,6 +429,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
         }
     }
 
+    const baseWarn = cfg.subtitle_score.warn_base || 10;
     const searchInfo = searcher.search(query);
     if (searchInfo && searchInfo.length > 0) {
         // 점수가 같을 경우, 검색된 단어의 출현 빈도(매칭된 대사 수)가 높은 에피소드를 우선 채택하도록 정렬
@@ -879,9 +882,10 @@ function printFutureEpisode(rtn, cmd, skipCount, label, _input) {
  * !시간표 명령어를 처리. 현재 시점 이후 연달아 방영될 회차들의 
  * 제목과 예상 시작 시각을 연속된 문자열로 이어붙여 요약 생성
  * @param {string} change - 동일 문구 스팸 차단 방어막용 특수 공백 패딩 문자열
+ * @param {string} cmd - 실행된 명령어 이름
  * @param {number} limitLength - 유튜브 채팅 길이 제한 상한
  */
-function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) {
+function printTimeTable(rtn, change, cmd, limitLength = cfg.timetable.default_limit) {
     const n = videoInfo.length;
     let str = "";
     let pdate; // 이전 회차 날짜(일자 변경 표시용)
@@ -910,9 +914,9 @@ function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) 
 
             // 누적된 시간표 문자열의 총 길이가 채팅 제한치(limitLength)를 넘으면 그만 붙이고 즉시 반환
             if (str.length + candidate.length >= limitLength) {
-                //if (Math.random() < 0.01)
-                //    str += " 프로필에서 전체 시간표 확인이 가능합니다.";
-                return str;
+                // if (Math.random() < 0.5)
+                //     str += " (프로필에서 전체 시간표 확인이 가능합니다.)";
+                return str + " " + getCooldownMsg(cmd);
             }
 
             str += candidate;
@@ -921,7 +925,7 @@ function printTimeTable(rtn, change, limitLength = cfg.timetable.default_limit) 
         currentIdx = (currentIdx + 1) % n;
     }
 
-    return str || null;
+    return str ? str + " " + getCooldownMsg(cmd) : null;
 }
 
 /**
@@ -989,7 +993,7 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd) {
             pdate = entry.futureDate;
         }
 
-        return str;
+        return str + " " + getCooldownMsg(cmd);
     };
 
     return {

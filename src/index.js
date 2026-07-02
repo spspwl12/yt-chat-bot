@@ -125,12 +125,15 @@ async function main() {
                     continue;
                 const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
                 const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
-                if (resp) {
+                if (resp || chkInput.blockedCommand) {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
                     if (banned) {
                         broadcastSpam();
                         continue;
                     }
+                    
+                    if (!resp) continue; // blockedCommand 였지만 혹시 모를 통과 상황 방어
+
                     if (chkInput.triggerCooldown) {
                         chkInput.triggerCooldown();
                     }
