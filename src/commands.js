@@ -69,6 +69,13 @@ function getCooldownConfig(group) {
     return { key: group, time: cfg.cooldown.time_min };
 }
 
+function returnWarning(msg, cmd, _input) {
+    if (_input) {
+        setCooldown(cmd, -(1000 * 60 * (cfg.cooldown.error_offset_min || 0)), _input);
+    }
+    return `${msg} ${getCooldownMsg(cmd)}`;
+}
+
 function getCooldownMsg(cmd) {
     if (!cmd) return "";
     if (cfg.cooldown.mode === 'global') {
@@ -226,8 +233,9 @@ async function handleCommand(type, text, displayName, _input) {
     };
 
     if (text.length > cfg.input.text_max_length) {
-        return _emitLog(`⚠️ 문장이 길어요. ${cfg.input.text_max_length}자 ` +
-            `이내로 간단히 작성해 주세요. ${getCooldownMsg(cmd)}`);
+        return _emitLog(returnWarning(
+            `⚠️ 문장이 길어요. ${cfg.input.text_max_length}자 ` +
+            `이내로 간단히 작성해 주세요.`, cmd, _input));
     }
 
     // 단순 봇 인사 명령어
@@ -409,7 +417,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 숫자 형식이 아닌 일반 텍스트가 인자로 넘어왔다고 가정하여 
     // 내부 자막 데이터세트를 기반으로 '대사 검색' 알고리즘 수행
     if (cfg.input.enable_search === false) {
-        return `⚠️ 대사 검색 기능이 비활성화되어 있습니다. ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 대사 검색 기능이 비활성화되어 있습니다.`, cmd, _input);
     }
 
     const trackerInfo = _input.spamGuard && _input.spamGuard.tracker.get(_input.channelId);
@@ -418,14 +426,14 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     if (query.length < cfg.input.search_min_length) {
-        return `⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요. ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 대사를 ${cfg.input.search_min_length} 글자 이상 입력하세요.`, cmd, _input);
     }
 
     // 비속어 필터링: 검색어에 비속어가 포함되어 있으면 즉시 차단
     const searchText = filterText(query);
     for (const word of profanitySet) {
         if (searchText.includes(word)) {
-            return `⚠️ 대사에 욕설이 포함되어 있습니다. ${getCooldownMsg(cmd)}`;
+            return returnWarning(`⚠️ 대사에 욕설이 포함되어 있습니다.`, cmd, _input);
         }
     }
 
@@ -559,7 +567,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
                         if (attempt === 1)
                             return makeMsg(attempt).s;
                         else
-                            return `⚠️ 출력에 실패했습니다. ${getCooldownMsg(cmd)}`;
+                            return returnWarning(`⚠️ 출력에 실패했습니다.`, cmd, _input);
                     }
                 };
             }
@@ -583,7 +591,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
                     }
                 }
 
-                sendChat(`⚠️ 검색에 실패했습니다. ${getCooldownMsg(cmd)}`);
+                sendChat(returnWarning(`⚠️ 검색에 실패했습니다.`, cmd, _input));
             })
             .catch(err => {
                 console.error('AI 검색 중 오류 발생:', err);
@@ -594,29 +602,29 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     _input.warn = baseWarn;
-    return `⚠️ 대사를 정확히 입력하세요. ${getCooldownMsg(cmd)}`;
+    return returnWarning(`⚠️ 대사를 정확히 입력하세요.`, cmd, _input);
 }
 
 function handleDateCommand(rtn, cmd, args, _input) {
     if (!args || args.length === 0) {
-        return `⚠️ 날짜나 시간을 입력하세요. (예: !날짜 19시 30분, !날짜 11/12) ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 날짜나 시간을 입력하세요. (예: !날짜 19시 30분, !날짜 11/12)`, cmd, _input);
     }
 
     const dtStr = args.join(' ');
     const dtParsed = parseKoreanDate(dtStr);
     if (!dtParsed) {
-        return `⚠️ 날짜 형식을 인식하지 못했습니다. ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 날짜 형식을 인식하지 못했습니다.`, cmd, _input);
     }
 
     const nowTime = Date.now();
     const limitFutureTime = nowTime + (1000 * 60 * 60 * 24 * 90); // 약 3개월(90일)
 
     if (dtParsed.endDate.getTime() < nowTime) {
-        return `⚠️ 과거 날짜나 시간은 조회할 수 없습니다. ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 과거 날짜나 시간은 조회할 수 없습니다.`, cmd, _input);
     }
 
     if (dtParsed.startDate.getTime() > limitFutureTime) {
-        return `⚠️ 너무 먼 미래의 날짜는 조회할 수 없습니다. (최대 3개월 이내) ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 너무 먼 미래의 날짜는 조회할 수 없습니다. (최대 3개월 이내)`, cmd, _input);
     }
 
     const makeDateMsg = (attempt) => {
@@ -858,7 +866,7 @@ function printFutureEpisode(rtn, cmd, skipCount, label, _input) {
     }
 
     if (info === null) {
-        return `⚠️ ${label} 회차 정보를 확인할 수 없습니다.`;
+        return returnWarning(`⚠️ ${label} 회차 정보를 확인할 수 없습니다.`, cmd, _input);
     }
 
     // 찾은 에피소드가 방영될 미래의 예정 시각 계산
@@ -1136,7 +1144,7 @@ function getMusicFreq() {
 
 async function handleMusicCommand(rtn, cmd, args, _input) {
     if (cfg.music && !cfg.music.enable) {
-        return `⚠️ 음악 검색 기능이 비활성화되어 있습니다. ${getCooldownMsg(cmd)}`;
+        return returnWarning(`⚠️ 음악 검색 기능이 비활성화되어 있습니다.`, cmd, _input);
     }
 
     if (!args || args.length === 0) {
@@ -1211,7 +1219,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
             };
         } else {
             return {
-                msg: `⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다. ${getCooldownMsg(cmd)}`,
+                msg: returnWarning(`⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다.`, cmd, _input),
                 proc: () => `⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다. ${getCooldownMsg(cmd)}`
             };
         }
@@ -1329,7 +1337,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
     }
 
     return {
-        msg: `⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요. ${getCooldownMsg(cmd)}`,
+        msg: returnWarning(`⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요.`, cmd, _input),
         proc: () => `⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요. ${getCooldownMsg(cmd)}`
     };
 }
