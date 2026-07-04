@@ -278,12 +278,12 @@ async function handleCommand(type, text, displayName, _input) {
 
     // 다음 방영 예정 회차 정보 조회
     if (group === 'next') {
-        return _emitLog(printFutureEpisode(rtn, cmd, 1, '다음'));
+        return _emitLog(printFutureEpisode(rtn, cmd, 1, '다음', _input));
     }
 
     // 다다음 방영 예정 회차 정보 조회
     if (group === 'nextnext') {
-        return _emitLog(printFutureEpisode(rtn, cmd, 2, '다다음'));
+        return _emitLog(printFutureEpisode(rtn, cmd, 2, '다다음', _input));
     }
 
     // 현재 에피소드 및 남은 시간 단축 출력 (!시간)
@@ -1055,18 +1055,19 @@ function printNumEpisode(rtn, num, cmd) {
         return printNowEpisode(rtn, cmd);
 
     // 해당 회차가 방영될 상대적/절대적 미래 예상 날짜 도출
-    const futureDate = roundUpTime(search_lib.getFutureDate(info, rtn, 0));
+    const futureDate = info.disable ? null : roundUpTime(search_lib.getFutureDate(info, rtn, 0));
     const unicodenum = toUnicodeNumber(info.alias);
-    const timestr = formatDate(futureDate);
-    const emoji = getClockEmoji(timestr);
+    const timestr = futureDate ? formatDate(futureDate) : null;
+    const emoji = timestr ? getClockEmoji(timestr) : '';
+    const timeMsg = info.disable ? '스트리밍하지 않습니다.' : `${emoji} 예정 시간은 ${timestr} 분 입니다.`;
 
     return {
         // 예정 시각 및 에피소드 제목 안내 텍스트 반환
         msg: `🔜 예정 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ` +
-            `${emoji} 예정 시간은 ${timestr} 분 입니다. ${getCooldownMsg(cmd)}`,
+            `${timeMsg} ${getCooldownMsg(cmd)}`,
         proc: function (attempt) {
             return `🔜 예정 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ` +
-                `${emoji} 예정 시간은 ${timestr} 분 입니다. ${getCooldownMsg(cmd)}`;
+                `${timeMsg} ${getCooldownMsg(cmd)}`;
         }
     };
 }
