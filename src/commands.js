@@ -174,8 +174,6 @@ async function handleCommand(type, text, displayName, _input) {
     if (text.length < cfg.input.text_min_length)
         return null;
 
-
-
     // 2. 명령어 접두사 확인
     text = text.replace(/^\s*!\s*/, '!');
     if (!text.startsWith('!'))
@@ -215,8 +213,10 @@ async function handleCommand(type, text, displayName, _input) {
     }
 
     // 이전 회차가 끝나고 다음 회차가 시작되기 직전 과도기/경계 시간엔 부정확한 정보 방지를 위해 명령어 처리 무시
-    if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec)
+    if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec) {
+        if (_input) _input.warn = 0;
         return null;
+    }
 
     // ★ 명령어 사용 로그 메타데이터 저장 (index.js에서 실제 전송 후 이벤트 발행)
     const _emitLog = (response) => {
@@ -1162,6 +1162,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
         const historySec = (cfg.music && cfg.music.history_sec !== undefined) ? cfg.music.history_sec : 180;
         const historyMin = Math.floor(historySec / 60);
 
+        // 현재 에피소드의 음악 스캔
         for (let i = epMusics.length - 1; i >= 0; i--) {
             const m = epMusics[i];
             const startSec = fromHHMMSS(m.start);
@@ -1169,10 +1170,50 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
 
             if (rtn.now >= startSec && rtn.now <= endSec) {
                 foundList.push({ diff: 0, text: m.text });
-            } else if (startSec < rtn.now && rtn.now - startSec <= historySec) {
-                let d = Math.floor((rtn.now - startSec) / 60);
+            } else if (endSec < rtn.now && rtn.now - endSec <= historySec) {
+                let d = Math.floor((rtn.now - endSec) / 60);
                 if (d === 0) d = 1;
                 foundList.push({ diff: d, text: m.text });
+            }
+        }
+
+        // 이전 에피소드의 음악도 스캔 (history_sec 범위가 현재 에피소드 시작 이전까지 확장될 때)
+        let remainingHistory = historySec - rtn.now;
+        if (remainingHistory > 0) {
+            let elapsedFromCurrent = rtn.now; // 현재 에피소드에서 경과한 시간
+            let prevIdx = (rtn.index - 1 + videoInfo.length) % videoInfo.length;
+
+            while (remainingHistory > 0 && prevIdx !== rtn.index) {
+                const prevEp = videoInfo[prevIdx];
+                if (!prevEp.disable) {
+                    const prevKey = prevEp.name;
+                    const prevMusics = musics[prevKey] || [];
+                    const prevEnd = prevEp._effectiveEndSec;
+
+                    for (let i = prevMusics.length - 1; i >= 0; i--) {
+                        const m = prevMusics[i];
+                        const startSec = fromHHMMSS(m.start);
+                        const endSec = fromHHMMSS(m.end);
+
+                        // 곡의 끝 시점이 이전 에피소드 유효 종료 범위 내에 있는지 확인
+                        if (endSec > prevEnd) continue;
+
+                        // 이전 에피소드의 끝(prevEnd)에서 곡 종료까지의 거리
+                        const distFromPrevEnd = prevEnd - endSec;
+
+                        if (distFromPrevEnd > remainingHistory) continue;
+
+                        // 현재 시점으로부터의 총 경과 시간 (분)
+                        const totalDiffSec = elapsedFromCurrent + distFromPrevEnd;
+                        let d = Math.floor(totalDiffSec / 60);
+                        if (d === 0) d = 1;
+                        foundList.push({ diff: d, text: m.text });
+                    }
+
+                    elapsedFromCurrent += prevEnd;
+                    remainingHistory -= prevEnd;
+                }
+                prevIdx = (prevIdx - 1 + videoInfo.length) % videoInfo.length;
             }
         }
 
@@ -1184,7 +1225,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
             foundList.forEach(item => {
                 item.penalty = 0;
                 if (enablePenalty && (freqMap.get(item.text) || 0) >= freqThreshold) {
-                    item.penalty = 1;
+                    item.penalty = Infinity;
                 }
             });
 
