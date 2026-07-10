@@ -4,7 +4,7 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const config = require('../../data/config-search.js');
+const config = require('./config/config.json');
 
 // --- FFmpeg 실행 파일 경로 설정 ---
 if (config.ffmpeg.ffmpegPath) {
@@ -19,9 +19,11 @@ if (config.ffmpeg.ffprobePath) {
  * @param {string} videoPath - 영상 파일 경로
  * @param {string} outputDir - 프레임 저장 디렉토리
  * @param {number} [fps] - 초당 프레임 수 (config 기본값 사용)
+ * @param {number} [videoWidth] - 원본 영상 너비
+ * @param {number} [videoHeight] - 원본 영상 높이
  * @returns {Promise<string[]>} 추출된 프레임 파일 경로 배열
  */
-function extractFrames(videoPath, outputDir, fps) {
+function extractFrames(videoPath, outputDir, fps, videoWidth, videoHeight) {
     const extractFps = fps || config.extraction.fps;
     const videoName = path.basename(videoPath, path.extname(videoPath));
     const framesDir = path.join(outputDir, videoName);
@@ -36,7 +38,16 @@ function extractFrames(videoPath, outputDir, fps) {
     // 1) 영역 크롭 (원본에서 특정 부분만 잘라내기)
     const crop = config.extraction.crop;
     if (crop && crop.enabled && crop.w && crop.h) {
-        filters.push(`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`);
+        // 원본 영상 해상도(iw, ih)를 넘어서는 크롭 방지 (Javascript 내장 Math 활용)
+        // extractFrames가 videoWidth, videoHeight를 인자로 받는다고 가정 (없으면 기본값 99999로 회피)
+        const iw = videoWidth || 99999;
+        const ih = videoHeight || 99999;
+        const cx = Math.min(crop.x, iw);
+        const cy = Math.min(crop.y, ih);
+        const cw = Math.min(crop.w, iw - cx);
+        const ch = Math.min(crop.h, ih - cy);
+        
+        filters.push(`crop=${cw}:${ch}:${cx}:${cy}`);
     }
 
     // 2) fps 추출
@@ -68,23 +79,40 @@ function extractFrames(videoPath, outputDir, fps) {
                     .map(f => path.join(framesDir, f));
                 resolve(files);
             })
-            .on('error', (err) => {
-                reject(new Error(`프레임 추출 실패 [${videoPath}]: ${err.message}`));
+            .on('error', (err, stdout, stderr) => {
+                let errMsg = err.message;
+                if (stderr) {
+                    const lines = stderr.split('\n').filter(l => l.trim().length > 0);
+                    if (lines.length > 0) {
+                        errMsg += `\n[FFmpeg 로그] ${lines[lines.length - 1]}`;
+                    }
+                }
+                reject(new Error(`프레임 추출 실패 [${videoPath}]: ${errMsg}`));
             })
             .run();
     });
 }
 
 /**
- * 영상의 길이를 초 단위로 반환
+ * 영상의 메타데이터(길이, 해상도) 반환
  * @param {string} videoPath
- * @returns {Promise<number>}
+ * @returns {Promise<{duration: number, width: number, height: number}>}
  */
-function getVideoDuration(videoPath) {
+function getVideoInfo(videoPath) {
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(videoPath, (err, metadata) => {
             if (err) return reject(err);
-            resolve(metadata.format.duration || 0);
+            const duration = metadata.format.duration || 0;
+            let width = 0;
+            let height = 0;
+            if (metadata.streams) {
+                const vStream = metadata.streams.find(s => s.codec_type === 'video');
+                if (vStream) {
+                    width = vStream.width || 0;
+                    height = vStream.height || 0;
+                }
+            }
+            resolve({ duration, width, height });
         });
     });
 }
@@ -99,4 +127,4 @@ function cleanupFrames(dirPath) {
     }
 }
 
-module.exports = { extractFrames, getVideoDuration, cleanupFrames, config };
+module.exports = { extractFrames, getVideoInfo, cleanupFrames, config };

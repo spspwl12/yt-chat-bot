@@ -19,28 +19,6 @@ module.exports = {
             "16"                                                      // 프레임수 등
         ]
     },
-    extraction: {
-        fps: 2,          // 초당 추출할 프레임 수
-        width: 64,       // 지문 추출용 썸네일 너비
-        height: 64,      // 지문 추출용 썸네일 높이
-        crop: {
-            enabled: true, // 크롭 활성화 여부 (방송 로고 등을 제외하고 화면만 분석할 때 사용)
-            x: 215,        // 크롭 시작 X 좌표
-            y: 0,          // 크롭 시작 Y 좌표
-            w: 1490,       // 크롭 너비
-            h: 1080        // 크롭 높이
-        },
-        videoExtensions: [ // 분석 대상 동영상 확장자 목록
-            ".mp4",
-            ".avi",
-            ".mkv",
-            ".mov",
-            ".wmv",
-            ".flv",
-            ".webm",
-            ".ts"
-        ]
-    },
     phash: {
         resizeWidth: 64,  // pHash 계산을 위한 리사이즈 너비
         resizeHeight: 64, // pHash 계산을 위한 리사이즈 높이
@@ -52,14 +30,5 @@ module.exports = {
         hammingThreshold: 30, // 이미지 일치 판단을 위한 해밍 거리 최소 기준값 (낮을수록 더 똑같아야 일치로 판정)
         topN: 5,              // 일치하는 결과의 최대 반환 개수
         earlyExit: true       // 일치 조건 충족 시 완전 검색 없이 즉시 종료 활성화 여부
-    },
-    performance: {
-        workerCount: 0,         // 멀티스레드/워커 타스크 개수 (0 = 시스템 코어 개수에 맞춤)
-        batchSize: 100,         // 한 번에 처리할 배치 크기
-        maxConcurrentVideos: 2  // 동시 분석할 최대 영상 개수
-    },
-    paths: {
-        fingerprintDb: "../data/video-fingerprints.json", // 영상 DB(핑거프린트) 파일 데이터 저장/로드 경로
-        tempDir: "../data/temp_frames"                    // 중간 이미지/프레임 저장용 임시 폴더 위치
     }
 };

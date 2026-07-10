@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>비디오 핑거프린트 생성기</title>
+    <meta name="description" content="Node.js 기반 비디오 핑거프린트 인덱서 웹 컨트롤러">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🎬 비디오 핑거프린트 생성기</h1>
+            <p>Node.js 백엔드 기반 — 옵션을 설정하고 인덱싱을 시작하세요</p>
+        </header>
+
+        <!-- 📁 경로 설정 -->
+        <section class="card" id="section-paths">
+            <div class="card-title">
+                <span class="icon">📁</span> 경로 설정
+            </div>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="input-videoDir">영상 디렉토리</label>
+                    <div class="input-with-button">
+                        <input type="text" id="input-videoDir" placeholder="예: C:\Videos\episodes">
+                        <button type="button" class="btn-browse" onclick="browseFolder('input-videoDir')">탐색기</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="input-fingerprintDb">출력 DB 경로</label>
+                    <input type="text" id="input-fingerprintDb" placeholder="../data/video-fingerprints.json">
+                </div>
+                <div class="form-group">
+                    <label for="input-tempDir">임시 프레임 디렉토리</label>
+                    <input type="text" id="input-tempDir" placeholder="../data/temp_frames">
+                </div>
+                <div class="form-group">
+                    <label for="input-ffmpegPath">FFmpeg 경로 (선택)</label>
+                    <input type="text" id="input-ffmpegPath" placeholder="환경변수 사용 시 비워둠">
+                </div>
+                <div class="form-group">
+                    <label for="input-ffprobePath">FFprobe 경로 (선택)</label>
+                    <input type="text" id="input-ffprobePath" placeholder="환경변수 사용 시 비워둠">
+                </div>
+            </div>
+        </section>
+
+        <!-- 🎬 프레임 추출 설정 -->
+        <section class="card" id="section-extraction">
+            <div class="card-title">
+                <span class="icon">🎬</span> 프레임 추출 설정
+            </div>
+            <div class="form-grid three-col">
+                <div class="form-group">
+                    <label for="input-fps">FPS (초당 프레임)</label>
+                    <input type="number" id="input-fps" min="1" max="30" value="2">
+                </div>
+                <div class="form-group">
+                    <label for="input-width">추출 너비 (px)</label>
+                    <input type="number" id="input-width" min="8" max="1920" value="64">
+                </div>
+                <div class="form-group">
+                    <label for="input-height">추출 높이 (px)</label>
+                    <input type="number" id="input-height" min="8" max="1080" value="64">
+                </div>
+            </div>
+
+            <!-- 크롭 토글 -->
+            <div class="toggle-row" style="margin-top: 16px;">
+                <span class="toggle-label">영역 크롭 (Crop)</span>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button type="button" class="btn-browse" onclick="openCropModal()">시각적 크롭 도구</button>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-crop" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 크롭 필드 -->
+            <div class="crop-fields visible" id="crop-fields">
+                <div class="form-grid four-col">
+                    <div class="form-group">
+                        <label for="input-cropX">X 좌표</label>
+                        <input type="number" id="input-cropX" value="215">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-cropY">Y 좌표</label>
+                        <input type="number" id="input-cropY" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-cropW">크롭 너비</label>
+                        <input type="number" id="input-cropW" value="1490">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-cropH">크롭 높이</label>
+                        <input type="number" id="input-cropH" value="1080">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 지원 확장자 -->
+            <div class="form-group full-width" style="margin-top: 16px;">
+                <label>지원 확장자</label>
+                <div class="ext-tags" id="ext-tags">
+                    <!-- JS에서 동적 생성 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ⚡ 성능 설정 -->
+        <section class="card" id="section-performance">
+            <div class="card-title">
+                <span class="icon">⚡</span> 성능 설정
+            </div>
+            <div class="form-grid three-col">
+                <div class="form-group">
+                    <label for="input-workerCount">워커 수 (0=자동)</label>
+                    <input type="number" id="input-workerCount" min="0" max="32" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="input-batchSize">배치 크기</label>
+                    <input type="number" id="input-batchSize" min="10" max="1000" value="100">
+                </div>
+            </div>
+        </section>
+
+        <!-- 🔑 pHash 정보 (읽기 전용) -->
+        <section class="card" id="section-phash">
+            <div class="card-title">
+                <span class="icon">🔑</span> pHash 알고리즘 정보
+                <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">읽기 전용</span>
+            </div>
+            <div class="info-grid">
+                <div class="info-badge">
+                    <div class="info-value" id="info-resizeWidth">64</div>
+                    <div class="info-label">Resize 너비</div>
+                </div>
+                <div class="info-badge">
+                    <div class="info-value" id="info-resizeHeight">64</div>
+                    <div class="info-label">Resize 높이</div>
+                </div>
+                <div class="info-badge">
+                    <div class="info-value" id="info-dctSize">64</div>
+                    <div class="info-label">DCT 크기</div>
+                </div>
+                <div class="info-badge">
+                    <div class="info-value" id="info-lowFreqSize">16</div>
+                    <div class="info-label">Low Freq 크기</div>
+                </div>
+                <div class="info-badge">
+                    <div class="info-value" id="info-hashBits">255</div>
+                    <div class="info-label">해시 비트 수</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 시작 버튼 -->
+        <div class="action-area" style="display: flex; gap: 10px;">
+            <button class="btn-start" id="btn-start" onclick="startIndexing()" style="flex: 1;">
+                🚀 인덱싱 시작
+            </button>
+            <button class="btn-cancel" id="btn-stop" onclick="stopIndexing()" style="display: none; padding: 16px; font-weight: 600;">
+                🛑 중지
+            </button>
+        </div>
+
+        <!-- 진행 상황 -->
+        <section class="card progress-section" id="progress-section">
+            <div class="card-title">
+                <span class="icon">📊</span> 진행 상황
+            </div>
+            <div class="progress-header">
+                <span class="progress-status" id="progress-status">대기 중...</span>
+                <span class="progress-percent" id="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+            <div class="log-output" id="log-output"></div>
+            <div class="result-banner" id="result-banner"></div>
+        </section>
+    </div>
+
+    <!-- 탐색기 모달 -->
+    <div class="modal-overlay" id="browser-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>폴더 선택</h3>
+                <button class="btn-close" onclick="closeBrowser()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="browser-path" id="browser-current-path">C:\</div>
+                <ul class="browser-list" id="browser-list">
+                    <!-- JS에서 동적 생성 -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeBrowser()">취소</button>
+                <button class="btn-select" onclick="selectCurrentFolder()">현재 폴더 선택</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 크롭 모달 -->
+    <div class="modal-overlay" id="crop-modal">
+        <div class="modal-content" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3>시각적 크롭 도구</h3>
+                <button class="btn-close" onclick="closeCropModal()">×</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <select id="crop-video-select" style="flex: 1; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary);"></select>
+                    <button class="btn-browse" onclick="loadCropVideo()">불러오기</button>
+                </div>
+                <div class="video-container" id="video-container" style="text-align: center; background: #000; padding: 10px; border-radius: 6px;">
+                    <div id="video-wrapper" style="position: relative; display: inline-block;">
+                        <video id="crop-video" autoplay loop muted style="max-width: 100%; max-height: 50vh; display: block;"></video>
+                        <div id="crop-overlay" class="crop-overlay"></div>
+                    </div>
+                </div>
+                <div class="form-grid four-col" style="margin-top: 10px;">
+                    <div class="form-group"><label>X</label><input type="text" id="preview-cropX" readonly></div>
+                    <div class="form-group"><label>Y</label><input type="text" id="preview-cropY" readonly></div>
+                    <div class="form-group"><label>W</label><input type="text" id="preview-cropW" readonly></div>
+                    <div class="form-group"><label>H</label><input type="text" id="preview-cropH" readonly></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeCropModal()">취소</button>
+                <button class="btn-select" onclick="applyCrop()">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
