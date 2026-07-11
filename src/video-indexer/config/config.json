@@ -1,0 +1,46 @@
+{
+    "ffmpeg": {
+        "ffmpegPath": "../../data/ffmpeg.exe",
+        "ffprobePath": "../../data/ffprobe.exe",
+        "inputOptions": []
+    },
+    "extraction": {
+        "fps": 2,
+        "width": 64,
+        "height": 64,
+        "crop": {
+            "enabled": true,
+            "x": 83,
+            "y": 0,
+            "w": 472,
+            "h": 360
+        },
+        "videoExtensions": [
+            ".mp4",
+            ".avi",
+            ".mkv",
+            ".mov",
+            ".wmv",
+            ".flv",
+            ".webm",
+            ".ts"
+        ]
+    },
+    "phash": {
+        "resizeWidth": 64,
+        "resizeHeight": 64,
+        "dctSize": 64,
+        "lowFreqSize": 16,
+        "hashBits": 256
+    },
+    "performance": {
+        "workerCount": 0,
+        "batchSize": 100,
+        "maxConcurrentVideos": 2
+    },
+    "paths": {
+        "fingerprintDb": "../data/video-fingerprints.json",
+        "tempDir": "./temp_frames",
+        "videoDir": ""
+    }
+}
