@@ -517,13 +517,84 @@ function initCropEvents() {
     const wrapper = document.getElementById('video-wrapper');
     const overlay = document.getElementById('crop-overlay');
     const video = document.getElementById('crop-video');
+    const magnifier = document.getElementById('crop-magnifier');
+    const magCtx = magnifier.getContext('2d', { willReadFrequently: true });
     
+    const SNAP_THRESHOLD = 15; // px (끝부분 자석 효과)
+
+    function snap(val, max) {
+        if (val < SNAP_THRESHOLD) return 0;
+        if (val > max - SNAP_THRESHOLD) return max;
+        return val;
+    }
+
+    function updateMagnifier(x, y, rect) {
+        magnifier.style.display = 'block';
+        
+        // 돋보기 위치 (커서 우측 하단, 화면 넘어가면 좌측 상단으로)
+        let magX = x + 20;
+        let magY = y + 20;
+        if (magX + 120 > rect.width) magX = x - 140;
+        if (magY + 120 > rect.height) magY = y - 140;
+        
+        magnifier.style.left = magX + 'px';
+        magnifier.style.top = magY + 'px';
+
+        // 캔버스 초기화
+        magCtx.fillStyle = '#000';
+        magCtx.fillRect(0, 0, 120, 120);
+
+        // 원본 해상도 대비 스케일 계산
+        const scaleX = video.videoWidth / rect.width;
+        const scaleY = video.videoHeight / rect.height;
+
+        const srcX = x * scaleX;
+        const srcY = y * scaleY;
+        
+        const zoom = 2;
+        const srcW = 120 / zoom;
+        const srcH = 120 / zoom;
+        
+        // 영상 픽셀 렌더링
+        try {
+            magCtx.drawImage(
+                video,
+                Math.max(0, srcX - srcW/2), Math.max(0, srcY - srcH/2), srcW, srcH,
+                0, 0, 120, 120
+            );
+        } catch (err) {
+            // CORS/Tainted canvas 에러 무시
+        }
+
+        // 십자선 그리기
+        magCtx.strokeStyle = 'rgba(0, 240, 255, 0.8)';
+        magCtx.lineWidth = 1;
+        magCtx.beginPath();
+        magCtx.moveTo(60, 0); magCtx.lineTo(60, 120);
+        magCtx.moveTo(0, 60); magCtx.lineTo(120, 60);
+        magCtx.stroke();
+    }
+    
+    // 마우스 호버 시 돋보기 보여주기
+    wrapper.addEventListener('mousemove', (e) => {
+        if (!video.videoWidth || isDragging) return;
+        const rect = video.getBoundingClientRect();
+        let hoverX = e.clientX - rect.left;
+        let hoverY = e.clientY - rect.top;
+        hoverX = snap(Math.max(0, Math.min(hoverX, rect.width)), rect.width);
+        hoverY = snap(Math.max(0, Math.min(hoverY, rect.height)), rect.height);
+        updateMagnifier(hoverX, hoverY, rect);
+    });
+    
+    wrapper.addEventListener('mouseleave', () => {
+        if (!isDragging) magnifier.style.display = 'none';
+    });
+
     wrapper.addEventListener('mousedown', (e) => {
         if (!video.videoWidth) return;
         isDragging = true;
         
         const rect = video.getBoundingClientRect();
-        // 비디오 엘리먼트 영역 기준 좌표 계산
         let clickX = e.clientX - rect.left;
         let clickY = e.clientY - rect.top;
         
@@ -531,6 +602,10 @@ function initCropEvents() {
             isDragging = false;
             return;
         }
+
+        // 스냅 적용
+        clickX = snap(clickX, rect.width);
+        clickY = snap(clickY, rect.height);
 
         startX = clickX;
         startY = clickY;
@@ -540,6 +615,8 @@ function initCropEvents() {
         overlay.style.top = startY + 'px';
         overlay.style.width = '0px';
         overlay.style.height = '0px';
+        
+        updateMagnifier(clickX, clickY, rect);
     });
     
     window.addEventListener('mousemove', (e) => {
@@ -549,9 +626,12 @@ function initCropEvents() {
         let currentX = e.clientX - rect.left;
         let currentY = e.clientY - rect.top;
         
-        // 경계 제한
         currentX = Math.max(0, Math.min(currentX, rect.width));
         currentY = Math.max(0, Math.min(currentY, rect.height));
+        
+        // 스냅 적용
+        currentX = snap(currentX, rect.width);
+        currentY = snap(currentY, rect.height);
         
         const left = Math.min(startX, currentX);
         const top = Math.min(startY, currentY);
@@ -563,7 +643,6 @@ function initCropEvents() {
         overlay.style.width = width + 'px';
         overlay.style.height = height + 'px';
         
-        // 원본 해상도 대비 스케일 계산
         const scaleX = video.videoWidth / rect.width;
         const scaleY = video.videoHeight / rect.height;
         
@@ -578,10 +657,13 @@ function initCropEvents() {
         document.getElementById('preview-cropY').value = cropData.y;
         document.getElementById('preview-cropW').value = cropData.w;
         document.getElementById('preview-cropH').value = cropData.h;
+
+        updateMagnifier(currentX, currentY, rect);
     });
     
     window.addEventListener('mouseup', () => {
         isDragging = false;
+        magnifier.style.display = 'none';
     });
 }
 

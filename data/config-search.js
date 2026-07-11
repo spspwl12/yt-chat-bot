@@ -19,6 +19,18 @@ module.exports = {
             "16"                                                      // 프레임수 등
         ]
     },
+    extraction: {
+        fps: 2,          // 초당 추출할 프레임 수
+        width: 64,       // 지문 추출용 썸네일 너비
+        height: 64,      // 지문 추출용 썸네일 높이
+        crop: {
+            enabled: true, // 크롭 활성화 여부 (방송 로고 등을 제외하고 화면만 분석할 때 사용)
+            x: 215,        // 크롭 시작 X 좌표
+            y: 0,          // 크롭 시작 Y 좌표
+            w: 1490,       // 크롭 너비
+            h: 1080        // 크롭 높이
+        }
+    },
     phash: {
         resizeWidth: 64,  // pHash 계산을 위한 리사이즈 너비
         resizeHeight: 64, // pHash 계산을 위한 리사이즈 높이
