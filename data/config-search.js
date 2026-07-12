@@ -20,7 +20,7 @@ module.exports = {
         ]
     },
     extraction: {
-        fps: 2,          // 초당 추출할 프레임 수
+        fps: 30,          // 초당 추출할 프레임 수
         width: 64,       // 지문 추출용 썸네일 너비
         height: 64,      // 지문 추출용 썸네일 높이
         crop: {
