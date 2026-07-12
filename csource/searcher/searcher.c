@@ -1,5 +1,5 @@
-/**
- * searcher.c — 순수 C 영상 지문 검색기
+﻿/**
+ * searcher.c ? 순수 C 영상 지문 검색기
  *
  * Node.js indexer가 생성한 JSON fingerprint DB를 읽고,
  * FFmpeg CLI로 클립 프레임을 추출한 뒤 초고속 검색.
@@ -594,22 +594,28 @@ static void cleanup_temp(const char *temp_dir) {
 static THREAD_RETURN search_worker(void *arg) {
     WorkerCtx *ctx = (WorkerCtx *)arg;
     ctx->result_count = 0;
+    /* bestDistance 초기값: PHASH_AC_COUNT+1 으로 일반화 (256 하드코딩 제거) */
+    const int INITIAL_BEST = PHASH_AC_COUNT + 1;
 
     for (int vi = ctx->vid_start; vi < ctx->vid_end; vi++) {
         VideoEntry *v = &ctx->db->videos[vi];
-        int best_dist = 256;
+        int best_dist = INITIAL_BEST;
         double best_ts = 0;
         int best_clip_fidx = 0;
+        /* [수정] match_cnt: 클립 프레임 단위로 "이 영상에서 threshold 이하 매칭이
+         *          1개라도 있는가" 를 카운트.
+         *          이전에는 DB 프레임 매칭 횟수를 총많으로 궼어서 coverage 과장 버그 있었음. */
         int match_cnt = 0;
 
         for (int ci = 0; ci < ctx->clip_hash_count; ci++) {
             const uint8_t *clip_h = ctx->clip_hashes[ci];
+            int clip_matched = 0;
 
             for (int di = 0; di < v->hash_count; di++) {
                 int dist = phash_hamming(clip_h, v->hashes[di].hash);
 
                 if (dist <= ctx->threshold) {
-                    match_cnt++;
+                    clip_matched = 1;
                     if (dist < best_dist) {
                         best_dist = dist;
                         best_ts = v->hashes[di].timestamp;
@@ -617,6 +623,8 @@ static THREAD_RETURN search_worker(void *arg) {
                     }
                 }
             }
+
+            if (clip_matched) match_cnt++;
         }
 
         if (match_cnt > 0) {
@@ -797,7 +805,7 @@ static int do_clip_search(FingerprintDB *db, ExtractConfig *ec, const char *clip
     return 0;
 }
 
-/* ═══════════════════ MAIN ═══════════════════ */
+/* ??????????????????? MAIN ??????????????????? */
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("사용법: %s <clip|--daemon> [db_path] [threshold] [config_path] [threads]\n", argv[0]);
@@ -864,7 +872,7 @@ int main(int argc, char *argv[]) {
     LOG("      %d개 영상, %d개 해시 (%.2fs)\n", db.video_count, total_hashes, load_time);
 
     if (daemon_mode) {
-        /* ═══ 데몬 모드: stdin에서 클립 경로를 받아 반복 검색 ═══ */
+        /* ??? 데몬 모드: stdin에서 클립 경로를 받아 반복 검색 ??? */
         fprintf(stderr, "__DAEMON_READY__\n");
         fflush(stderr);
 
@@ -892,7 +900,7 @@ int main(int argc, char *argv[]) {
         fflush(stderr);
 
     } else {
-        /* ═══ 일반 모드: 단일 클립 검색 ═══ */
+        /* ??? 일반 모드: 단일 클립 검색 ??? */
         do_clip_search(&db, &ec, clip_path, threshold, num_threads, total_hashes, 0);
     }
 

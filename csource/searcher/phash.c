@@ -1,12 +1,12 @@
-/**
- * phash.c ? pHash C ±¸Çö
+ï»¿/**
+ * phash.c ? pHash C êµ¬í˜„
  *
- * DCT ±â¹İ perceptual hash:
- *   1) 64x64 ±×·¹ÀÌ½ºÄÉÀÏ ¸®»çÀÌÁî (bilinear)
- *   2) Á¤±ÔÈ­ (mean/stddev)
- *   3) 2D DCT (»çÀü °è»ê cosine Å×ÀÌºí)
- *   4) DC Á¦¿Ü, MAD dead zone
- *   5) 255-bit ÇØ½Ã »ı¼º
+ * DCT ê¸°ë°˜ perceptual hash:
+ *   1) 64x64 ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ë¦¬ì‚¬ì´ì¦ˆ (bilinear)
+ *   2) ì •ê·œí™” (mean/stddev)
+ *   3) 2D DCT (ì‚¬ì „ ê³„ì‚° cosine í…Œì´ë¸”)
+ *   4) DC ì œì™¸, MAD dead zone
+ *   5) 255-bit í•´ì‹œ ìƒì„±
  */
 #include "phash.h"
 #include <math.h>
@@ -21,7 +21,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
- /* ¦¡¦¡ Àü¿ª Å×ÀÌºí ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡ */
+ /* â”€â”€ ì „ì—­ í…Œì´ë¸” â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 static double cos_table[PHASH_DCT_SIZE * PHASH_DCT_SIZE];
 static uint8_t popcount_lut[256];
 static int initialized = 0;
@@ -29,7 +29,7 @@ static int initialized = 0;
 void phash_init(void) {
     if (initialized) return;
 
-    /* cosine Å×ÀÌºí */
+    /* cosine í…Œì´ë¸” */
     for (int i = 0; i < PHASH_DCT_SIZE; i++) {
         for (int j = 0; j < PHASH_DCT_SIZE; j++) {
             cos_table[i * PHASH_DCT_SIZE + j] =
@@ -45,7 +45,7 @@ void phash_init(void) {
     initialized = 1;
 }
 
-/* ¦¡¦¡ bilinear ¸®»çÀÌÁî (±×·¹ÀÌ½ºÄÉÀÏ) ¦¡¦¡ */
+/* â”€â”€ bilinear ë¦¬ì‚¬ì´ì¦ˆ (ê·¸ë ˆì´ìŠ¤ì¼€ì¼) â”€â”€ */
 static void resize_bilinear(const uint8_t* src, int sw, int sh,
     double* dst, int dw, int dh) {
     double x_ratio = (double)sw / dw;
@@ -72,24 +72,24 @@ static void resize_bilinear(const uint8_t* src, int sw, int sh,
     }
 }
 
-/* ¦¡¦¡ qsort ºñ±³ ÇÔ¼ö ¦¡¦¡ */
+/* â”€â”€ qsort ë¹„êµ í•¨ìˆ˜ â”€â”€ */
 static int cmp_double(const void* a, const void* b) {
     double da = *(const double*)a, db = *(const double*)b;
     return (da > db) - (da < db);
 }
 
-/* ¦¡¦¡ ÇÙ½É: pHash °è»ê ¦¡¦¡ */
+/* â”€â”€ í•µì‹¬: pHash ê³„ì‚° â”€â”€ */
 void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
     const int RW = PHASH_RESIZE_W;
     const int RH = PHASH_RESIZE_H;
     const int LF = PHASH_LOW_FREQ;
     const int total = RW * RH;
 
-    /* 1) bilinear ¸®»çÀÌÁî */
+    /* 1) bilinear ë¦¬ì‚¬ì´ì¦ˆ */
     double* resized = (double*)malloc(sizeof(double) * total);
     resize_bilinear(gray, w, h, resized, RW, RH);
 
-    /* 2) Á¤±ÔÈ­: mean Á¦°Å + stddev ³ª´©±â */
+    /* 2) ì •ê·œí™”: mean ì œê±° + stddev ë‚˜ëˆ„ê¸° */
     double mean = 0;
     for (int i = 0; i < total; i++) mean += resized[i];
     mean /= total;
@@ -106,8 +106,12 @@ void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
         resized[i] = (resized[i] - mean) / stddev;
     }
 
-    /* 3) 2D DCT (Çà ¡æ ¿­) */
-    double* row_dct = (double*)calloc(RH * PHASH_DCT_SIZE, sizeof(double));
+    /* 3) 2D DCT (í–‰ â†’ ì—´ ìˆœì„œ) */
+    /* [ìˆ˜ì •] row_dct ë¥¼ RH * LF í¬ê¸°ë¡œ í• ë‹¹í•˜ê³  y * LF + u ê°„ê²©ìœ¼ë¡œ ì €ì¥.
+     *        ì´ì „ì—ëŠ” RH * PHASH_DCT_SIZE ë¡œ í• ë‹¹í•˜ê³  y * PHASH_DCT_SIZE + u ì— ì €ì¥í–ˆìœ¼ë‚˜
+     *        LF ê°œë§Œ ì±„ìš°ê³  ë‚˜ë¨¸ì§€ëŠ” 0 â†’ ì—´ ë°©í–¥ íŒ¨ìŠ¤ì—ì„œ ê°™ì€ stride ë¡œ ì½ìœ¼ë©´
+     *        ì €ì¥ëœ ê°’ì„ ì˜¬ë°”ë¥´ê²Œ ì°¸ì¡°í•˜ì§€ ëª»í•˜ëŠ” ë²„ê·¸ê°€ ìˆì—ˆìŒ. */
+    double* row_dct = (double*)calloc(RH * LF, sizeof(double));
 
     for (int y = 0; y < RH; y++) {
         for (int u = 0; u < LF; u++) {
@@ -115,16 +119,16 @@ void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
             for (int x = 0; x < RW; x++) {
                 sum += resized[y * RW + x] * cos_table[u * PHASH_DCT_SIZE + x];
             }
-            row_dct[y * PHASH_DCT_SIZE + u] = sum;
+            row_dct[y * LF + u] = sum;  /* stride = LF */
         }
     }
 
     double dct_matrix[PHASH_LOW_FREQ * PHASH_LOW_FREQ];
-    for (int u = 0; u < LF; u++) {
-        for (int v = 0; v < LF; v++) {
+    for (int v = 0; v < LF; v++) {
+        for (int u = 0; u < LF; u++) {
             double sum = 0;
             for (int y = 0; y < RH; y++) {
-                sum += row_dct[y * PHASH_DCT_SIZE + u] * cos_table[v * PHASH_DCT_SIZE + y];
+                sum += row_dct[y * LF + u] * cos_table[v * PHASH_DCT_SIZE + y];  /* stride = LF */
             }
             dct_matrix[v * LF + u] = sum;
         }
@@ -133,19 +137,19 @@ void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
     free(row_dct);
     free(resized);
 
-    /* 4) AC ¼ººĞ ÃßÃâ (DC Á¦¿Ü) */
+    /* 4) AC ì„±ë¶„ ì¶”ì¶œ (DC ì œì™¸) */
     double ac[PHASH_AC_COUNT];
     for (int i = 0; i < PHASH_AC_COUNT; i++) {
         ac[i] = dct_matrix[i + 1];
     }
 
-    /* Áß¾Ó°ª */
+    /* ì¤‘ì•™ê°’ */
     double sorted[PHASH_AC_COUNT];
     memcpy(sorted, ac, sizeof(sorted));
     qsort(sorted, PHASH_AC_COUNT, sizeof(double), cmp_double);
     double median = sorted[PHASH_AC_COUNT / 2];
 
-    /* MAD ±â¹İ dead zone */
+    /* MAD ê¸°ë°˜ dead zone */
     double abs_dev[PHASH_AC_COUNT];
     for (int i = 0; i < PHASH_AC_COUNT; i++) {
         abs_dev[i] = fabs(sorted[i] - median);
@@ -154,7 +158,7 @@ void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
     double mad = abs_dev[PHASH_AC_COUNT / 2];
     double dead_zone = mad * 0.5;
 
-    /* 5) ÇØ½Ã »ı¼º */
+    /* 5) í•´ì‹œ ìƒì„± */
     memset(out, 0, PHASH_HASH_BYTES);
     for (int i = 0; i < PHASH_AC_COUNT; i++) {
         if (ac[i] > median + dead_zone) {
@@ -163,10 +167,10 @@ void phash_compute(const uint8_t* gray, int w, int h, uint8_t* out) {
     }
 }
 
-/* ¦¡¦¡ ÆÄÀÏ¿¡¼­ pHash °è»ê ¦¡¦¡ */
+/* â”€â”€ íŒŒì¼ì—ì„œ pHash ê³„ì‚° â”€â”€ */
 int phash_compute_file(const char* filepath, uint8_t* out) {
     int w, h, channels;
-    uint8_t* img = stbi_load(filepath, &w, &h, &channels, 1); /* ±×·¹ÀÌ½ºÄÉÀÏ °­Á¦ */
+    uint8_t* img = stbi_load(filepath, &w, &h, &channels, 1); /* ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ê°•ì œ */
     if (!img) return -1;
 
     phash_compute(img, w, h, out);
@@ -174,7 +178,7 @@ int phash_compute_file(const char* filepath, uint8_t* out) {
     return 0;
 }
 
-/* ¦¡¦¡ Hamming Distance ¦¡¦¡ */
+/* â”€â”€ Hamming Distance â”€â”€ */
 int phash_hamming(const uint8_t* a, const uint8_t* b) {
     int dist = 0;
     for (int i = 0; i < PHASH_HASH_BYTES; i++) {
@@ -183,7 +187,7 @@ int phash_hamming(const uint8_t* a, const uint8_t* b) {
     return dist;
 }
 
-/* ¦¡¦¡ hex º¯È¯ À¯Æ¿ ¦¡¦¡ */
+/* â”€â”€ hex ë³€í™˜ ìœ í‹¸ â”€â”€ */
 static int hex_char(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
