@@ -180,8 +180,11 @@ async function handleAction(client, req) {
         let totalTime = 0;
         let totalEpCount = search_lib.videoInfo ? search_lib.videoInfo.length : 0;
 
+        let episodeAlias = null;
         if (epInfo && search_lib.videoInfo && search_lib.videoInfo[epInfo.index]) {
-            totalTime = search_lib.videoInfo[epInfo.index]._streamDurationSec || 0;
+            const epEntry = search_lib.videoInfo[epInfo.index];
+            totalTime = epEntry._streamDurationSec || 0;
+            episodeAlias = epEntry.alias || epEntry.title || epEntry.shorten || epEntry.name || null;
         }
 
         sendWSFrame(client, JSON.stringify({
@@ -190,6 +193,7 @@ async function handleAction(client, req) {
                 episodeInfo: epInfo,
                 totalEpisodes: totalEpisodes || totalEpCount,
                 totalTime: totalTime,
+                episodeAlias: episodeAlias,
                 videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null,
                 botMuted: botMuted,
                 cooldownState: commandsLib.getCooldownState()
@@ -363,7 +367,8 @@ async function handleAction(client, req) {
     // ── 새 기능: video-info.json 편집 ──
     else if (action === 'getVideoInfo') {
         try {
-            const viText = fs.readFileSync(path.join(__dirname, '../data', 'video-info.json'), 'utf8');
+            const viText = fs.readFileSync(path.join(__dirname, '../data', 'video-info.json'), 'utf8')
+                .replace(/^\uFEFF/, '').trim(); // BOM 및 앞뒤 공백 제거
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: viText }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: '[]' }));
@@ -372,9 +377,10 @@ async function handleAction(client, req) {
     else if (action === 'saveVideoInfo') {
         const { content } = payload;
         try {
-            // JSON 유효성 검증
-            JSON.parse(content);
-            fs.writeFileSync(path.join(__dirname, '../data', 'video-info.json'), content, 'utf8');
+            // BOM, \r, 앞뒤 공백 제거 후 JSON 유효성 검증
+            const cleanContent = content.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+            JSON.parse(cleanContent);
+            fs.writeFileSync(path.join(__dirname, '../data', 'video-info.json'), cleanContent, 'utf8');
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
@@ -440,18 +446,29 @@ function startServer(port, spamGuard, getEpisodeInfo) {
 
     const server = http.createServer((req, res) => {
         // 대시보드 정적 호스팅
-        if (req.method === 'GET' && (req.url === '/' || req.url === '/dashboard.html')) {
-            const htmlPath = path.join(__dirname, 'public', 'dashboard.html');
-            fs.readFile(htmlPath, 'utf8', (err, data) => {
-                if (err) {
-                    res.writeHead(500, { 'Content-Type': 'text/plain' });
-                    res.end('Dashboard HTML not found.');
-                } else {
-                    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-                    res.end(data);
-                }
-            });
-            return;
+        if (req.method === 'GET') {
+            let filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
+            if (req.url === '/dashboard.html') filePath = path.join(__dirname, 'public', 'index.html');
+
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes = {
+                '.html': 'text/html; charset=utf-8',
+                '.js': 'application/javascript; charset=utf-8',
+                '.css': 'text/css; charset=utf-8'
+            };
+
+            if (mimeTypes[ext]) {
+                fs.readFile(filePath, 'utf8', (err, data) => {
+                    if (err) {
+                        res.writeHead(404, { 'Content-Type': 'text/plain' });
+                        res.end('Not Found');
+                    } else {
+                        res.writeHead(200, { 'Content-Type': mimeTypes[ext] });
+                        res.end(data);
+                    }
+                });
+                return;
+            }
         }
 
         res.writeHead(404);

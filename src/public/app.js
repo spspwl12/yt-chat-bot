@@ -134,7 +134,8 @@ let ws;
                 case 'state':
                     if (payload.episodeInfo) {
                         const totalEp = payload.totalEpisodes || '--';
-                        document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}`;
+                        const aliasStr = payload.episodeAlias ? ` (${payload.episodeAlias})` : '';
+                        document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}${aliasStr}`;
                         document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
                     } else {
                         document.getElementById('stat-episode').innerText = '-- / --';
@@ -285,7 +286,7 @@ let ws;
 
                 // ── 새 기능 ──
                 case 'videoInfo_data':
-                    document.getElementById('val-videoinfo').value = payload;
+                    document.getElementById('val-videoinfo').value = payload.replace(/^\uFEFF/, '').trim();
                     break;
 
                 case 'saveVideoInfo_result':
@@ -840,7 +841,9 @@ let ws;
         };
 
         window.saveVideoInfo = function () {
-            const content = document.getElementById('val-videoinfo').value;
+            const raw = document.getElementById('val-videoinfo').value;
+            // BOM, \r, \uFEFF 제거 후 trim
+            const content = raw.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
             // 먼저 클라이언트에서 JSON 유효성 검사
             try {
                 JSON.parse(content);
@@ -853,7 +856,8 @@ let ws;
         window.formatVideoInfo = function () {
             const el = document.getElementById('val-videoinfo');
             try {
-                const obj = JSON.parse(el.value);
+                const raw = el.value.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+                const obj = JSON.parse(raw);
                 el.value = JSON.stringify(obj, null, 2);
                 showToast('JSON 포맷 완료');
             } catch (e) {
