@@ -191,6 +191,27 @@
                     </table>
                 </div>
             </div>
+
+            <h3 style="margin-top: 20px;">⚠️ segment_duration 위반 로그</h3>
+            <div class="log-container glass">
+                <div class="log-scroll" id="violation-log-scroll" style="max-height: 250px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>File</th>
+                                <th>DB Timestamp</th>
+                                <th>Current Time (now)</th>
+                                <th>Difference (s)</th>
+                                <th>Reason</th>
+                                <th>Match Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="violation-log-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- Command Logs -->

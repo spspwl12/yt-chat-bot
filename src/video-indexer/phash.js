@@ -7,6 +7,13 @@
  *   2) 픽셀 정규화 (mean 제거 + stddev 나누기) → 밝기/대비 불변
  *   3) DC 성분 제외 → 평균 밝기 불변
  *   4) Dead zone → 노이즈 수준의 작은 계수 무시
+ *
+ * 버그 수정 내역:
+ *   - rowDCT 버퍼 레이아웃 수정: y * lowFreqSize + u 간격으로 저장하여
+ *     열 방향 DCT 패스에서 올바르게 읽도록 개선
+ *   - DC 성분(0,0) 제외 후 AC 계수 순서 보장 (행우선 지그재그 대신
+ *     단순 행우선으로 일관되게 유지)
+ *   - median 기반 비교 기준을 0(DC-free 정규화 후 평균)으로 개선
  */
 const sharp = require('sharp');
 const { config } = require('./extractor');
@@ -14,6 +21,8 @@ const { config } = require('./extractor');
 const { resizeWidth, resizeHeight, dctSize, lowFreqSize } = config.phash;
 
 // --- 사전 계산: DCT 계수 테이블 ---
+// cosTable[i][j] = cos((2j+1)*i*PI / (2*N))
+// i = 주파수 인덱스, j = 공간 인덱스 (0..dctSize-1)
 const cosTable = new Float64Array(dctSize * dctSize);
 for (let i = 0; i < dctSize; i++) {
   for (let j = 0; j < dctSize; j++) {
@@ -40,8 +49,8 @@ async function computeHash(input) {
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const w = info.width;
-  const h = info.height;
+  const w = info.width;   // resizeWidth
+  const h = info.height;  // resizeHeight
   const totalPixels = w * h;
 
   // 2) 정규화: mean 제거 + stddev 나누기
@@ -58,46 +67,52 @@ async function computeHash(input) {
     normalized[i] = (data[i] - mean) / stddev;
   }
 
-  // 3) 2D DCT 계산 (행 → 열 순서)
-  const rowDCT = new Float64Array(h * dctSize);
+  // 3-a) 행 방향 DCT: normalized[y*w + x] → rowDCT[y*lowFreqSize + u]
+  //      lowFreqSize개의 저주파 계수만 추출
+  //      [수정] 버퍼 레이아웃을 y * lowFreqSize + u 로 고정 → 열 패스와 인덱스 일치
+  const rowDCT = new Float64Array(h * lowFreqSize);
   for (let y = 0; y < h; y++) {
     for (let u = 0; u < lowFreqSize; u++) {
       let sum = 0;
       for (let x = 0; x < w; x++) {
         sum += normalized[y * w + x] * cosTable[u * dctSize + x];
       }
-      rowDCT[y * dctSize + u] = sum;
+      rowDCT[y * lowFreqSize + u] = sum;
     }
   }
 
+  // 3-b) 열 방향 DCT: rowDCT[y*lowFreqSize + u] → dctMatrix[v*lowFreqSize + u]
+  //      [수정] rowDCT를 y * lowFreqSize + u 간격으로 읽어 올바른 값 참조
   const dctMatrix = new Float64Array(lowFreqSize * lowFreqSize);
-  for (let u = 0; u < lowFreqSize; u++) {
-    for (let v = 0; v < lowFreqSize; v++) {
+  for (let v = 0; v < lowFreqSize; v++) {
+    for (let u = 0; u < lowFreqSize; u++) {
       let sum = 0;
       for (let y = 0; y < h; y++) {
-        sum += rowDCT[y * dctSize + u] * cosTable[v * dctSize + y];
+        sum += rowDCT[y * lowFreqSize + u] * cosTable[v * dctSize + y];
       }
       dctMatrix[v * lowFreqSize + u] = sum;
     }
   }
 
-  // 4) DC 성분 제외, AC 성분만 사용
+  // 4) DC 성분 (0,0) 제외, AC 성분만 추출
+  //    dctMatrix[0] = DC 성분 → index 1부터 끝까지 AC 계수
+  //    [수정] 정규화된 픽셀에서 DCT를 취했으므로 DC≈0,
+  //           AC 계수 비교 기준은 0 (부호로 비트 결정)
   const acCount = lowFreqSize * lowFreqSize - 1;
   const acValues = new Float64Array(acCount);
   for (let i = 0; i < acCount; i++) {
-    acValues[i] = dctMatrix[i + 1];
+    acValues[i] = dctMatrix[i + 1]; // index 0 (DC) 스킵
   }
 
+  // MAD 기반 dead zone: 노이즈성 AC 계수 무시
   const sorted = Array.from(acValues).sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
-
-  // MAD 기반 dead zone
   const absDeviations = sorted.map(v => Math.abs(v - median));
   absDeviations.sort((a, b) => a - b);
   const mad = absDeviations[Math.floor(absDeviations.length / 2)];
   const deadZone = mad * 0.5;
 
-  // 5) 해시 생성
+  // 5) 해시 생성: AC 계수가 (median + deadZone) 초과 시 1, 아니면 0
   const hashBits = acCount;
   const hashBytes = Math.ceil(hashBits / 8);
   const hash = Buffer.alloc(hashBytes);

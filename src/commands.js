@@ -5,8 +5,13 @@ const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
 const schCfg = require('../data/config-search.js');
-const subtitles = require('../data/video-sub.json');
-const musics = require('../data/video-music.json');
+let subtitles = {};
+try { subtitles = require('../data/video-sub.json'); }
+catch (e) { console.warn('⚠️ [경고] video-sub.json 로드 실패 - 대사 검색 기능 제한됨'); }
+
+let musics = {};
+try { musics = require('../data/video-music.json'); }
+catch (e) { console.warn('⚠️ [경고] video-music.json 파일이 없습니다. 음악 검색 기능이 비활성화됩니다.'); }
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
 const { sendChat } = require('./innertube.js');
@@ -14,9 +19,11 @@ const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
     toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate } = require('./func.js');
 
 const profanitySet = require('../data/profanity-list.js');
-const eventBus = require('./event-bus.js');
 const videoInfo = search_lib.videoInfo;
-const videoMetadata = require('../data/video-metadata.json');
+let videoMetadata = [];
+try { videoMetadata = require('../data/video-metadata.json'); }
+catch (e) { console.warn('⚠️ [경고] video-metadata.json 파일이 없습니다. 방송 메타데이터 관련 기능이 비활성화됩니다.'); }
+
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const searcher = new TextSearchEngine(subtitles);
 const musicSearcher = new TextSearchEngine(musics);
@@ -24,6 +31,15 @@ const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
 // ─── 설정 로드 (data/config-youtube.json) ─────────────────────
 const cfg = require('../data/config-youtube.js');
+
+// ─── JSON 파일 누락 시 연관 기능 강제 비활성화 ───
+if (Object.keys(subtitles).length === 0 && cfg.input) {
+    cfg.input.enable_search = false;
+}
+if (Object.keys(musics).length === 0 && cfg.music) {
+    cfg.music.enable = false;
+}
+
 // ──────────────────────────────────────────────────────────
 
 let delayChatTime = 0;                 // global 모드용

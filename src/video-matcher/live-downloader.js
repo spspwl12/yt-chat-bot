@@ -62,7 +62,7 @@ class LiveDownloader extends EventEmitter {
         if (!this._running) return;
 
         const segmentDir = this._getSegmentDir();
-        const duration = this._syncCfg.segment_duration || 20;
+        const duration = this._syncCfg.segment_duration_max || 20;
         const segmentPattern = path.join(segmentDir, 'live_segment_%06d.mp4');
 
         // seg 폴더 생성 (없으면)

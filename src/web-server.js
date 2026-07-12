@@ -35,8 +35,10 @@ function saveMuteState() {
 // ═══════════════════════════════════════
 const MAX_SEARCH_LOGS = 200;
 const MAX_COMMAND_LOGS = 300;
+const MAX_VIOLATION_LOGS = 100;
 const searchLogs = [];
 const commandLogs = [];
+const violationLogs = [];
 
 // 이벤트 버스 리스너
 eventBus.on('search_result', (data) => {
@@ -44,6 +46,13 @@ eventBus.on('search_result', (data) => {
     searchLogs.push(entry);
     while (searchLogs.length > MAX_SEARCH_LOGS) searchLogs.shift();
     broadcastMsg({ action: 'search_push', payload: entry });
+});
+
+eventBus.on('segment_violation', (data) => {
+    const entry = { time: Date.now(), ...data };
+    violationLogs.push(entry);
+    while (violationLogs.length > MAX_VIOLATION_LOGS) violationLogs.shift();
+    broadcastMsg({ action: 'violation_push', payload: entry });
 });
 
 eventBus.on('command_used', (data) => {
@@ -402,6 +411,7 @@ async function handleAction(client, req) {
     // ── 새 기능: 검색 로그 ──
     else if (action === 'getSearchLogs') {
         sendWSFrame(client, JSON.stringify({ action: 'search_logs', payload: searchLogs }));
+        sendWSFrame(client, JSON.stringify({ action: 'violation_logs', payload: violationLogs }));
     }
     // ── 새 기능: 명령어 로그 ──
     else if (action === 'getCommandLogs') {

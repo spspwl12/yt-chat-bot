@@ -11,7 +11,7 @@ module.exports = {
         path: "../data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로
         segmentDir: "../data/seg",                                   // 세그먼트 파일 저장 디렉토리
         lastquery_path: "../data/lastquery.json",                   // 가장 최근의 영상/에피소드 정보를 저장하는 파일
-        youtube_url: "https://www.youtube.com/watch?v=4fa2e2bF0nI", // 트래킹할 유튜브 라이브 채널 주소
+        youtube_url: "https://www.youtube.com/watch?v=l1ivJtlM7gE", // 트래킹할 유튜브 라이브 채널 주소
         commandLine: [                                              // 검색 엔진(searcher.exe)에 전달할 인자 배열
             "../data/video-fingerprints.json",                         // DB파일 경로
             "30",                                                     // 처리시간(초) 등
@@ -25,10 +25,10 @@ module.exports = {
         height: 64,      // 지문 추출용 썸네일 높이
         crop: {
             enabled: true, // 크롭 활성화 여부 (방송 로고 등을 제외하고 화면만 분석할 때 사용)
-            x: 215,        // 크롭 시작 X 좌표
-            y: 0,          // 크롭 시작 Y 좌표
-            w: 1490,       // 크롭 너비
-            h: 1080        // 크롭 높이
+            x: 256,        // 크롭 시작 X 좌표
+            y: 6,          // 크롭 시작 Y 좌표
+            w: 1415,       // 크롭 너비
+            h: 1069        // 크롭 높이
         }
     },
     phash: {
@@ -40,7 +40,7 @@ module.exports = {
     },
     matching: {
         hammingThreshold: 30, // 이미지 일치 판단을 위한 해밍 거리 최소 기준값 (낮을수록 더 똑같아야 일치로 판정)
-        topN: 5,              // 일치하는 결과의 최대 반환 개수
+        topN: 10,              // 일치하는 결과의 최대 반환 개수
         earlyExit: true       // 일치 조건 충족 시 완전 검색 없이 즉시 종료 활성화 여부
     }
 };

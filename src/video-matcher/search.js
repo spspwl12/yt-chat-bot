@@ -276,14 +276,27 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
     if (cmp && jsonResult.matches.length > 1) {
         let adoptedMatch = null;
 
-        // 1. 현재 회차와 일치하며, 시차가 20초 이내인 결과가 있다면 매칭율 복잡한 계산 없이 우선 즉시 채택
+        // 1. 현재 회차와 일치하며, 시차가 segment_duration 범위 내인 결과가 있다면 매칭율 복잡한 계산 없이 우선 즉시 채택
         for (const match of jsonResult.matches) {
             const matchIdx = indexMap[match.filename];
             if (matchIdx === cmp.index) {
                 const diffNow = Math.abs(match.dbTimestamp - cmp.now);
-                if (diffNow <= config.sync.segment_duration) {
+                if (diffNow >= config.sync.segment_duration_min && diffNow <= config.sync.segment_duration_max) {
                     adoptedMatch = match;
                     break;
+                } else {
+                    const reason = diffNow < config.sync.segment_duration_min 
+                        ? 'MIN_VIOLATION'
+                        : 'MAX_VIOLATION';
+
+                    eventBus.emit('segment_violation', {
+                        filename: match.filename,
+                        dbTimestamp: match.dbTimestamp,
+                        cmpNow: cmp.now,
+                        diffNow: diffNow,
+                        matchCount: match.matchCount,
+                        reason: reason
+                    });
                 }
             }
         }

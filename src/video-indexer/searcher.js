@@ -7,6 +7,14 @@
  *   3) Worker thread 병렬 검색 (CPU 코어 수만큼)
  *   4) Early exit: 완벽 매치(distance=0) 발견 시 즉시 종료
  *
+ * 수정 내역:
+ *   - matchCount 중복 카운팅 버그 수정:
+ *     각 클립 프레임에 대해 threshold 이하인 DB 프레임이 존재하는지 여부(0/1)만 카운트
+ *     → "클립 프레임 중 몇 %가 이 영상에서 매칭됐는가" (실제 커버리지)
+ *   - argThreshold/argTopN 0 입력 시 무시되던 || 연산자를 ?? 로 교체
+ *   - bestDistance 초기값을 hashBits+1 로 일반화 (256 하드코딩 제거)
+ *   - searchWithWorkers 에러 발생 시 로그만 남기고 결과 누락되는 문제 명확화
+ *
  * 사용법:
  *   node src/searcher.js <클립_파일> [--config config.json] [--threshold 30] [--top 5]
  */
@@ -49,14 +57,18 @@ function formatTime(seconds) {
 }
 
 // --- 단일 스레드 고속 검색 (소규모 DB용) ---
-function searchSingleThread(clipBufs, db, threshold, hashByteLen) {
+function searchSingleThread(clipBufs, db, threshold, hashByteLen, hashBits) {
     const matches = [];
+    // bestDistance 초기값: 실제 최댓값(hashBits)보다 1 큰 값으로 일반화
+    const INITIAL_BEST = hashBits + 1;
 
     for (let vi = 0; vi < db.videos.length; vi++) {
         const video = db.videos[vi];
-        let bestDistance = 256;
+        let bestDistance = INITIAL_BEST;
         let bestTimestamp = 0;
         let bestFrameIdx = 0;
+        // [수정] matchCount: 클립 프레임 단위로 "최소 1개 DB 프레임과 매칭됐는가" 를 카운트
+        //        (같은 DB 프레임에 여러 클립 프레임이 매칭돼도 중복 안 됨)
         let matchCount = 0;
 
         const hashes = video.hashes;
@@ -64,6 +76,7 @@ function searchSingleThread(clipBufs, db, threshold, hashByteLen) {
 
         for (let ci = 0; ci < clipBufs.length; ci++) {
             const clipBuf = clipBufs[ci];
+            let clipMatched = false; // 이 클립 프레임이 이 영상에서 매칭됐는가
 
             for (let di = 0; di < hashCount; di++) {
                 // 인라인 hamming: 함수 호출 오버헤드 제거
@@ -74,7 +87,7 @@ function searchSingleThread(clipBufs, db, threshold, hashByteLen) {
                 }
 
                 if (dist <= threshold) {
-                    matchCount++;
+                    clipMatched = true;
                     if (dist < bestDistance) {
                         bestDistance = dist;
                         bestTimestamp = hashes[di].timestamp;
@@ -82,6 +95,8 @@ function searchSingleThread(clipBufs, db, threshold, hashByteLen) {
                     }
                 }
             }
+
+            if (clipMatched) matchCount++;
         }
 
         if (matchCount > 0) {
@@ -99,7 +114,7 @@ function searchSingleThread(clipBufs, db, threshold, hashByteLen) {
 }
 
 // --- 워커 스레드 병렬 검색 (대규모 DB용) ---
-function searchWithWorkers(clipHashHexes, db, threshold, hashByteLen, workerCount) {
+function searchWithWorkers(clipHashHexes, db, threshold, hashByteLen, hashBits, workerCount) {
     return new Promise((resolve, reject) => {
         // 영상을 워커에 균등 배분
         const chunks = [];
@@ -118,6 +133,7 @@ function searchWithWorkers(clipHashHexes, db, threshold, hashByteLen, workerCoun
 
         const allResults = [];
         let completed = 0;
+        let hasRejected = false;
 
         for (let w = 0; w < chunks.length; w++) {
             const worker = new Worker(path.join(__dirname, 'search-worker.js'), {
@@ -125,7 +141,8 @@ function searchWithWorkers(clipHashHexes, db, threshold, hashByteLen, workerCoun
                     clipHashBuffers: clipHashHexes,
                     videoChunks: chunks[w],
                     threshold,
-                    hashByteLen
+                    hashByteLen,
+                    hashBits
                 }
             });
 
@@ -138,7 +155,7 @@ function searchWithWorkers(clipHashHexes, db, threshold, hashByteLen, workerCoun
             });
 
             worker.on('error', (err) => {
-                console.error(`  ⚠ Worker ${w} 오류:`, err.message);
+                console.error(`  ⚠ Worker ${w} 오류 (해당 청크 ${chunks[w].length}개 영상 결과 누락):`, err.message);
                 completed++;
                 if (completed === chunks.length) {
                     resolve(allResults);
@@ -177,7 +194,8 @@ async function main() {
     const totalHashes = db.videos.reduce((sum, v) => sum + v.frameCount, 0);
 
     // ★ 핵심 최적화: hex → Buffer 사전 변환 (검색 시 재할당 0)
-    const hashByteLen = Math.ceil((config.phash.lowFreqSize * config.phash.lowFreqSize - 1) / 8);
+    const hashBits = config.phash.lowFreqSize * config.phash.lowFreqSize - 1;
+    const hashByteLen = Math.ceil(hashBits / 8);
     for (const video of db.videos) {
         for (const h of video.hashes) {
             h._buf = Buffer.from(h.hash, 'hex');
@@ -207,9 +225,9 @@ async function main() {
     console.log(`   계산된 해시: ${clipHashes.length}개\n`);
 
     // --- 검색 ---
-    const hammingThreshold = argThreshold || config.matching.hammingThreshold;
-    const topN = argTopN || config.matching.topN;
-    const hashBits = config.phash.lowFreqSize * config.phash.lowFreqSize - 1;
+    // [수정] || 대신 ?? 사용 — 0을 명시적으로 입력해도 무시되지 않음
+    const hammingThreshold = argThreshold ?? config.matching.hammingThreshold;
+    const topN = argTopN ?? config.matching.topN;
     const totalComparisons = clipHashes.length * totalHashes;
     const workerCount = config.performance.workerCount || os.cpus().length;
 
@@ -221,10 +239,10 @@ async function main() {
     // DB 해시 50만 이상이면 워커 스레드 사용, 아니면 단일 스레드 (오버헤드 방지)
     if (totalHashes > 500000 && workerCount > 1) {
         console.log(`   ⚡ 멀티스레드 검색 (${workerCount} workers)...`);
-        rawMatches = await searchWithWorkers(clipHashes, db, hammingThreshold, hashByteLen, workerCount);
+        rawMatches = await searchWithWorkers(clipHashes, db, hammingThreshold, hashByteLen, hashBits, workerCount);
     } else {
         console.log(`   ⚡ 단일스레드 고속 검색...`);
-        rawMatches = searchSingleThread(clipBufs, db, hammingThreshold, hashByteLen);
+        rawMatches = searchSingleThread(clipBufs, db, hammingThreshold, hashByteLen, hashBits);
     }
 
     const searchTime = ((Date.now() - startSearch) / 1000).toFixed(2);

@@ -302,6 +302,14 @@ let ws;
                     appendSearchLog(payload);
                     break;
 
+                case 'violation_logs':
+                    renderViolationLogs(payload);
+                    break;
+
+                case 'violation_push':
+                    appendViolationLog(payload);
+                    break;
+
                 case 'command_logs':
                     renderCommandLogs(payload);
                     break;
@@ -637,11 +645,44 @@ let ws;
             const tbody = document.getElementById('search-log-tbody');
             tbody.insertBefore(createSearchLogRow(data), tbody.firstChild);
             searchLogCount++;
-            // 200개 초과 시 오래된 행 제거
-            while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
-        }
+        // 200개 초과 시 오래된 행 제거
+        while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+    }
 
-        // ── Command Log Render ──
+    function createViolationLogRow(d) {
+        const tr = document.createElement('tr');
+        
+        let reasonText = d.reason || '--';
+        if (d.reason === 'MIN_VIOLATION') reasonText = '최소 길이 미달 (너무 짧음)';
+        else if (d.reason === 'MAX_VIOLATION') reasonText = '최대 길이 초과 (너무 김)';
+
+        tr.innerHTML = `
+            <td>${fmtTime(d.time)}</td>
+            <td style="font-weight:600; color:#f87171;">${d.filename || '--'}</td>
+            <td>${d.dbTimestamp != null ? d.dbTimestamp.toFixed(1) : '--'}s</td>
+            <td>${d.cmpNow != null ? d.cmpNow.toFixed(1) : '--'}s</td>
+            <td style="color:var(--danger);">${d.diffNow != null ? d.diffNow.toFixed(1) : '--'}s</td>
+            <td style="color:var(--text-dim); font-size: 0.85em;">${reasonText}</td>
+            <td>${d.matchCount != null ? d.matchCount : '--'}</td>
+        `;
+        return tr;
+    }
+
+    function renderViolationLogs(logs) {
+        const tbody = document.getElementById('violation-log-tbody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        logs.forEach(d => tbody.insertBefore(createViolationLogRow(d), tbody.firstChild));
+    }
+
+    function appendViolationLog(data) {
+        const tbody = document.getElementById('violation-log-tbody');
+        if(!tbody) return;
+        tbody.insertBefore(createViolationLogRow(data), tbody.firstChild);
+        while (tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+    }
+
+    // ── Command Log Render ──
         function groupBadge(g) {
             const map = {
                 'greeting': 'badge-green', 'help': 'badge-blue', 'episode': 'badge-purple',
@@ -979,36 +1020,70 @@ let ws;
 
         function saveVideoMatchingConfig() {
             if (!window._currentSearchConfig) return;
-            const cfg = window._currentSearchConfig;
+            let text = document.getElementById('val-search').value;
 
+            function updateKey(key, value, isString = false) {
+                // (?<![A-Za-z0-9_]) 로 앞 word boundary, (?![A-Za-z0-9_]) 로 뒤 word boundary
+                // 값은 문자열("...") 또는 숫자/불리언 단일값만 교체 (배열 [ 로 시작하면 절대 건드리지 않음)
+                const regex = new RegExp(
+                    '(?<![A-Za-z0-9_])(' + key + '\\s*:\\s*)("[^"]*"|true|false|-?[0-9]+(?:\\.[0-9]+)?)',
+                    'g'
+                );
+                text = text.replace(regex, (match, p1) => {
+                    return p1 + (isString ? '"' + value + '"' : value);
+                });
+            }
+
+            updateKey('youtube_url', document.getElementById('vm-search-url').value.trim(), true);
+            updateKey('x', parseInt(document.getElementById('vm-crop-x').value) || 0);
+            updateKey('y', parseInt(document.getElementById('vm-crop-y').value) || 0);
+            updateKey('w', parseInt(document.getElementById('vm-crop-w').value) || 0);
+            updateKey('h', parseInt(document.getElementById('vm-crop-h').value) || 0);
+            updateKey('enabled', document.getElementById('vm-crop-enabled').checked);
+
+            updateKey('fps', parseInt(document.getElementById('vm-ext-fps').value) || 2);
+            updateKey('width', parseInt(document.getElementById('vm-ext-w').value) || 64);
+            updateKey('height', parseInt(document.getElementById('vm-ext-h').value) || 64);
+
+            updateKey('resizeWidth', parseInt(document.getElementById('vm-ph-rw').value) || 64);
+            updateKey('resizeHeight', parseInt(document.getElementById('vm-ph-rh').value) || 64);
+            updateKey('dctSize', parseInt(document.getElementById('vm-ph-dct').value) || 64);
+            updateKey('lowFreqSize', parseInt(document.getElementById('vm-ph-low').value) || 16);
+            
+            const lowFreqSize = parseInt(document.getElementById('vm-ph-low').value) || 16;
+            const hashBits = parseInt(document.getElementById('vm-ph-bits').value) || (lowFreqSize * lowFreqSize - 1);
+            updateKey('hashBits', hashBits);
+
+            updateKey('hammingThreshold', parseInt(document.getElementById('vm-match-th').value) || 30);
+            updateKey('topN', parseInt(document.getElementById('vm-match-topn').value) || 5);
+            updateKey('earlyExit', document.getElementById('vm-match-early').checked);
+
+            // 메모리 내 객체도 업데이트
+            const cfg = window._currentSearchConfig;
             cfg.extraction.crop.x = parseInt(document.getElementById('vm-crop-x').value) || 0;
             cfg.extraction.crop.y = parseInt(document.getElementById('vm-crop-y').value) || 0;
             cfg.extraction.crop.w = parseInt(document.getElementById('vm-crop-w').value) || 0;
             cfg.extraction.crop.h = parseInt(document.getElementById('vm-crop-h').value) || 0;
             cfg.extraction.crop.enabled = document.getElementById('vm-crop-enabled').checked;
-
             cfg.extraction.fps = parseInt(document.getElementById('vm-ext-fps').value) || 2;
             cfg.extraction.width = parseInt(document.getElementById('vm-ext-w').value) || 64;
             cfg.extraction.height = parseInt(document.getElementById('vm-ext-h').value) || 64;
-
             if (!cfg.phash) cfg.phash = {};
             cfg.phash.resizeWidth = parseInt(document.getElementById('vm-ph-rw').value) || 64;
             cfg.phash.resizeHeight = parseInt(document.getElementById('vm-ph-rh').value) || 64;
             cfg.phash.dctSize = parseInt(document.getElementById('vm-ph-dct').value) || 64;
-            cfg.phash.lowFreqSize = parseInt(document.getElementById('vm-ph-low').value) || 16;
-            cfg.phash.hashBits = parseInt(document.getElementById('vm-ph-bits').value) || (cfg.phash.lowFreqSize * cfg.phash.lowFreqSize - 1);
-
+            cfg.phash.lowFreqSize = lowFreqSize;
+            cfg.phash.hashBits = hashBits;
             if (!cfg.matching) cfg.matching = {};
             cfg.matching.hammingThreshold = parseInt(document.getElementById('vm-match-th').value) || 30;
             cfg.matching.topN = parseInt(document.getElementById('vm-match-topn').value) || 5;
             cfg.matching.earlyExit = document.getElementById('vm-match-early').checked;
-
             if (!cfg.searcher) cfg.searcher = {};
             cfg.searcher.youtube_url = document.getElementById('vm-search-url').value.trim();
 
-            const content = 'module.exports = ' + JSON.stringify(cfg, null, 4) + ';';
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: content } }));
+                document.getElementById('val-search').value = text;
+                ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: text } }));
             }
         }
 

@@ -543,18 +543,20 @@ function initCropEvents() {
         magCtx.fillStyle = '#000';
         magCtx.fillRect(0, 0, 120, 120);
 
-        const zoom = 2;
-        const dx = 60 - x * zoom;
-        const dy = 60 - y * zoom;
-        const dWidth = rect.width * zoom;
-        const dHeight = rect.height * zoom;
+        // 원본 해상도 대비 스케일 계산
+        const scaleX = video.videoWidth / rect.width;
+        const scaleY = video.videoHeight / rect.height;
+
+        const srcX = x * scaleX;
+        const srcY = y * scaleY;
 
         // 영상 픽셀 렌더링
         try {
             magCtx.filter = video.style.filter || 'none';
             magCtx.drawImage(
                 video,
-                dx, dy, dWidth, dHeight
+                srcX - 30, srcY - 30, 60, 60,
+                0, 0, 120, 120
             );
             magCtx.filter = 'none';
         } catch (err) {

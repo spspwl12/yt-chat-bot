@@ -8,3 +8,4 @@ data/bot-mute.json
 data/lastquery.json
 *.mp4
 /misc
+/data

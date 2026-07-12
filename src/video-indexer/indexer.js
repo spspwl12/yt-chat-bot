@@ -153,10 +153,16 @@ async function main() {
             // 유효한 해시만 필터링
             const hashes = hashResults
                 .filter(r => r.hash !== null)
-                .map(r => ({
-                    timestamp: (parseInt(path.basename(r.path).match(/(\d+)/)[1]) - 1) / config.extraction.fps,
-                    hash: r.hash
-                }))
+                .map(r => {
+                    // 파일명에서 프레임 번호 추출 (frame_000001.png → 1)
+                    const frameNum = parseInt(path.basename(r.path).match(/(\d+)/)[1]);
+                    const frameIndex = frameNum - 1; // 0-based
+                    return {
+                        frameIndex,
+                        timestamp: frameIndex / config.extraction.fps,
+                        hash: r.hash
+                    };
+                })
                 .sort((a, b) => a.frameIndex - b.frameIndex);
 
             console.log(`  🔑 해시 계산: ${hashes.length}개 (${hashTime}s)`);
