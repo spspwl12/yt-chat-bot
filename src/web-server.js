@@ -3,9 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+
 const chatHistory = require('./chat-history.js');
 const { banUser, blockUser } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
+const { extractLatestSegmentFrame } = require('./video-matcher/live-downloader.js');
 const cfgYoutube = require('../data/config-youtube.js');
 const eventBus = require('./event-bus.js');
 const commandsLib = require('./commands.js');
@@ -353,6 +355,10 @@ async function handleAction(client, req) {
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: false, error: e.message } }));
         }
+    }
+    else if (action === 'getLiveFrame') {
+        const result = await extractLatestSegmentFrame();
+        sendWSFrame(client, JSON.stringify({ action: 'liveFrame_result', payload: result }));
     }
     // ── 새 기능: video-info.json 편집 ──
     else if (action === 'getVideoInfo') {

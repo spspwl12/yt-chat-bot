@@ -84,15 +84,23 @@ class LiveDownloader extends EventEmitter {
             this._config.searcher.youtube_url
         ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-        // ── ffmpeg: stdin에서 읽어 20초 단위 세그먼트 파일 생성 ──
+        // ── ffmpeg: stdin에서 읽어 20초 단위 세그먼트 파일 생성 & 2초마다 썸네일 업데이트 ──
+        const tempPreview = path.resolve(__dirname, '../../data/temp_preview.jpg');
         this._ffmpeg = spawn(this._config.ffmpeg.ffmpegPath, [
             '-y',
             '-i', 'pipe:0',
+            // 첫 번째 출력: 세그먼트 파일 (스트림 복사)
+            '-map', '0',
             '-c', 'copy',
             '-f', 'segment',
             '-segment_time', String(duration),
             '-reset_timestamps', '1',
-            segmentPattern
+            segmentPattern,
+            // 두 번째 출력: 실시간 썸네일 지속 갱신 (요청 시 즉시 제공되도록 마련)
+            '-map', '0:v',
+            '-vf', 'fps=1/2',
+            '-update', '1',
+            tempPreview
         ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
         // ── 파이프 연결: yt-dlp stdout → ffmpeg stdin ──
@@ -303,3 +311,25 @@ class LiveDownloader extends EventEmitter {
 }
 
 module.exports = LiveDownloader;
+
+/**
+ * 라이브 세그먼트에서 최신 완성 프레임을 JPEG base64로 추출
+ * (LiveDownloader가 실시간으로 temp_preview.jpg를 갱신해 두므로 바로 읽기만 함)
+ * @returns {Promise<{ success: boolean, image?: string, source?: string, error?: string }>}
+ */
+async function extractLatestSegmentFrame() {
+    const tempOut = path.resolve(__dirname, '../../data/temp_preview.jpg');
+
+    if (fs.existsSync(tempOut)) {
+        try {
+            const base64 = fs.readFileSync(tempOut).toString('base64');
+            return { success: true, image: 'data:image/jpeg;base64,' + base64, source: 'live_thumbnail' };
+        } catch (err) {
+            return { success: false, error: '프레임 읽기 실패: ' + err.message };
+        }
+    }
+
+    return { success: false, error: '준비된 썸네일이 없습니다. (방송 다운로드 대기 중)' };
+}
+
+module.exports.extractLatestSegmentFrame = extractLatestSegmentFrame;
