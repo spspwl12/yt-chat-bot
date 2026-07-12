@@ -46,7 +46,9 @@
 }
 
 /* --- Reset & Base --- */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -295,11 +297,11 @@ body::after {
     transition: all var(--transition);
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
     background: var(--accent-solid);
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
+.toggle-switch input:checked+.toggle-slider::before {
     transform: translateX(20px);
     background: white;
 }
@@ -420,7 +422,7 @@ body::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
     opacity: 0;
     transition: opacity var(--transition);
 }
@@ -500,18 +502,21 @@ body::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.3),
-        transparent
-    );
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.3),
+            transparent);
     animation: shimmer 2s infinite;
 }
 
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 /* --- Log Output --- */
@@ -611,6 +616,7 @@ body::after {
         opacity: 0;
         transform: translateY(12px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -621,10 +627,21 @@ body::after {
     animation: fadeInUp 0.4s ease forwards;
 }
 
-.card:nth-child(2) { animation-delay: 0.05s; }
-.card:nth-child(3) { animation-delay: 0.1s; }
-.card:nth-child(4) { animation-delay: 0.15s; }
-.card:nth-child(5) { animation-delay: 0.2s; }
+.card:nth-child(2) {
+    animation-delay: 0.05s;
+}
+
+.card:nth-child(3) {
+    animation-delay: 0.1s;
+}
+
+.card:nth-child(4) {
+    animation-delay: 0.15s;
+}
+
+.card:nth-child(5) {
+    animation-delay: 0.2s;
+}
 
 /* --- Custom Browser Modal --- */
 .modal-overlay {

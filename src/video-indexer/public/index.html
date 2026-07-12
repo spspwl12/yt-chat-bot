@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <meta name="description" content="Node.js 기반 비디오 핑거프린트 인덱서 웹 컨트롤러">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Header -->
@@ -131,7 +133,8 @@
         <section class="card" id="section-phash">
             <div class="card-title">
                 <span class="icon">🔑</span> pHash 알고리즘 정보
-                <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">읽기 전용</span>
+                <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">읽기
+                    전용</span>
             </div>
             <div class="info-grid">
                 <div class="info-badge">
@@ -162,7 +165,8 @@
             <button class="btn-start" id="btn-start" onclick="startIndexing()" style="flex: 1;">
                 🚀 인덱싱 시작
             </button>
-            <button class="btn-cancel" id="btn-stop" onclick="stopIndexing()" style="display: none; padding: 16px; font-weight: 600;">
+            <button class="btn-cancel" id="btn-stop" onclick="stopIndexing()"
+                style="display: none; padding: 16px; font-weight: 600;">
                 🛑 중지
             </button>
         </div>
@@ -212,15 +216,25 @@
                 <button class="btn-close" onclick="closeCropModal()">×</button>
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: flex; gap: 10px;">
-                    <select id="crop-video-select" style="flex: 1; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary);"></select>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="crop-video-select"
+                        style="flex: 1; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary);"></select>
                     <button class="btn-browse" onclick="loadCropVideo()">불러오기</button>
+                    <div
+                        style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 20px;">
+                        <span style="font-size: 0.8rem;">💡 밝기</span>
+                        <input type="range" id="crop-brightness" min="50" max="300" value="100" style="width: 100px;">
+                    </div>
                 </div>
-                <div class="video-container" id="video-container" style="text-align: center; background: #000; padding: 10px; border-radius: 6px;">
+                <div class="video-container" id="video-container"
+                    style="text-align: center; background: #000; padding: 10px; border-radius: 6px;">
                     <div id="video-wrapper" style="position: relative; display: inline-block;">
-                        <video id="crop-video" autoplay loop muted style="max-width: 100%; max-height: 50vh; display: block; cursor: crosshair;"></video>
-                        <div id="crop-overlay" class="crop-overlay"></div>
-                        <canvas id="crop-magnifier" width="120" height="120" style="display: none; position: absolute; border: 2px solid #00f0ff; border-radius: 50%; z-index: 100; pointer-events: none; box-shadow: 0 0 15px rgba(0,240,255,0.4);"></canvas>
+                        <video id="crop-video" autoplay loop muted
+                            style="max-width: 100%; max-height: 50vh; display: block; cursor: crosshair; user-select: none;"
+                            draggable="false"></video>
+                        <div id="crop-overlay" class="crop-overlay" style="pointer-events: none;"></div>
+                        <canvas id="crop-magnifier" width="120" height="120"
+                            style="display: none; position: absolute; border: 2px solid #00f0ff; border-radius: 50%; z-index: 100; pointer-events: none; box-shadow: 0 0 15px rgba(0,240,255,0.4);"></canvas>
                     </div>
                 </div>
                 <div class="form-grid four-col" style="margin-top: 10px;">
@@ -239,4 +253,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

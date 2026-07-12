@@ -25,7 +25,7 @@ function setDefaultPaths() {
 // --- 자동 저장 헬퍼 ---
 function debounce(func, wait) {
     let timeout;
-    return function(...args) {
+    return function (...args) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
@@ -46,7 +46,7 @@ const autoSaveConfig = debounce(async () => {
 
 document.addEventListener('DOMContentLoaded', async () => {
     setDefaultPaths();
-    
+
     // 서버에서 현재 설정값 로드
     try {
         const res = await fetch('/api/config');
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // SSE 연결
     connectSSE();
-    
+
     // 크롭 드래그 이벤트 바인딩
     initCropEvents();
 
@@ -187,7 +187,7 @@ function browseFolder(targetId) {
     currentBrowserTarget = targetId;
     const input = document.getElementById(targetId);
     let startPath = input.value.trim() || 'root';
-    
+
     document.getElementById('browser-modal').classList.add('active');
     loadDirectory(startPath);
 }
@@ -217,18 +217,18 @@ function selectCurrentFolder() {
 async function loadDirectory(targetPath) {
     const listEl = document.getElementById('browser-list');
     listEl.innerHTML = '<li class="browser-item">로딩 중...</li>';
-    
+
     try {
         const res = await fetch(`/api/list-dirs?path=${encodeURIComponent(targetPath)}`);
         const data = await res.json();
-        
+
         if (data.error) throw new Error(data.error);
-        
+
         currentBrowserPath = data.currentPath;
         document.getElementById('browser-current-path').textContent = currentBrowserPath;
-        
+
         listEl.innerHTML = '';
-        
+
         // 상위 폴더로 가기
         if (data.parentPath) {
             const li = document.createElement('li');
@@ -237,7 +237,7 @@ async function loadDirectory(targetPath) {
             li.onclick = () => loadDirectory(data.parentPath);
             listEl.appendChild(li);
         }
-        
+
         // 하위 폴더 목록
         if (data.dirs.length === 0) {
             const li = document.createElement('li');
@@ -251,8 +251,8 @@ async function loadDirectory(targetPath) {
                 li.className = 'browser-item';
                 li.innerHTML = `<span>📁</span> ${dir}`;
                 // 폴더 경로 결합 (간단히 슬래시 추가)
-                const nextPath = currentBrowserPath.endsWith('\\') || currentBrowserPath.endsWith('/') 
-                    ? currentBrowserPath + dir 
+                const nextPath = currentBrowserPath.endsWith('\\') || currentBrowserPath.endsWith('/')
+                    ? currentBrowserPath + dir
                     : currentBrowserPath + '\\' + dir;
                 li.onclick = () => loadDirectory(nextPath);
                 listEl.appendChild(li);
@@ -467,17 +467,17 @@ async function openCropModal() {
         alert('먼저 영상 디렉토리를 입력하거나 선택해주세요.');
         return;
     }
-    
+
     document.getElementById('crop-modal').classList.add('active');
-    
+
     const select = document.getElementById('crop-video-select');
     select.innerHTML = '<option>비디오 목록을 불러오는 중...</option>';
-    
+
     try {
         const res = await fetch(`/api/list-videos?path=${encodeURIComponent(videoDir)}`);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        
+
         select.innerHTML = '';
         if (data.videos.length === 0) {
             select.innerHTML = '<option value="">(해당 폴더에 지원되는 비디오 없음)</option>';
@@ -505,7 +505,7 @@ function loadCropVideo() {
     const select = document.getElementById('crop-video-select');
     const filePath = select.value;
     if (!filePath) return;
-    
+
     const video = document.getElementById('crop-video');
     video.src = `/api/video-stream?path=${encodeURIComponent(filePath)}`;
     video.load();
@@ -519,24 +519,23 @@ function initCropEvents() {
     const video = document.getElementById('crop-video');
     const magnifier = document.getElementById('crop-magnifier');
     const magCtx = magnifier.getContext('2d', { willReadFrequently: true });
-    
-    const SNAP_THRESHOLD = 15; // px (끝부분 자석 효과)
 
-    function snap(val, max) {
-        if (val < SNAP_THRESHOLD) return 0;
-        if (val > max - SNAP_THRESHOLD) return max;
-        return val;
+    const brightnessInput = document.getElementById('crop-brightness');
+    if (brightnessInput) {
+        brightnessInput.addEventListener('input', (e) => {
+            video.style.filter = `brightness(${e.target.value}%)`;
+        });
     }
 
     function updateMagnifier(x, y, rect) {
         magnifier.style.display = 'block';
-        
+
         // 돋보기 위치 (커서 우측 하단, 화면 넘어가면 좌측 상단으로)
         let magX = x + 20;
         let magY = y + 20;
         if (magX + 120 > rect.width) magX = x - 140;
         if (magY + 120 > rect.height) magY = y - 140;
-        
+
         magnifier.style.left = magX + 'px';
         magnifier.style.top = magY + 'px';
 
@@ -544,24 +543,20 @@ function initCropEvents() {
         magCtx.fillStyle = '#000';
         magCtx.fillRect(0, 0, 120, 120);
 
-        // 원본 해상도 대비 스케일 계산
-        const scaleX = video.videoWidth / rect.width;
-        const scaleY = video.videoHeight / rect.height;
-
-        const srcX = x * scaleX;
-        const srcY = y * scaleY;
-        
         const zoom = 2;
-        const srcW = 120 / zoom;
-        const srcH = 120 / zoom;
-        
+        const dx = 60 - x * zoom;
+        const dy = 60 - y * zoom;
+        const dWidth = rect.width * zoom;
+        const dHeight = rect.height * zoom;
+
         // 영상 픽셀 렌더링
         try {
+            magCtx.filter = video.style.filter || 'none';
             magCtx.drawImage(
                 video,
-                Math.max(0, srcX - srcW/2), Math.max(0, srcY - srcH/2), srcW, srcH,
-                0, 0, 120, 120
+                dx, dy, dWidth, dHeight
             );
+            magCtx.filter = 'none';
         } catch (err) {
             // CORS/Tainted canvas 에러 무시
         }
@@ -574,107 +569,96 @@ function initCropEvents() {
         magCtx.moveTo(0, 60); magCtx.lineTo(120, 60);
         magCtx.stroke();
     }
-    
-    // 마우스 호버 시 돋보기 보여주기
-    wrapper.addEventListener('mousemove', (e) => {
-        if (!video.videoWidth || isDragging) return;
-        const rect = video.getBoundingClientRect();
-        let hoverX = e.clientX - rect.left;
-        let hoverY = e.clientY - rect.top;
-        hoverX = snap(Math.max(0, Math.min(hoverX, rect.width)), rect.width);
-        hoverY = snap(Math.max(0, Math.min(hoverY, rect.height)), rect.height);
-        updateMagnifier(hoverX, hoverY, rect);
-    });
-    
-    wrapper.addEventListener('mouseleave', () => {
-        if (!isDragging) magnifier.style.display = 'none';
-    });
 
-    wrapper.addEventListener('mousedown', (e) => {
+    video.addEventListener('mousedown', (e) => {
         if (!video.videoWidth) return;
         isDragging = true;
-        
+        e.preventDefault();
+
         const rect = video.getBoundingClientRect();
-        let clickX = e.clientX - rect.left;
-        let clickY = e.clientY - rect.top;
-        
-        if(clickX < 0 || clickY < 0 || clickX > rect.width || clickY > rect.height) {
-            isDragging = false;
-            return;
-        }
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
 
-        // 스냅 적용
-        clickX = snap(clickX, rect.width);
-        clickY = snap(clickY, rect.height);
-
-        startX = clickX;
-        startY = clickY;
-        
         overlay.style.display = 'block';
         overlay.style.left = startX + 'px';
         overlay.style.top = startY + 'px';
         overlay.style.width = '0px';
         overlay.style.height = '0px';
-        
-        updateMagnifier(clickX, clickY, rect);
     });
-    
+
     window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
+        if (!video.videoWidth) return;
         const rect = video.getBoundingClientRect();
-        
-        let currentX = e.clientX - rect.left;
-        let currentY = e.clientY - rect.top;
-        
-        currentX = Math.max(0, Math.min(currentX, rect.width));
-        currentY = Math.max(0, Math.min(currentY, rect.height));
-        
-        // 스냅 적용
-        currentX = snap(currentX, rect.width);
-        currentY = snap(currentY, rect.height);
-        
-        const left = Math.min(startX, currentX);
-        const top = Math.min(startY, currentY);
-        const width = Math.abs(currentX - startX);
-        const height = Math.abs(currentY - startY);
-        
+
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+
+        const isHover = rawX >= 0 && rawX <= rect.width && rawY >= 0 && rawY <= rect.height;
+
+        if (isDragging || isHover) {
+            const mx = Math.max(0, Math.min(rawX, rect.width));
+            const my = Math.max(0, Math.min(rawY, rect.height));
+            updateMagnifier(mx, my, rect);
+        } else {
+            magnifier.style.display = 'none';
+        }
+
+        if (!isDragging) return;
+
+        let curX = rawX;
+        let curY = rawY;
+        if (curX < 0) curX = 0;
+        if (curX > rect.width) curX = rect.width;
+        if (curY < 0) curY = 0;
+        if (curY > rect.height) curY = rect.height;
+
+        const left = Math.min(startX, curX);
+        const top = Math.min(startY, curY);
+        const width = Math.abs(curX - startX);
+        const height = Math.abs(curY - startY);
+
         overlay.style.left = left + 'px';
         overlay.style.top = top + 'px';
         overlay.style.width = width + 'px';
         overlay.style.height = height + 'px';
-        
+
         const scaleX = video.videoWidth / rect.width;
         const scaleY = video.videoHeight / rect.height;
-        
+
         cropData = {
             x: Math.round(left * scaleX),
             y: Math.round(top * scaleY),
             w: Math.round(width * scaleX),
             h: Math.round(height * scaleY)
         };
-        
+
         document.getElementById('preview-cropX').value = cropData.x;
         document.getElementById('preview-cropY').value = cropData.y;
         document.getElementById('preview-cropW').value = cropData.w;
         document.getElementById('preview-cropH').value = cropData.h;
-
-        updateMagnifier(currentX, currentY, rect);
     });
-    
-    window.addEventListener('mouseup', () => {
+
+    window.addEventListener('mouseup', (e) => {
+        if (!isDragging) return;
         isDragging = false;
-        magnifier.style.display = 'none';
+
+        const rect = video.getBoundingClientRect();
+        const rawX = e.clientX - rect.left;
+        const rawY = e.clientY - rect.top;
+        if (rawX < 0 || rawX > rect.width || rawY < 0 || rawY > rect.height) {
+            magnifier.style.display = 'none';
+        }
     });
 }
 
 function applyCrop() {
     document.getElementById('toggle-crop').checked = true;
     document.getElementById('crop-fields').classList.add('visible');
-    
+
     document.getElementById('input-cropX').value = cropData.x || 0;
     document.getElementById('input-cropY').value = cropData.y || 0;
     document.getElementById('input-cropW').value = cropData.w || 0;
     document.getElementById('input-cropH').value = cropData.h || 0;
-    
+
     closeCropModal();
 }
