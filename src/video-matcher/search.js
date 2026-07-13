@@ -273,40 +273,51 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
     let mJson = jsonResult.matches[0];
 
     // ── 현재 회차 및 현재 시간 우선 채택 로직 ──
-    if (cmp && jsonResult.matches.length > 1) {
+    if (cmp) {
         let adoptedMatch = null;
 
         // 1. 현재 회차와 일치하며, 시차가 segment_duration 범위 내인 결과가 있다면 매칭율 복잡한 계산 없이 우선 즉시 채택
         for (const match of jsonResult.matches) {
             const matchIdx = indexMap[match.filename];
-            if (matchIdx === cmp.index) {
-                const diffNow = Math.abs(match.dbTimestamp - cmp.now);
-                if (diffNow >= config.sync.segment_duration_min && diffNow <= config.sync.segment_duration_max) {
-                    adoptedMatch = match;
-                    break;
-                } else {
-                    const reason = diffNow < config.sync.segment_duration_min 
-                        ? 'MIN_VIOLATION'
-                        : 'MAX_VIOLATION';
 
-                    eventBus.emit('segment_violation', {
-                        filename: match.filename,
-                        dbTimestamp: match.dbTimestamp,
-                        cmpNow: cmp.now,
-                        diffNow: diffNow,
-                        matchCount: match.matchCount,
-                        reason: reason
-                    });
-                }
+            if (matchIdx !== cmp.index) {
+                // 회차가 다른 경우 → EPISODE_MISMATCH violation
+                eventBus.emit('segment_violation', {
+                    filename: match.filename,
+                    dbTimestamp: match.dbTimestamp,
+                    cmpNow: cmp.now,
+                    diffNow: null,
+                    matchCount: match.matchCount,
+                    reason: 'EPISODE_MISMATCH',
+                    cmpIndex: cmp.index,
+                    matchIndex: matchIdx
+                });
+                continue;
+            }
+
+            const diffNow = Math.abs(match.dbTimestamp - cmp.now);
+            if (diffNow >= config.sync.segment_duration_min && diffNow <= config.sync.segment_duration_max) {
+                adoptedMatch = match;
+                break;
+            } else {
+                const reason = diffNow < config.sync.segment_duration_min
+                    ? 'MIN_VIOLATION'
+                    : 'MAX_VIOLATION';
+
+                eventBus.emit('segment_violation', {
+                    filename: match.filename,
+                    dbTimestamp: match.dbTimestamp,
+                    cmpNow: cmp.now,
+                    diffNow: diffNow,
+                    matchCount: match.matchCount,
+                    reason: reason
+                });
             }
         }
 
         if (adoptedMatch) {
-            //if (adoptedMatch !== mJson) {
-            //console.log(`pHash 보정: 1위 ${mJson.filename} → 시차 20초 이내 현재회차 ${adoptedMatch.filename} 즉시 채택`);
-            //}
             mJson = adoptedMatch;
-        } else {
+        } else if (jsonResult.matches.length > 1) {
             // 2. 기존 폴백: 1위가 방영 회차가 아닐 때, 현재 회차가 순위 안에 있으면(1위 매칭점수의 50% 이상) 채택
             const topMatchCount = mJson.matchCount;
             const topIdx = indexMap[mJson.filename];
@@ -317,12 +328,12 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
                 );
 
                 if (currentMatch && currentMatch.matchCount >= topMatchCount * 0.5) {
-                    //console.log(`pHash 보정: 1위 ${mJson.filename}(${topMatchCount}매칭) → 현재회차 ${currentMatch.filename}(${currentMatch.matchCount}매칭) 채택`);
                     mJson = currentMatch;
                 }
             }
         }
     }
+
 
     // realTimestamp: 파일 쓰기 시작 시점 + 클립 내 매칭 프레임 위치
     const realTimestamp = segmentInfo.st + mJson.clipTimestamp * 1000;
