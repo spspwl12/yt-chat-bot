@@ -493,7 +493,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
                     let outOfbounds = subInfo.disable;
                     if (!outOfbounds && subInfo._editParsed) {
                         for (const et of subInfo._editParsed) {
-                            if (subTime >= et.s && subTime <= et.e) {
+                            if (subTime && subTime >= et.s && subTime <= et.e) {
                                 outOfbounds = true;
                                 break;
                             }
