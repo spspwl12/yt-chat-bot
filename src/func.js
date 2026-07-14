@@ -27,21 +27,33 @@ async function removeDummy(dir) {
     }
 }
 
-function toHHMMSS(seconds) {
+function toHHMMSS(seconds, includeMs = false) {
     if (!seconds)
         return "00:00:00";
     const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
     const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     const s = String(Math.floor(seconds % 60)).padStart(2, '0');
+    if (includeMs || (seconds % 1 !== 0)) {
+        const ms = String(Math.round((seconds % 1) * 1000)).padStart(3, '0');
+        return `${h}:${m}:${s}.${ms}`;
+    }
     return `${h}:${m}:${s}`;
 }
 
 function fromHHMMSS(timeStr) {
     if (!timeStr)
         return 0;
-    const parts = timeStr.split(":").map(Number);
-    const [hours, minutes, seconds] = parts;
-    return hours * 3600 + minutes * 60 + seconds;
+    // HH:MM:SS.mmm 또는 HH:MM:SS 형식 모두 지원
+    const dotIdx = timeStr.indexOf('.');
+    let ms = 0;
+    let base = timeStr;
+    if (dotIdx !== -1) {
+        ms = parseFloat('0' + timeStr.slice(dotIdx));
+        base = timeStr.slice(0, dotIdx);
+    }
+    const parts = base.split(':').map(Number);
+    const [hours = 0, minutes = 0, seconds = 0] = parts;
+    return hours * 3600 + minutes * 60 + seconds + ms;
 }
 
 function getClockEmoji(time) {
