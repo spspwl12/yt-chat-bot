@@ -1172,6 +1172,13 @@ let ws;
             ws.send(JSON.stringify({ action: 'saveVideoInfo', payload: { content } }));
         };
 
+        window.reloadVideoSub = function () {
+            if (confirm('서버의 video-sub.json 파일을 다시 읽어옵니다.\n진행하시겠습니까?')) {
+                ws.send(JSON.stringify({ action: 'reloadVideoSub' }));
+                showToast('video-sub 리로드 요청 중...');
+            }
+        };
+
         window.formatVideoInfo = function () {
             const el = document.getElementById('val-videoinfo');
             try {

@@ -446,6 +446,12 @@ async function handleAction(client, req) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
         }
     }
+    // ── 새 기능: video-sub.json 리로드 ──
+    else if (action === 'reloadVideoSub') {
+        const videoSubManager = require('./sub-manager.js');
+        const success = videoSubManager.reloadVideoSub();
+        sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success } }));
+    }
     // ── 새 기능: 봇 재부팅 (설정 리로드) ──
     else if (action === 'reboot_bot') {
         console.log("🔄 관리자 웹에서 재부팅 요청을 받았습니다. 프로세스를 종료합니다...");

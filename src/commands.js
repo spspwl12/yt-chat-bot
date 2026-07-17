@@ -5,9 +5,7 @@ const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
 const schCfg = require('../data/config-search.js');
-let subtitles = {};
-try { subtitles = require('../data/video-sub.json'); }
-catch (e) { console.warn('⚠️ [경고] video-sub.json 로드 실패 - 대사 검색 기능 제한됨'); }
+const videoSubManager = require('./sub-manager.js');
 
 let musics = {};
 try { musics = require('../data/video-music.json'); }
@@ -26,7 +24,6 @@ try { videoMetadata = require('../data/video-metadata.json'); }
 catch (e) { console.warn('⚠️ [경고] video-metadata.json 파일이 없습니다. 방송 메타데이터 관련 기능이 비활성화됩니다.'); }
 
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
-const searcher = new TextSearchEngine(subtitles);
 const musicSearcher = new TextSearchEngine(musics);
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -37,7 +34,7 @@ const cfg = require('../data/config-youtube.js');
 const msg = require('../data/config-messages.js');
 
 // ─── JSON 파일 누락 시 연관 기능 강제 비활성화 ───
-if (Object.keys(subtitles).length === 0 && cfg.input) {
+if (!videoSubManager.hasSubtitles() && cfg.input) {
     cfg.input.enable_search = false;
 }
 if (Object.keys(musics).length === 0 && cfg.music) {
@@ -453,67 +450,8 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     }
 
     const baseWarn = cfg.subtitle_score.warn_base || 10;
-    const searchInfo = searcher.search(query);
-    if (searchInfo && searchInfo.length > 0) {
-        // 점수가 같을 경우, 검색된 단어의 출현 빈도(매칭된 대사 수)가 높은 에피소드를 우선 채택하도록 정렬
-        searchInfo.sort((a, b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            const lenA = a.matchedIndices ? a.matchedIndices.length : 0;
-            const lenB = b.matchedIndices ? b.matchedIndices.length : 0;
-            if (lenB !== lenA) return lenB - lenA;
-            if (b.alpha !== a.alpha) return b.alpha - a.alpha;
-            return a.key.localeCompare(b.key, undefined, { numeric: true });
-        });
-
-        const validResults = [];
-        const removeDup = searchInfo.filter(
-            (item, index, self) =>
-                index === self.findIndex(obj => obj.key === item.key)
-        );
-
-        for (const result of removeDup) {
-            if (validResults.length >= 3) break;
-
-            const matched = result.matchedIndices;
-            if (!matched || matched.length === 0) continue;
-
-            const score = result.score;
-            // 매칭 점수가 내부 통과 기준을 넘었는지 확인
-            if (score > cfg.subtitle_score.min_value) {
-                const key = result.key;
-                const pfSub = subtitles[key][matched[0] - 1]; // 추출된 자막 구간
-
-                if (pfSub) {
-
-                    const subInfo = videoInfo.find(e => e.name === key);
-                    if (!subInfo) continue;
-
-                    const subTime = fromHHMMSS(pfSub.start);
-                    const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subTime));
-                    // 에피소드가 짤린 부분(편집된 구간에 해당하는 자막인지 검증)
-                    let outOfbounds = subInfo.disable;
-                    if (!outOfbounds && subInfo._editParsed) {
-                        for (const et of subInfo._editParsed) {
-                            if (subTime && subTime >= et.s && subTime <= et.e) {
-                                outOfbounds = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    const unicodenum = toUnicodeNumber(subInfo.alias);
-                    const unicodescore = toUnicodeNumber(score);
-                    const timestr = formatDate(futureDate);
-                    const emoji = getClockEmoji(timestr);
-
-                    validResults.push({
-                        subInfo, outOfbounds, unicodenum, unicodescore, timestr, emoji, score
-                    });
-                }
-            }
-        }
-
-        if (validResults.length > 0) {
+    const { validResults, searchInfo } = videoSubManager.searchAndFormat(query, rtn);
+    if (validResults && validResults.length > 0) {
             // 부하/스팸 방지를 위해 1위 결과물의 점수에 역비례하게 페널티 차등 책정
             _input.warn = baseWarn +
                 parseInt((100 - validResults[0].score) / cfg.subtitle_score.warn_divisor);
@@ -587,7 +525,6 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
                 };
             }
         }
-    }
 
     // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시 → AI 폴백 시도
     if (cfg.ai && cfg.ai.enable) {
