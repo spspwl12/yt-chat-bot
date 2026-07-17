@@ -390,7 +390,9 @@ async function handleAction(client, req) {
             const cleanContent = content.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
             JSON.parse(cleanContent);
             fs.writeFileSync(path.join(__dirname, '../data', 'video-info.json'), cleanContent, 'utf8');
-            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
+            // 재부팅 없이 즉시 메모리에 반영
+            const reloaded = search_lib.reloadVideoInfo();
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true, reloaded } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
         }

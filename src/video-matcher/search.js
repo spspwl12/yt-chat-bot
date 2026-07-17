@@ -1,65 +1,110 @@
 const { fromHHMMSS } = require('../func.js');
-const videoInfo = require('../../data/video-info.json');
+const path = require('path');
+const fs = require('fs');
 const config = require('../../data/config-youtube.js');
 const eventBus = require('../event-bus.js');
+
+const VIDEO_INFO_PATH = path.join(__dirname, '../../data/video-info.json');
+
 
 // --- 초기 메타데이터 전처리 및 시간 캐싱 ---
 const indexMap = Object.create(null);
 let totalVideoDurationSec = 0;
+let videoInfo = [];
 
-for (let i = 0; i < videoInfo.length; i++) {
-    const e = videoInfo[i];
-    if (!e.disable) {
-        e._startSec = fromHHMMSS(e.start_time);
-        e._endSec = fromHHMMSS(e.end_time);
-        e._editSec = 0;
-        e._editParsed = null;
-        e._effectiveEndSec = e._endSec;
-        if (e.edit_time) {
-            const editArr = JSON.parse(e.edit_time);
-            e._editParsed = editArr.map(et => ({
-                s: fromHHMMSS(et.s),
-                e: fromHHMMSS(et.e)
-            }));
-            for (const et of e._editParsed) {
-                e._editSec += (et.e - et.s);
-            }
-            // edit_time 끝이 영상 끝에 닿으면 콘텐츠는 edit 시작점에서 종료
-            // 연속된 편집 구간이 이어지면 역추적하여 실제 콘텐츠 종료 시점 산출
-            for (const et of e._editParsed) {
-                if (et.e >= e._endSec) {
-                    e._effectiveEndSec = et.s;
+function getEditOffset(editParsed, localPos) {
+    if (!editParsed) return 0;
+    let offset = 0;
+    for (const et of editParsed) {
+        if (localPos >= et.e) {
+            offset += (et.e - et.s);
+        } else if (localPos > et.s) {
+            offset += (localPos - et.s);
+        }
+    }
+    return offset;
+}
+
+function preprocessVideoInfo(data) {
+    // indexMap 초기화
+    for (const key of Object.keys(indexMap)) delete indexMap[key];
+    totalVideoDurationSec = 0;
+
+    // videoInfo 배열 in-place 교체
+    videoInfo.length = 0;
+    for (const item of data) videoInfo.push(item);
+
+    for (let i = 0; i < videoInfo.length; i++) {
+        const e = videoInfo[i];
+        if (!e.disable) {
+            e._startSec = fromHHMMSS(e.start_time);
+            e._endSec = fromHHMMSS(e.end_time);
+            e._editSec = 0;
+            e._editParsed = null;
+            e._effectiveEndSec = e._endSec;
+            if (e.edit_time) {
+                const editArr = JSON.parse(e.edit_time);
+                e._editParsed = editArr.map(et => ({
+                    s: fromHHMMSS(et.s),
+                    e: fromHHMMSS(et.e)
+                }));
+                for (const et of e._editParsed) {
+                    e._editSec += (et.e - et.s);
                 }
-            }
-            if (e._effectiveEndSec < e._endSec) {
-                let changed = true;
-                while (changed) {
-                    changed = false;
-                    for (const et of e._editParsed) {
-                        if (et.e >= e._effectiveEndSec && et.s < e._effectiveEndSec) {
-                            e._effectiveEndSec = et.s;
-                            changed = true;
+                // edit_time 끝이 영상 끝에 닿으면 콘텐츠는 edit 시작점에서 종료
+                // 연속된 편집 구간이 이어지면 역추적하여 실제 콘텐츠 종료 시점 산출
+                for (const et of e._editParsed) {
+                    if (et.e >= e._endSec) {
+                        e._effectiveEndSec = et.s;
+                    }
+                }
+                if (e._effectiveEndSec < e._endSec) {
+                    let changed = true;
+                    while (changed) {
+                        changed = false;
+                        for (const et of e._editParsed) {
+                            if (et.e >= e._effectiveEndSec && et.s < e._effectiveEndSec) {
+                                e._effectiveEndSec = et.s;
+                                changed = true;
+                            }
                         }
                     }
                 }
             }
+            e._durationSec = e._endSec - e._editSec;
+            // _streamDurationSec: _effectiveEndSec 범위 내에서 편집 구간을 제외한 실제 스트리밍 재생 시간
+            e._streamDurationSec = e._effectiveEndSec - getEditOffset(e._editParsed, e._effectiveEndSec);
+            totalVideoDurationSec += e._streamDurationSec;
+        } else {
+            e._startSec = 0;
+            e._endSec = 0;
+            e._editSec = 0;
+            e._editParsed = null;
+            e._durationSec = 0;
+            e._effectiveEndSec = 0;
+            e._streamDurationSec = 0;
         }
-        e._durationSec = e._endSec - e._editSec;
-        // _streamDurationSec: _effectiveEndSec 범위 내에서 편집 구간을 제외한 실제 스트리밍 재생 시간
-        e._streamDurationSec = e._effectiveEndSec - getEditOffset(e._editParsed, e._effectiveEndSec);
-        totalVideoDurationSec += e._streamDurationSec;
-    } else {
-        e._startSec = 0;
-        e._endSec = 0;
-        e._editSec = 0;
-        e._editParsed = null;
-        e._durationSec = 0;
-        e._effectiveEndSec = 0;
-        e._streamDurationSec = 0;
+        indexMap[e.name] = i;
     }
-    indexMap[e.name] = i;
 }
+
+function reloadVideoInfo() {
+    try {
+        const raw = fs.readFileSync(VIDEO_INFO_PATH, 'utf8').replace(/^\uFEFF/, '').trim();
+        const data = JSON.parse(raw);
+        preprocessVideoInfo(data);
+        console.log(`[search] video-info.json 리로드 완료 (${data.length}개 항목)`);
+        return true;
+    } catch (e) {
+        console.error('[search] video-info.json 리로드 실패:', e.message);
+        return false;
+    }
+}
+
+// 최초 로드
+reloadVideoInfo();
 // ---------------------------------------------
+
 
 
 /**
@@ -122,24 +167,10 @@ function getRemainingTime(name, currentIdx) {
 
 /**
  * 파일 위치 → 그 위치까지 편집(컷)된 총 시간(초) 반환
- */
-function getEditOffset(editParsed, localPos) {
-    if (!editParsed) return 0;
-    let offset = 0;
-    for (const et of editParsed) {
-        if (localPos >= et.e) {
-            offset += (et.e - et.s);
-        } else if (localPos > et.s) {
-            offset += (localPos - et.s);
-        }
-    }
-    return offset;
-}
+ * 스트림 시간 → 파일 위치 변환(getEditOffset의 역함수)
+    * 예: edit[0, 41] → streamPos 0 → filePos 41, streamPos 1 → filePos 42
+*/
 
-/**
- * 스트림 시간 → 파일 위치 변환 (getEditOffset의 역함수)
- * 예: edit [0,41] → streamPos 0 → filePos 41, streamPos 1 → filePos 42
- */
 function streamToFilePos(editParsed, streamPos) {
     if (!editParsed) return streamPos;
     let filePos = streamPos;
@@ -397,4 +428,5 @@ function getAdjustedVideoTime(requestTime, phashTime, nowIdx) {
     return rtn;
 }
 
-module.exports = { videoInfo, processSearchResult, getLiveVideoTime, getAdjustedVideoTime, getRemainingTime, getFutureDate, getEffectiveIndex, getEditOffset, getEpAtDate };
+module.exports = { videoInfo, processSearchResult, getLiveVideoTime, getAdjustedVideoTime, getRemainingTime, getFutureDate, getEffectiveIndex, getEditOffset, getEpAtDate, reloadVideoInfo };
+

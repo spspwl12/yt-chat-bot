@@ -290,7 +290,7 @@ let ws;
                     break;
 
                 case 'saveVideoInfo_result':
-                    if (payload.success) showToast('video-info.json 저장 완료! 재시작 시 적용됩니다.');
+                    if (payload.success) showToast('video-info.json 저장 완료! 즉시 적용되었습니다.');
                     else showToast('저장 실패: ' + payload.error, true);
                     break;
 
