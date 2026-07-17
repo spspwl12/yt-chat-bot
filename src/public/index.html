@@ -13,6 +13,54 @@
 
 <body>
 
+    <!-- ══ Timeline History Slider Bar (최상단 고정) ══ -->
+    <div class="timeline-bar" id="timeline-bar">
+        <div class="timeline-bar-label">
+            <span class="tl-icon">⏱️</span>
+            <span>Timeline</span>
+        </div>
+
+        <!-- 카드 + 이력건수 + 삭제 → 왼쪽 -->
+        <div class="timeline-info-panel">
+            <div class="timeline-info-card tl-card-current">
+                <div class="tl-card-label">회차 No.</div>
+                <div class="tl-card-value" id="tl-ep-index">--</div>
+            </div>
+            <div class="timeline-info-card">
+                <div class="tl-card-label">시간</div>
+                <div class="tl-card-value" id="tl-ep-time">--:--</div>
+            </div>
+            <div class="timeline-info-card" id="tl-raw-card">
+                <div class="tl-card-label">기록 시점</div>
+                <div class="tl-card-value" id="tl-raw-value">--</div>
+            </div>
+            <div class="timeline-info-card tl-card-diff" id="tl-diff-card">
+                <div class="tl-card-label">현재와 차이</div>
+                <div class="tl-card-value" id="tl-diff-value">--</div>
+            </div>
+            <div class="timeline-total-count" style="display:flex; align-items:center; gap:6px;">
+                <span id="tl-total-count">이력 0건</span>
+                <button onclick="tlClearHistory()" style="background:rgba(239, 68, 68, 0.2); border:1px solid rgba(239, 68, 68, 0.4); color:#fca5a5; border-radius:4px; padding:2px 6px; font-size:0.6rem; cursor:pointer;">삭제</button>
+            </div>
+        </div>
+
+        <!-- 슬라이더 → 오른쪽 (flex:1) -->
+        <div class="timeline-slider-wrap">
+            <input
+                type="range"
+                class="timeline-slider"
+                id="timeline-slider"
+                min="0" max="100000" value="100000"
+                step="1"
+            >
+            <div class="timeline-tick-row" id="timeline-tick-row">
+                <span id="tl-tick-oldest">--</span>
+                <span id="tl-tick-mid">--</span>
+                <span id="tl-tick-now">현재</span>
+            </div>
+        </div>
+    </div>
+
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <div class="mobile-header">

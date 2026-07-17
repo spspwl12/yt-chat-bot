@@ -1209,10 +1209,273 @@
                 width: 100%;
             }
         }
+        /* ── Timeline Slider Bar (최상단 고정) ── */
+        .timeline-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: rgba(10, 15, 30, 0.97);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(139, 92, 246, 0.05);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 60px;
+        }
+
+        .timeline-bar-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #a78bfa;
+            white-space: nowrap;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 80px;
+        }
+
+        .timeline-bar-label .tl-icon {
+            font-size: 1rem;
+        }
+
+        .timeline-slider-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .timeline-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right,
+                rgba(139, 92, 246, 0.8) var(--slider-pct, 100%),
+                rgba(255, 255, 255, 0.1) var(--slider-pct, 100%));
+            outline: none;
+            cursor: pointer;
+            transition: height 0.2s ease;
+        }
+
+        .timeline-slider:hover {
+            height: 8px;
+        }
+
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #c084fc, #8b5cf6);
+            cursor: pointer;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3), 0 2px 8px rgba(0,0,0,0.5);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+            box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.25), 0 0 20px rgba(139, 92, 246, 0.5);
+        }
+
+        .timeline-slider::-webkit-slider-thumb:active {
+            transform: scale(1.1);
+            background: radial-gradient(circle, #e0a0ff, #a855f7);
+        }
+
+        .timeline-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #c084fc, #8b5cf6);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+        }
+
+        .timeline-tick-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.62rem;
+            color: rgba(148, 163, 184, 0.5);
+            pointer-events: none;
+            padding: 0 1px;
+        }
+
+        .timeline-info-panel {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .timeline-info-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 5px 12px;
+            text-align: center;
+            min-width: 90px;
+        }
+
+        .timeline-info-card .tl-card-label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .timeline-info-card .tl-card-value {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timeline-info-card.tl-card-diff .tl-card-value {
+            color: #fbbf24;
+        }
+
+        .timeline-info-card.tl-card-current .tl-card-value {
+            background: linear-gradient(90deg, #34d399, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .timeline-live-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #34d399;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .timeline-live-badge:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        .timeline-live-badge.past-mode {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+
+        .timeline-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #34d399;
+            animation: tlPulse 1.5s ease infinite;
+        }
+
+        .timeline-live-badge.past-mode .timeline-live-dot {
+            background: #fbbf24;
+            animation: none;
+        }
+
+        @keyframes tlPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .timeline-total-count {
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.6);
+            white-space: nowrap;
+        }
+
+        /* body에 timeline 공간 확보용 패딩 */
+        body {
+            padding-top: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-bar {
+                flex-wrap: wrap;
+                padding: 8px 12px;
+                gap: 8px;
+                min-height: auto;
+            }
+            .timeline-info-panel {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .timeline-info-card {
+                min-width: 70px;
+                padding: 4px 8px;
+            }
+            body {
+                padding-top: 56px;
+            }
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- ══ Timeline History Slider Bar (최상단 고정) ══ -->
+    <div class="timeline-bar" id="timeline-bar">
+        <div class="timeline-bar-label">
+            <span class="tl-icon">⏱️</span>
+            <span>Timeline</span>
+        </div>
+
+        <div class="timeline-slider-wrap">
+            <input
+                type="range"
+                class="timeline-slider"
+                id="timeline-slider"
+                min="0" max="100000" value="100000"
+                step="1"
+            >
+            <div class="timeline-tick-row" id="timeline-tick-row">
+                <span id="tl-tick-oldest">--</span>
+                <span id="tl-tick-mid">--</span>
+                <span id="tl-tick-now">현재</span>
+            </div>
+        </div>
+
+        <div class="timeline-info-panel">
+            <div class="timeline-info-card tl-card-current">
+                <div class="tl-card-label">회차 No.</div>
+                <div class="tl-card-value" id="tl-ep-index">--</div>
+            </div>
+            <div class="timeline-info-card">
+                <div class="tl-card-label">시점</div>
+                <div class="tl-card-value" id="tl-ep-time">--:--</div>
+            </div>
+            <div class="timeline-info-card tl-card-diff" id="tl-diff-card" style="display:none;">
+                <div class="tl-card-label">현재와 차이</div>
+                <div class="tl-card-value" id="tl-diff-value">--</div>
+            </div>
+            <div class="timeline-total-count" id="tl-total-count">이력 0건</div>
+            <div class="timeline-live-badge" id="tl-live-badge" onclick="tlResetToLive()">
+                <div class="timeline-live-dot"></div>
+                <span id="tl-live-text">LIVE</span>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
@@ -1656,6 +1919,215 @@
         let searchLogCount = 0;
         let cmdLogCount = 0;
 
+        // ══════════════════════════════════════════════
+        //  Timeline Slider 상태
+        // ══════════════════════════════════════════════
+        const TL = {
+            history: [],        // lastqueryHistory 배열 (서버에서 수신)
+            total: 0,           // 전체 이력 건수
+            isLive: true,       // 현재 LIVE 상태 여부
+            currentHistIdx: -1, // -1 = 현재(LIVE)
+            debounceTimer: null
+        };
+
+        const tlSlider = document.getElementById('timeline-slider');
+        const tlEpIndex = document.getElementById('tl-ep-index');
+        const tlEpTime = document.getElementById('tl-ep-time');
+        const tlDiffCard = document.getElementById('tl-diff-card');
+        const tlDiffValue = document.getElementById('tl-diff-value');
+        const tlTotalCount = document.getElementById('tl-total-count');
+        const tlLiveBadge = document.getElementById('tl-live-badge');
+        const tlLiveText = document.getElementById('tl-live-text');
+        const tlTickOldest = document.getElementById('tl-tick-oldest');
+        const tlTickMid = document.getElementById('tl-tick-mid');
+
+        function tlFmtDuration(ms) {
+            if (!ms || ms <= 0) return '0초';
+            const absMs = Math.abs(ms);
+            const totalSec = Math.floor(absMs / 1000);
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            const sign = ms < 0 ? '-' : '';
+            if (h > 0) return `${sign}${h}시간 ${m}분 전`;
+            if (m > 0) return `${sign}${m}분 ${s}초 전`;
+            return `${sign}${s}초 전`;
+        }
+
+        function tlFmtTime(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts);
+            return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+        }
+
+        function tlFmtShort(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts);
+            return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function secToHHMMSS(sec) {
+            if (!sec || isNaN(sec)) return '--:--';
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = Math.floor(sec % 60);
+            if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            return `${m}:${String(s).padStart(2,'0')}`;
+        }
+
+        function tlUpdateSliderBackground() {
+            const max = parseInt(tlSlider.max) || 100000;
+            const val = parseInt(tlSlider.value) || max;
+            const pct = (val / max * 100).toFixed(2);
+            tlSlider.style.setProperty('--slider-pct', pct + '%');
+        }
+
+        function tlUpdateTickLabels() {
+            if (TL.history.length === 0) {
+                tlTickOldest.textContent = '--';
+                tlTickMid.textContent = '--';
+                return;
+            }
+            const oldest = TL.history[0];
+            const mid = TL.history[Math.floor(TL.history.length / 2)];
+            if (oldest) tlTickOldest.textContent = tlFmtShort(oldest.recordedAt);
+            if (mid) tlTickMid.textContent = tlFmtShort(mid.recordedAt);
+        }
+
+        function tlSetLiveMode() {
+            TL.isLive = true;
+            TL.currentHistIdx = -1;
+            tlSlider.value = tlSlider.max;
+            tlUpdateSliderBackground();
+            tlLiveBadge.classList.remove('past-mode');
+            tlLiveText.textContent = 'LIVE';
+            tlDiffCard.style.display = 'none';
+        }
+
+        function tlResetToLive() {
+            tlSetLiveMode();
+            // 현재 상태로 UI 갱신
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getState' }));
+            }
+        }
+
+        function tlLoadHistory() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getLastqueryHistory' }));
+            }
+        }
+
+        function tlHandleHistoryData(data) {
+            TL.history = data.history || [];
+            TL.total = data.total || 0;
+            tlTotalCount.textContent = `이력 ${TL.total.toLocaleString()}건`;
+
+            // 슬라이더 max = 이력 총 건수 (인덱스 0~total-1)
+            // value = total → 현재(LIVE)
+            const maxVal = Math.max(TL.total, 1);
+            tlSlider.min = 0;
+            tlSlider.max = maxVal;
+
+            if (TL.isLive) {
+                tlSlider.value = maxVal;
+            }
+            tlUpdateSliderBackground();
+            tlUpdateTickLabels();
+
+            // 현재 query로 즉시 표시
+            if (data.current && TL.isLive) {
+                tlUpdateFromQuery(data.current, null);
+            }
+        }
+
+        function tlUpdateFromQuery(query, diffMs) {
+            if (!query) return;
+            // 회차 번호 표시 (index는 배열 인덱스이므로 +1 해서 표시)
+            if (query.index !== undefined) {
+                tlEpIndex.textContent = `${query.index + 1}화`;
+            }
+            // 시점 표시: now(초) 기준
+            if (query.now !== undefined) {
+                tlEpTime.textContent = secToHHMMSS(query.now);
+            }
+            // 차이 표시
+            if (diffMs !== null && diffMs !== undefined && !TL.isLive) {
+                tlDiffCard.style.display = '';
+                tlDiffValue.textContent = tlFmtDuration(diffMs);
+            } else {
+                tlDiffCard.style.display = 'none';
+            }
+        }
+
+        function tlHandleStateAtHistory(payload) {
+            if (!payload) return;
+            tlUpdateFromQuery(payload.query, payload.diffMs);
+
+            // 대시보드 전체 상태 업데이트 (에피소드 정보 반영)
+            if (payload.episodeInfo) {
+                const totalEp = payload.totalEpisodes || '--';
+                document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}`;
+                document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+            }
+        }
+
+        // 슬라이더 이벤트
+        tlSlider.addEventListener('input', () => {
+            tlUpdateSliderBackground();
+            const max = parseInt(tlSlider.max) || 1;
+            const val = parseInt(tlSlider.value);
+
+            if (val >= max) {
+                // LIVE 모드
+                tlSetLiveMode();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action: 'getState' }));
+                }
+                return;
+            }
+
+            // 과거 모드
+            TL.isLive = false;
+            TL.currentHistIdx = val; // val이 곧 history 배열 인덱스
+
+            tlLiveBadge.classList.add('past-mode');
+            tlLiveText.textContent = '과거 모드';
+
+            // 해당 인덱스의 이력 데이터 즉시 UI 반영 (로컬)
+            if (TL.history.length > 0 && val < TL.history.length) {
+                const entry = TL.history[val];
+                if (entry) {
+                    tlEpIndex.textContent = `${(entry.index !== undefined ? entry.index + 1 : '--')}화`;
+                    tlEpTime.textContent = secToHHMMSS(entry.now);
+                }
+            }
+
+            // 서버에 상태 조회 (디바운스)
+            clearTimeout(TL.debounceTimer);
+            TL.debounceTimer = setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        action: 'getStateAtHistory',
+                        payload: { historyIndex: val }
+                    }));
+                }
+            }, 150);
+        });
+
+        // 슬라이더 드래그 종료 시 최종 조회
+        tlSlider.addEventListener('change', () => {
+            clearTimeout(TL.debounceTimer);
+            const max = parseInt(tlSlider.max) || 1;
+            const val = parseInt(tlSlider.value);
+            if (val < max && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: 'getStateAtHistory',
+                    payload: { historyIndex: val }
+                }));
+            }
+        });
+
         // ── Mobile Sidebar Toggle ──
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebar-overlay');
@@ -1756,6 +2228,7 @@
                 document.getElementById('status-dot-mobile').classList.add('connected');
                 document.getElementById('status-text').innerText = 'Connected';
                 ws.send(JSON.stringify({ action: 'getState' }));
+                tlLoadHistory(); // 타임라인 이력 로드
 
                 pinger = setInterval(() => {
                     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
@@ -1789,6 +2262,11 @@
                         const totalEp = payload.totalEpisodes || '--';
                         document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}`;
                         document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+                        // 타임라인 LIVE 모드일 때 슬라이더 업데이트
+                        if (TL.isLive && payload.episodeInfo) {
+                            tlEpIndex.textContent = `${payload.episodeInfo.index + 1}화`;
+                            tlEpTime.textContent = secToHHMMSS(payload.episodeInfo.now);
+                        }
                     } else {
                         document.getElementById('stat-episode').innerText = '-- / --';
                         document.getElementById('stat-sec').innerText = '-- / --';
@@ -1968,6 +2446,26 @@
 
                 case 'userDetail':
                     renderUserDetail(payload);
+                    break;
+
+                // ── 타임라인 이력 ──
+                case 'lastquery_history_data':
+                    tlHandleHistoryData(payload);
+                    break;
+
+                case 'lastquery_history_push':
+                    // 이력이 늘어났음만 알림 (LIVE 모드일 때는 전체 이력 재로드)
+                    if (TL.isLive) {
+                        tlLoadHistory();
+                    } else {
+                        // 타이탈 카운트만 업데이트
+                        TL.total = payload.total || TL.total;
+                        tlTotalCount.textContent = `이력 ${TL.total.toLocaleString()}건`;
+                    }
+                    break;
+
+                case 'stateAtHistory_data':
+                    tlHandleStateAtHistory(payload);
                     break;
             }
         }

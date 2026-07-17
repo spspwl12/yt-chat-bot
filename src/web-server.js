@@ -36,9 +36,26 @@ function saveMuteState() {
 const MAX_SEARCH_LOGS = 200;
 const MAX_COMMAND_LOGS = 300;
 const MAX_VIOLATION_LOGS = 100;
+const MAX_LASTQUERY_HISTORY = 100000;
 const searchLogs = [];
 const commandLogs = [];
 const violationLogs = [];
+let lastqueryHistory = [];
+
+const HISTORY_FILE = path.join(__dirname, '../data', 'lastquery-history.json');
+try {
+    if (fs.existsSync(HISTORY_FILE)) {
+        lastqueryHistory = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    }
+} catch (e) {
+    console.error("Failed to load lastquery history", e);
+}
+
+function saveHistoryFile() {
+    fs.writeFile(HISTORY_FILE, JSON.stringify(lastqueryHistory), (err) => {
+        if(err) console.error("Failed to save lastquery history", err);
+    });
+}
 
 // 이벤트 버스 리스너
 eventBus.on('search_result', (data) => {
@@ -60,6 +77,38 @@ eventBus.on('command_used', (data) => {
     while (commandLogs.length > MAX_COMMAND_LOGS) commandLogs.shift();
     broadcastMsg({ action: 'command_push', payload: data });
 });
+
+eventBus.on('lastquery_update', (data) => {
+    const entry = { ...data, recordedAt: Date.now() };
+    lastqueryHistory.push(entry);
+    while (lastqueryHistory.length > MAX_LASTQUERY_HISTORY) lastqueryHistory.shift();
+    saveHistoryFile();
+    broadcastMsg({ action: 'lastquery_history_push', payload: { total: lastqueryHistory.length } });
+});
+
+function generateScheduleFromEpInfo(epInfo) {
+    if (!epInfo || !search_lib.videoInfo) return [];
+    const n = search_lib.videoInfo.length;
+    const schedule = [];
+    let currentIdx = epInfo.index % n;
+    let count = 0;
+    let cIdx = currentIdx;
+    while (count < n && schedule.length < 150) {
+        const e = search_lib.videoInfo[cIdx];
+        if (!e.disable) {
+            const fdate = search_lib.getFutureDate(e, epInfo, 0);
+            schedule.push({
+                alias: e.alias,
+                title: e.title || e.shorten || e.name,
+                date: fdate.getTime(),
+                isCurrent: count === 0
+            });
+        }
+        cIdx = (cIdx + 1) % n;
+        count++;
+    }
+    return schedule;
+}
 
 function broadcastMsg(data) {
     const msg = JSON.stringify(data);
@@ -419,36 +468,86 @@ async function handleAction(client, req) {
     else if (action === 'getCommandLogs') {
         sendWSFrame(client, JSON.stringify({ action: 'command_logs', payload: commandLogs }));
     }
-    // ── 새 기능: 편성표 ──
+    // ── 신 기능: 편성표 ──
     else if (action === 'getSchedule') {
         const epInfo = getEpisodeInfoRef ? getEpisodeInfoRef() : null;
-        if (!epInfo || !search_lib.videoInfo) {
-            sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: [] }));
+        sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: generateScheduleFromEpInfo(epInfo) }));
+    }
+    // ── 새 기능: lastquery 이력 조회 ──
+    else if (action === 'getLastqueryHistory') {
+        let currentQuery = null;
+        try {
+            currentQuery = JSON.parse(fs.readFileSync(path.join(__dirname, '../data', 'lastquery.json'), 'utf8'));
+        } catch(e) {}
+        sendWSFrame(client, JSON.stringify({
+            action: 'lastquery_history_data',
+            payload: {
+                history: lastqueryHistory,
+                current: currentQuery,
+                total: lastqueryHistory.length
+            }
+        }));
+    }
+    // ── 새 기능: lastquery 이력 삭제 ──
+    else if (action === 'clearLastqueryHistory') {
+        lastqueryHistory = [];
+        saveHistoryFile();
+        sendWSFrame(client, JSON.stringify({ action: 'lastquery_history_data', payload: { history: [], current: null, total: 0 } }));
+        broadcastMsg({ action: 'lastquery_history_push', payload: { total: 0 } });
+    }
+    // ── 새 기능: 특정 시점 lastquery로 조정된 상태 조회 ──
+    else if (action === 'getStateAtHistory') {
+        const { historyIndex } = payload; // lastqueryHistory 배열 인덱스 (-1 = 현재)
+        let targetQuery = null;
+        if (historyIndex === -1) {
+            try {
+                targetQuery = JSON.parse(fs.readFileSync(path.join(__dirname, '../data', 'lastquery.json'), 'utf8'));
+            } catch(e) {}
+        } else if (historyIndex >= 0 && historyIndex < lastqueryHistory.length) {
+            targetQuery = lastqueryHistory[historyIndex];
+        }
+        if (!targetQuery) {
+            sendWSFrame(client, JSON.stringify({ action: 'stateAtHistory_data', payload: null }));
             return;
         }
-
-        const n = search_lib.videoInfo.length;
-        const schedule = [];
-        let currentIdx = epInfo.index % n;
-
-        let count = 0;
-        let cIdx = currentIdx;
-        while (count < n && schedule.length < 150) { // Limit to full cycle or 150 max
-            const e = search_lib.videoInfo[cIdx];
-            if (!e.disable) {
-                const fdate = search_lib.getFutureDate(e, epInfo, 0);
-                schedule.push({
-                    alias: e.alias,
-                    title: e.title || e.shorten || e.name,
-                    date: fdate.getTime(),
-                    isCurrent: count === 0
-                });
-            }
-            cIdx = (cIdx + 1) % n;
-            count++;
+        // 해당 시점의 에피소드 정보 계산
+        const epInfo = search_lib.getAdjustedVideoTime(targetQuery.requestTime, targetQuery.now, targetQuery.index);
+        let totalEpisodes = cfgYoutube.episode ? cfgYoutube.episode.end : 0;
+        let totalTime = 0;
+        let episodeAlias = null;
+        let totalEpCount = search_lib.videoInfo ? search_lib.videoInfo.length : 0;
+        if (epInfo && search_lib.videoInfo && search_lib.videoInfo[epInfo.index]) {
+            const epEntry = search_lib.videoInfo[epInfo.index];
+            totalTime = epEntry._streamDurationSec || 0;
+            episodeAlias = epEntry.alias || epEntry.title || epEntry.shorten || epEntry.name || null;
         }
-
-        sendWSFrame(client, JSON.stringify({ action: 'schedule_data', payload: schedule }));
+        // 현재 lastquery.json도 getAdjustedVideoTime으로 현재 시각 기준 video time 계산
+        let currentQuery = null;
+        try {
+            currentQuery = JSON.parse(fs.readFileSync(path.join(__dirname, '../data', 'lastquery.json'), 'utf8'));
+        } catch(e) {}
+        // 양쪽 다 getAdjustedVideoTime으로 현재 시각 기준으로 보정한 video time의 차이
+        let diffSec = 0;
+        if (currentQuery) {
+            const currentEpInfo = search_lib.getAdjustedVideoTime(currentQuery.requestTime, currentQuery.now, currentQuery.index);
+            if (currentEpInfo && epInfo) {
+                diffSec = currentEpInfo.now - epInfo.now;
+            }
+        }
+        sendWSFrame(client, JSON.stringify({
+            action: 'stateAtHistory_data',
+            payload: {
+                episodeInfo: epInfo,
+                totalEpisodes: totalEpisodes || totalEpCount,
+                totalTime: totalTime,
+                episodeAlias: episodeAlias,
+                query: targetQuery,
+                diffSec: diffSec,
+                historyIndex: historyIndex,
+                total: lastqueryHistory.length,
+                schedule: generateScheduleFromEpInfo(epInfo)
+            }
+        }));
     }
 }
 

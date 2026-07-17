@@ -3,6 +3,258 @@ let ws;
         let searchLogCount = 0;
         let cmdLogCount = 0;
 
+        // ══════════════════════════════════════════════
+        //  Timeline Slider 상태
+        // ══════════════════════════════════════════════
+        const TL = {
+            history: [],        // lastqueryHistory 배열 (서버에서 수신)
+            total: 0,           // 전체 이력 건수
+            isLive: true,       // 현재 LIVE 상태 여부
+            currentHistIdx: -1, // -1 = 현재(LIVE)
+            debounceTimer: null
+        };
+
+        const tlSlider = document.getElementById('timeline-slider');
+        const tlEpIndex = document.getElementById('tl-ep-index');
+        const tlEpTime = document.getElementById('tl-ep-time');
+        const tlDiffCard = document.getElementById('tl-diff-card');
+        const tlDiffValue = document.getElementById('tl-diff-value');
+        const tlTotalCount = document.getElementById('tl-total-count');
+        const tlRawCard = document.getElementById('tl-raw-card');
+        const tlRawValue = document.getElementById('tl-raw-value');
+        const tlTickOldest = document.getElementById('tl-tick-oldest');
+        const tlTickMid = document.getElementById('tl-tick-mid');
+
+        function tlFmtDuration(sec) {
+            if (sec === null || sec === undefined) return '--';
+            const absSec = Math.abs(sec);
+            const h = Math.floor(absSec / 3600);
+            const m = Math.floor((absSec % 3600) / 60);
+            const s = Math.floor(absSec % 60);
+            const sign = sec < 0 ? '-' : '+';
+            if (h > 0) return `${sign}${h}:​${String(m).padStart(2,'0')}:​${String(s).padStart(2,'0')}`;
+            if (m > 0) return `${sign}${m}분 ${s}초`;
+            return `${sign}${s}초`;
+        }
+
+        function tlFmtTime(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts);
+            return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+        }
+
+        function tlFmtShort(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts);
+            return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function secToHHMMSS(sec) {
+            if (!sec || isNaN(sec)) return '--:--';
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = Math.floor(sec % 60);
+            if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            return `${m}:${String(s).padStart(2,'0')}`;
+        }
+
+        function tlUpdateSliderBackground() {
+            const max = parseInt(tlSlider.max) || 100000;
+            let val = parseInt(tlSlider.value);
+            if (isNaN(val)) val = max;
+            const pct = (val / max * 100).toFixed(2);
+            tlSlider.style.setProperty('--slider-pct', pct + '%');
+        }
+
+        function tlUpdateTickLabels() {
+            if (TL.history.length === 0) {
+                tlTickOldest.textContent = '--';
+                tlTickMid.textContent = '--';
+                return;
+            }
+            const oldest = TL.history[0];
+            const mid = TL.history[Math.floor(TL.history.length / 2)];
+            if (oldest) tlTickOldest.textContent = tlFmtShort(oldest.recordedAt);
+            if (mid) tlTickMid.textContent = tlFmtShort(mid.recordedAt);
+        }
+
+        function tlSetLiveMode() {
+            TL.isLive = true;
+            TL.currentHistIdx = -1;
+            tlSlider.value = tlSlider.max;
+            tlUpdateSliderBackground();
+            tlDiffCard.style.display = '';
+            tlDiffValue.textContent = '--';
+            tlRawCard.style.display = '';
+            tlRawValue.textContent = '--';
+        }
+
+        function tlClearHistory() {
+            if (confirm('모든 타임라인 이력을 삭제하시겠습니까?')) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action: 'clearLastqueryHistory' }));
+                    tlResetToLive();
+                }
+            }
+        }
+
+        function tlResetToLive() {
+            tlSetLiveMode();
+            // 현재 상태로 UI 갱신
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getState' }));
+            }
+        }
+
+        function tlLoadHistory() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getLastqueryHistory' }));
+            }
+        }
+
+        function tlHandleHistoryData(data) {
+            TL.history = data.history || [];
+            TL.total = data.total || 0;
+            tlTotalCount.textContent = `이력 ${TL.total.toLocaleString()}건`;
+
+            // 슬라이더 max = 이력 총 건수 (인덱스 0~total-1)
+            // value = total → 현재(LIVE)
+            const maxVal = Math.max(TL.total, 1);
+            tlSlider.min = 0;
+            tlSlider.max = maxVal;
+
+            if (TL.isLive) {
+                tlSlider.value = maxVal;
+            }
+            tlUpdateSliderBackground();
+            tlUpdateTickLabels();
+
+            // 현재 query로 즉시 표시
+            if (data.current && TL.isLive) {
+                tlUpdateFromQuery(data.current, null);
+            }
+        }
+
+        function tlUpdateFromQuery(query, diffSec, epInfo) {
+            if (!query) return;
+            // 회차 번호 표시
+            if (epInfo && epInfo.index !== undefined) {
+                tlEpIndex.textContent = `${epInfo.index + 1}화`;
+            } else if (query.index !== undefined) {
+                tlEpIndex.textContent = `${query.index + 1}화`;
+            }
+            
+            // 시간 표시: 현재 보정된 video time 기준
+            if (epInfo && epInfo.now !== undefined) {
+                tlEpTime.textContent = secToHHMMSS(epInfo.now);
+            } else if (query.now !== undefined) {
+                let approxNow = query.now;
+                if (query.requestTime) {
+                    approxNow += (Date.now() - query.requestTime) / 1000;
+                }
+                tlEpTime.textContent = secToHHMMSS(approxNow);
+            }
+            
+            // 현재 lastquery.now 와 과거 lastquery.now 의 차이(초) 표시 - 항상 표시
+            tlDiffCard.style.display = '';
+            if (!TL.isLive && diffSec !== null && diffSec !== undefined) {
+                tlDiffValue.textContent = tlFmtDuration(diffSec);
+            } else {
+                tlDiffValue.textContent = '--';
+            }
+        }
+
+        function tlHandleStateAtHistory(payload) {
+            if (!payload) return;
+            tlUpdateFromQuery(payload.query, payload.diffSec, payload.episodeInfo);
+
+            // 기록 시점 카드: 과거 lastquery의 원본(raw) 화수와 시간 표시
+            if (payload.query) {
+                tlRawCard.style.display = '';
+                const rawEp = payload.query.index !== undefined ? `${payload.query.index + 1}화` : '--화';
+                const rawTime = secToHHMMSS(payload.query.now);
+                tlRawValue.textContent = `${rawEp} · ${rawTime}`;
+            }
+
+            // 대시보드 전체 상태 업데이트 (에피소드 정보 반영)
+            if (payload.episodeInfo) {
+                const totalEp = payload.totalEpisodes || '--';
+                const aliasStr = payload.episodeAlias ? ` (${payload.episodeAlias})` : '';
+                document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}${aliasStr}`;
+                document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+            }
+            if (payload.schedule) {
+                renderSchedule(payload.schedule);
+            }
+        }
+
+        // DOM 로드 후 슬라이더 이벤트 등록
+        document.addEventListener('DOMContentLoaded', () => {
+            tlSlider.addEventListener('input', () => {
+                tlUpdateSliderBackground();
+                const max = parseInt(tlSlider.max) || 1;
+                const val = parseInt(tlSlider.value);
+
+                if (val >= max) {
+                    // LIVE 모드
+                    tlSetLiveMode();
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ action: 'getState' }));
+                    }
+                    return;
+                }
+
+                // 과거 모드
+                TL.isLive = false;
+                TL.currentHistIdx = val; // val이 곧 history 배열 인덱스
+
+                // 해당 인덱스의 이력 데이터 즉시 UI 반영 (로컬) - 회차/시간만
+                if (TL.history.length > 0 && val < TL.history.length) {
+                    const entry = TL.history[val];
+                    if (entry) {
+                        tlEpIndex.textContent = `${(entry.index !== undefined ? entry.index + 1 : '--')}화`;
+                        let approxNow = entry.now || 0;
+                        if (entry.requestTime) {
+                            approxNow += (Date.now() - entry.requestTime) / 1000;
+                        }
+                        tlEpTime.textContent = secToHHMMSS(approxNow);
+                        // diff는 서버 응답 전까지 '...' 로 표시 (깜빡거림 방지)
+                        tlDiffCard.style.display = '';
+                        tlDiffValue.textContent = '...';
+                        // 기록 시점: 과거 lastquery의 원본 화수/시간 즉시 표시
+                        tlRawCard.style.display = '';
+                        const rawEp = entry.index !== undefined ? `${entry.index + 1}화` : '--화';
+                        const rawTime = secToHHMMSS(entry.now);
+                        tlRawValue.textContent = `${rawEp} · ${rawTime}`;
+                    }
+                }
+
+                // 서버에 상태 조회 (디바운스)
+                clearTimeout(TL.debounceTimer);
+                TL.debounceTimer = setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            action: 'getStateAtHistory',
+                            payload: { historyIndex: val }
+                        }));
+                    }
+                }, 50);
+            });
+
+            // 슬라이더 드래그 종료 시 최종 조회
+            tlSlider.addEventListener('change', () => {
+                clearTimeout(TL.debounceTimer);
+                const max = parseInt(tlSlider.max) || 1;
+                const val = parseInt(tlSlider.value);
+                if (val < max && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        action: 'getStateAtHistory',
+                        payload: { historyIndex: val }
+                    }));
+                }
+            });
+        });
+
         // ── Mobile Sidebar Toggle ──
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebar-overlay');
@@ -103,6 +355,7 @@ let ws;
                 document.getElementById('status-dot-mobile').classList.add('connected');
                 document.getElementById('status-text').innerText = 'Connected';
                 ws.send(JSON.stringify({ action: 'getState' }));
+                tlLoadHistory(); // 타임라인 이력 로드
 
                 pinger = setInterval(() => {
                     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
@@ -137,6 +390,11 @@ let ws;
                         const aliasStr = payload.episodeAlias ? ` (${payload.episodeAlias})` : '';
                         document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}${aliasStr}`;
                         document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+                        // 타임라인 LIVE 모드일 때 슬라이더 업데이트
+                        if (TL.isLive && payload.episodeInfo) {
+                            tlEpIndex.textContent = `${payload.episodeInfo.index + 1}화`;
+                            tlEpTime.textContent = secToHHMMSS(payload.episodeInfo.now);
+                        }
                     } else {
                         document.getElementById('stat-episode').innerText = '-- / --';
                         document.getElementById('stat-sec').innerText = '-- / --';
@@ -324,6 +582,26 @@ let ws;
 
                 case 'userDetail':
                     renderUserDetail(payload);
+                    break;
+
+                // ── 타임라인 이력 ──
+                case 'lastquery_history_data':
+                    tlHandleHistoryData(payload);
+                    break;
+
+                case 'lastquery_history_push':
+                    // 이력이 늘어났음만 알림 (LIVE 모드일 때는 전체 이력 재로드)
+                    if (TL.isLive) {
+                        tlLoadHistory();
+                    } else {
+                        // 타이탈 카운트만 업데이트
+                        TL.total = payload.total || TL.total;
+                        tlTotalCount.textContent = `이력 ${TL.total.toLocaleString()}건`;
+                    }
+                    break;
+
+                case 'stateAtHistory_data':
+                    tlHandleStateAtHistory(payload);
                     break;
             }
         }

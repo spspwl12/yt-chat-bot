@@ -14,6 +14,7 @@ try { musics = require('../data/video-music.json'); }
 catch (e) { console.warn('⚠️ [경고] video-music.json 파일이 없습니다. 음악 검색 기능이 비활성화됩니다.'); }
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
+const eventBus = require('./event-bus.js');
 const { sendChat } = require('./innertube.js');
 const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
     toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate } = require('./func.js');
@@ -719,6 +720,8 @@ function copyQuery(obj) {
     tempQuery.length = 0;
     const json = JSON.stringify(lastQuery, null, 4);
     fs.writeFileSync(schCfg.searcher.lastquery_path, json, 'utf-8');
+    // lastquery 이력 이벤트 발생
+    eventBus.emit('lastquery_update', { index: lastQuery.index, now: lastQuery.now, requestTime: lastQuery.requestTime, retry: lastQuery.retry });
 }
 
 /**
