@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 
 const chatHistory = require('./chat-history.js');
@@ -121,22 +122,22 @@ function broadcastMsg(data) {
 
 // WS 데이터 전송 헬퍼 (초경량 프레이밍)
 function sendWSFrame(socket, text) {
-    const payload = Buffer.from(text, 'utf8');
+    const payload = zlib.deflateSync(Buffer.from(text, 'utf8'));
     const length = payload.length;
     let header;
 
     if (length <= 125) {
         header = Buffer.alloc(2);
-        header[0] = 0x81;
+        header[0] = 0x82;
         header[1] = length;
     } else if (length <= 65535) {
         header = Buffer.alloc(4);
-        header[0] = 0x81;
+        header[0] = 0x82;
         header[1] = 126;
         header.writeUInt16BE(length, 2);
     } else {
         header = Buffer.alloc(10);
-        header[0] = 0x81;
+        header[0] = 0x82;
         header[1] = 127;
         header.writeBigUInt64BE(BigInt(length), 2);
     }
@@ -177,8 +178,12 @@ function parseWSFrame(buffer) {
         }
     }
 
-    if (opcode !== 0x1) {
+    if (opcode !== 0x1 && opcode !== 0x2) {
         return { isControl: true, byteLength: offset + length }; // Non-text frame
+    }
+
+    if (opcode === 0x2) {
+        return { isBinary: true, data: data, byteLength: offset + length };
     }
 
     return { data: data.toString('utf8'), byteLength: offset + length };
@@ -617,8 +622,17 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                     if (!parsed) break;
 
                     if (parsed.data) {
-                        // 정상적인 텍스트 메시지
-                        processClientMessage(socket, parsed.data);
+                        try {
+                            if (parsed.isBinary) {
+                                const decompressed = zlib.inflateSync(parsed.data).toString('utf8');
+                                processClientMessage(socket, decompressed);
+                            } else {
+                                // 정상적인 텍스트 메시지
+                                processClientMessage(socket, parsed.data);
+                            }
+                        } catch (e) {
+                            console.error("WS Decompress error", e);
+                        }
                     }
                     buffer = buffer.slice(parsed.byteLength);
                 }
