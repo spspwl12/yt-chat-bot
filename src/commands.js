@@ -335,6 +335,8 @@ async function handleCommand(type, text, displayName, _input) {
     return null;
 }
 
+const subtt = videoSubManager.getSubtitles();
+
 async function handleEpisodeCommand(rtn, cmd, args, _input) {
     // 별도 인자가 없으면(예: '!몇화') 현재 실시간으로 방영 중인 회차와 남은 시간 반환
     if (!args || args.length <= 0) {
@@ -452,79 +454,87 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
     const baseWarn = cfg.subtitle_score.warn_base || 10;
     const { validResults, searchInfo } = videoSubManager.searchAndFormat(query, rtn);
     if (validResults && validResults.length > 0) {
-            // 부하/스팸 방지를 위해 1위 결과물의 점수에 역비례하게 페널티 차등 책정
-            _input.warn = baseWarn +
-                parseInt((100 - validResults[0].score) / cfg.subtitle_score.warn_divisor);
+        // 부하/스팸 방지를 위해 1위 결과물의 점수에 역비례하게 페널티 차등 책정
+        _input.warn = baseWarn +
+            parseInt((100 - validResults[0].score) / cfg.subtitle_score.warn_divisor);
 
-            setCooldown(cmd, 0, _input);
+        setCooldown(cmd, 0, _input);
 
-            const isDefinitive = validResults[0].score >= 100 ||
-                validResults.length === 1 ||
-                (validResults[0].score - validResults[1].score >= 20);
+        searchInfo
+            .slice(0, cfg.subtitle_score.max_candidate_episodes)
+            .forEach(e => {
+                console.log(JSON.stringify({
+                    key: e.key, score: e.score, sub: subtt[e.key][e.matchedIndices[0] - 1].text
+                }));
+            });
 
-            if (isDefinitive) {
-                const firstResult = validResults[0];
+        const isDefinitive = validResults[0].score >= 100 ||
+            validResults.length === 1 ||
+            (validResults[0].score - validResults[1].score >= 20);
 
-                // 1위 검색 결과 외에 다른 회차에서 비슷하게 잡힌 대안 후보군 산출
-                const subEpisodeKeys = searchInfo
-                    .filter(e => searchInfo[0].key !== e.key && e.score >= firstResult.score)
-                    .slice(0, cfg.subtitle_score.max_candidate_episodes)
-                    .map(e => e.key);
+        if (isDefinitive) {
+            const firstResult = validResults[0];
 
-                const subEpisodeSet = new Set(subEpisodeKeys);
+            // 1위 검색 결과 외에 다른 회차에서 비슷하게 잡힌 대안 후보군 산출
+            const subEpisodeKeys = searchInfo
+                .filter(e => searchInfo[0].key !== e.key && e.score >= firstResult.score)
+                .slice(0, cfg.subtitle_score.max_candidate_episodes)
+                .map(e => e.key);
 
-                const subEpisodeMatching = videoInfo
-                    .filter(e => subEpisodeSet.has(e.name))
-                    .map(e => e.alias);
+            const subEpisodeSet = new Set(subEpisodeKeys);
 
-                const message = (firstResult.outOfbounds ? msg.subtitle.not_in_stream :
-                    msg.subtitle.found_time(firstResult.emoji, firstResult.timestr)) +
-                    `${subEpisodeMatching.length > 0 ? msg.subtitle.candidates(subEpisodeMatching) : ''}`;
+            const subEpisodeMatching = videoInfo
+                .filter(e => subEpisodeSet.has(e.name))
+                .map(e => e.alias);
 
-                const prefixEmoji = firstResult.score < 100 ? "⚠️ 📜" : "📜";
+            const message = (firstResult.outOfbounds ? msg.subtitle.not_in_stream :
+                msg.subtitle.found_time(firstResult.emoji, firstResult.timestr)) +
+                `${subEpisodeMatching.length > 0 ? msg.subtitle.candidates(subEpisodeMatching) : ''}`;
 
-                return {
-                    msg: msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
-                        insertSpaces(firstResult.subInfo.title, retryPattern[0]),
-                        message, firstResult.unicodescore, getCooldownMsg(cmd)),
-                    proc: function (attempt) {
-                        return msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
-                            insertSpaces(firstResult.subInfo.title, retryPattern[attempt]),
-                            message, firstResult.unicodescore, getCooldownMsg(cmd));
-                    }
-                };
-            } else {
-                const makeMsg = (attempt) => {
-                    const mapped = validResults.map((r, i) => {
-                        const rankEmoji = toUnicodeNumber2((i + 1).toString());
-                        const title = insertSpaces(r.subInfo.shorten, retryPattern[attempt]);
-                        const timeMsg = r.outOfbounds ?
-                            msg.subtitle.not_in_stream_short :
-                            `${r.emoji} ${r.timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
+            const prefixEmoji = firstResult.score < 100 ? "⚠️ 📜" : "📜";
 
-                        return {
-                            n: `${rankEmoji}${r.unicodenum})${title}${timeMsg.replace(/ /g, '')}`,
-                            s: `${rankEmoji}${r.unicodenum}화${timeMsg.replace(/ /g, '')}`
-                        };
-                    });
-                    const WrongMsg = msg.subtitle.ambiguous_warning;
+            return {
+                msg: msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
+                    insertSpaces(firstResult.subInfo.title, retryPattern[0]),
+                    message, firstResult.unicodescore, getCooldownMsg(cmd)),
+                proc: function (attempt) {
+                    return msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
+                        insertSpaces(firstResult.subInfo.title, retryPattern[attempt]),
+                        message, firstResult.unicodescore, getCooldownMsg(cmd));
+                }
+            };
+        } else {
+            const makeMsg = (attempt) => {
+                const mapped = validResults.map((r, i) => {
+                    const rankEmoji = toUnicodeNumber2((i + 1).toString());
+                    const title = insertSpaces(r.subInfo.shorten, retryPattern[attempt]);
+                    const timeMsg = r.outOfbounds ?
+                        msg.subtitle.not_in_stream_short :
+                        `${r.emoji} ${r.timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
+
                     return {
-                        n: `${WrongMsg} ${mapped.map(e => e.n).join('')} ${getCooldownMsg(cmd)}`,
-                        s: `${WrongMsg} ${mapped.map(e => e.s).join('')} ${getCooldownMsg(cmd)}`
+                        n: `${rankEmoji}${r.unicodenum})${title}${timeMsg.replace(/ /g, '')}`,
+                        s: `${rankEmoji}${r.unicodenum}화${timeMsg.replace(/ /g, '')}`
                     };
-                };
-
+                });
+                const WrongMsg = msg.subtitle.ambiguous_warning;
                 return {
-                    msg: makeMsg(0).n,
-                    proc: function (attempt) {
-                        if (attempt === 1)
-                            return makeMsg(attempt).s;
-                        else
-                            return returnWarning(msg.error.search_output_failed, cmd, _input);
-                    }
+                    n: `${WrongMsg} ${mapped.map(e => e.n).join('')} ${getCooldownMsg(cmd)}`,
+                    s: `${WrongMsg} ${mapped.map(e => e.s).join('')} ${getCooldownMsg(cmd)}`
                 };
-            }
+            };
+
+            return {
+                msg: makeMsg(0).n,
+                proc: function (attempt) {
+                    if (attempt === 1)
+                        return makeMsg(attempt).s;
+                    else
+                        return returnWarning(msg.error.search_output_failed, cmd, _input);
+                }
+            };
         }
+    }
 
     // 검색 알고리즘을 타기에는 조건이 부족하거나 매칭 실패 시 → AI 폴백 시도
     if (cfg.ai && cfg.ai.enable) {
