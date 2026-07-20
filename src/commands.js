@@ -470,7 +470,7 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
 
         const isDefinitive = validResults[0].score >= 100 ||
             validResults.length === 1 ||
-            (validResults[0].score - validResults[1].score >= 20);
+            (validResults[0].score - validResults[1].score >= 10);
 
         if (isDefinitive) {
             const firstResult = validResults[0];
