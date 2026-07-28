@@ -475,6 +475,12 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
         if (isDefinitive) {
             const firstResult = validResults[0];
 
+            if (firstResult.subSt === 0 && firstResult.subEd === 0) {
+                _input.warn = 0;
+                setCooldown(cmd, 0, _input);
+                return printNumEpisode(rtn, firstResult.subInfo.alias, cmd);
+            }
+
             // 1위 검색 결과 외에 다른 회차에서 비슷하게 잡힌 대안 후보군 산출
             const subEpisodeKeys = searchInfo
                 .filter(e => searchInfo[0].key !== e.key && e.score >= firstResult.score)

@@ -75,13 +75,14 @@ function searchAndFormat(query, rtn) {
                 const subInfo = videoInfo.find(e => e.name === key);
                 if (!subInfo) continue;
 
-                const subTime = fromHHMMSS(pfSub.start);
-                const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subTime));
+                const subSt = fromHHMMSS(pfSub.start);
+                const subEd = fromHHMMSS(pfSub.end);
+                const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subSt));
                 
                 let outOfbounds = subInfo.disable;
                 if (!outOfbounds && subInfo._editParsed) {
                     for (const et of subInfo._editParsed) {
-                        if (subTime && subTime >= et.s && subTime <= et.e) {
+                        if (subSt && subSt >= et.s && subSt <= et.e) {
                             outOfbounds = true;
                             break;
                         }
@@ -94,7 +95,7 @@ function searchAndFormat(query, rtn) {
                 const emoji = getClockEmoji(timestr);
 
                 validResults.push({
-                    subInfo, outOfbounds, unicodenum, unicodescore, timestr, emoji, score, key
+                    subInfo, outOfbounds, unicodenum, unicodescore, timestr, emoji, score, key, subSt, subEd
                 });
             }
         }
