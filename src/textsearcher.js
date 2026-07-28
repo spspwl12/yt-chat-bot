@@ -252,7 +252,7 @@ class KoreanSubSearchEngine {
             if (wordSum > fullScore) {
                 raw = fullScore + (wordSum - fullScore) * 0.7;
             }
-            const lengthPenalty = Math.max(0, target.length - qCharLen * 3) * 0.5;
+            const lengthPenalty = Math.min(15, Math.max(0, target.length - qCharLen * 3) * 0.15);
             let sc = Math.round((raw / qCharLen) * CHAR_FUZZY_CAP - lengthPenalty);
             if (sc > CHAR_FUZZY_CAP) sc = CHAR_FUZZY_CAP;
             if (sc < 0) sc = 0;
@@ -284,7 +284,7 @@ class KoreanSubSearchEngine {
             if (wordSum > fullScore) {
                 raw = fullScore + (wordSum - fullScore) * 0.7;
             }
-            const lengthPenalty = Math.max(0, target.length - qFullLen * 3) * 0.5;
+            const lengthPenalty = Math.min(15, Math.max(0, target.length - qFullLen * 3) * 0.15);
             let sc = Math.round((raw / qFullLen) * JAMO_CAP - lengthPenalty);
             if (sc > JAMO_CAP) sc = JAMO_CAP;
             if (sc < 0) sc = 0;
@@ -376,6 +376,13 @@ class KoreanSubSearchEngine {
                         matchedIndices: [s.index],
                     });
                 }
+            }
+        }
+
+        for (const res of resultsMap.values()) {
+            if (res.score < CHAR_EXACT_SCORE) {
+                const matchBonus = Math.min(10, Math.floor((res.matchedIndices.length - 1) * 0.4));
+                res.score = Math.min(CHAR_FUZZY_CAP, res.score + matchBonus);
             }
         }
 
