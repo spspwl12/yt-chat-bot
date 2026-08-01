@@ -36,6 +36,9 @@ class LiveDownloader extends EventEmitter {
         // 재시작 관리
         this._restartCount = 0;
         this._restarting = false;
+
+        // Watchdog
+        this._watchdogTimer = null;
     }
 
     start() {
@@ -49,6 +52,7 @@ class LiveDownloader extends EventEmitter {
 
     stop() {
         this._running = false;
+        this._clearWatchdog();
         this._killProcesses();
         this._closeWatcher();
         this._cleanupOldSegments();
@@ -73,6 +77,9 @@ class LiveDownloader extends EventEmitter {
         this._processedSegments.clear();
         this._segmentTimes = {};
         this._restarting = false;
+
+        // Watchdog 시작 (최초 세그먼트 대기)
+        this._resetWatchdog();
 
         console.log('📥 파이프라인 시작: yt-dlp → ffmpeg (segment)');
 
@@ -231,6 +238,9 @@ class LiveDownloader extends EventEmitter {
                 // 다운로드 성공 → 재시작 카운터 초기화
                 this._restartCount = 0;
 
+                // Watchdog 타이머 리셋 (세그먼트 도착 확인)
+                this._resetWatchdog();
+
                 // 타이밍 기록 정리
                 delete this._segmentTimes[prevNum];
             }
@@ -248,6 +258,7 @@ class LiveDownloader extends EventEmitter {
         if (this._restarting || !this._running) return;
         this._restarting = true;
 
+        this._clearWatchdog();
         this._killProcesses();
         this._closeWatcher();
 
@@ -266,6 +277,29 @@ class LiveDownloader extends EventEmitter {
             setTimeout(() => {
                 if (this._running) this._startPipeline();
             }, delay);
+        }
+    }
+
+    /**
+     * Watchdog 타이머 시작/리셋.
+     * downloader_timeout_ms 동안 세그먼트가 오지 않으면 파이프라인 강제 재시작.
+     */
+    _resetWatchdog() {
+        const wdCfg = this._config.watchdog;
+        if (!wdCfg || !wdCfg.enable) return;
+
+        this._clearWatchdog();
+        const timeout = wdCfg.downloader_timeout_ms || 120000;
+        this._watchdogTimer = setTimeout(() => {
+            console.error(`📥 [Watchdog] ${timeout}ms 동안 세그먼트 무응답 → 파이프라인 강제 재시작`);
+            this._scheduleRestart();
+        }, timeout);
+    }
+
+    _clearWatchdog() {
+        if (this._watchdogTimer) {
+            clearTimeout(this._watchdogTimer);
+            this._watchdogTimer = null;
         }
     }
 

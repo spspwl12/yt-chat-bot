@@ -42,5 +42,11 @@ module.exports = {
         hammingThreshold: 40, // 이미지 일치 판단을 위한 해밍 거리 최소 기준값 (낮을수록 더 똑같아야 일치로 판정)
         topN: 10,              // 일치하는 결과의 최대 반환 개수
         earlyExit: true       // 일치 조건 충족 시 완전 검색 없이 즉시 종료 활성화 여부
-    }
+    },
+    watchdog: {
+        // ─── Watchdog (phash 파이프라인 무응답 감지 및 자동 재시작) ────────────────
+        enable: true, // Watchdog 전체 활성화 여부 (false = 이하 모든 항목 무시)
+        downloader_timeout_ms: 120000, // 이 시간(ms) 동안 새 세그먼트가 도착하지 않으면 yt-dlp + ffmpeg 파이프라인 강제 재시작 (기본 2분)
+        searcher_timeout_ms: 90000, // 이 시간(ms) 동안 검색 결과(stdout)가 오지 않으면 searcher.exe 데몬을 강제 종료 후 재시작 (기본 1분 30초)
+    },
 };

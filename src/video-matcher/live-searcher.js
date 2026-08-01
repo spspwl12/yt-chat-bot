@@ -37,6 +37,10 @@ class LiveSearcher extends EventEmitter {
         // 현재 처리 중인 세그먼트
         this._currentSegment = null;
         this._resolveResult = null;
+
+        // Watchdog
+        this._watchdogTimer = null;
+        this._lastResultTime = 0;   // 마지막으로 결과를 받은 시각 (ms)
     }
 
     start() {
@@ -48,6 +52,7 @@ class LiveSearcher extends EventEmitter {
 
     stop() {
         this._running = false;
+        this._clearWatchdog();
         this._killDaemon();
         this._queue.length = 0;
         console.log('🔍 LiveSearcher 중지');
@@ -109,6 +114,9 @@ class LiveSearcher extends EventEmitter {
             this._jsonBuffer = '';
             this._resolveResult = resolve;
 
+            // Watchdog 시작 (검색 요청 시점에서)
+            this._resetWatchdog();
+
             // 타임아웃 설정 (60초)
             const timeout = setTimeout(() => {
                 this._resolveResult = null;
@@ -122,6 +130,7 @@ class LiveSearcher extends EventEmitter {
                 this._daemon.stdin.write(clipPath + '\n');
             } catch (err) {
                 clearTimeout(timeout);
+                this._clearWatchdog();
                 this._resolveResult = null;
                 reject(err);
             }
@@ -226,6 +235,10 @@ class LiveSearcher extends EventEmitter {
     _onResult(jsonStr) {
         if (!jsonStr) return;
 
+        // Watchdog 리셋 (결과 수신 확인)
+        this._lastResultTime = Date.now();
+        this._clearWatchdog();
+
         try {
             const parsed = JSON.parse(jsonStr);
             if (this._resolveResult) {
@@ -240,6 +253,37 @@ class LiveSearcher extends EventEmitter {
                 this._resolveResult(null);
                 this._resolveResult = null;
             }
+        }
+    }
+
+    /**
+     * Watchdog 타이머 시작/리셋.
+     * searcher_timeout_ms 동안 결과가 오지 않으면 데슬을 강제 종료하여 재시작 트리거.
+     */
+    _resetWatchdog() {
+        const wdCfg = this._config.watchdog;
+        if (!wdCfg || !wdCfg.enable) return;
+
+        this._clearWatchdog();
+        const timeout = wdCfg.searcher_timeout_ms || 90000;
+        this._watchdogTimer = setTimeout(() => {
+            console.error(`🔍 [Watchdog] ${timeout}ms 동안 데슬 stdout 무응답 → 데슬 강제 종료`);
+            if (this._resolveResult) {
+                if (this._searchTimeout) clearTimeout(this._searchTimeout);
+                this._resolveResult(null);
+                this._resolveResult = null;
+            }
+            // 프로세스 강제 종료 → exit 이벤트에서 자동 재시작
+            if (this._daemon) {
+                try { this._daemon.kill('SIGTERM'); } catch (_) { }
+            }
+        }, timeout);
+    }
+
+    _clearWatchdog() {
+        if (this._watchdogTimer) {
+            clearTimeout(this._watchdogTimer);
+            this._watchdogTimer = null;
         }
     }
 
