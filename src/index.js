@@ -72,7 +72,8 @@ async function main() {
         const chkInput = { warn: 0, ban: 0, channelId: msg.channelId, spamGuard };
         const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
         if (resp) {
-            const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
+            // 웹 디버깅 가상입력에서는 처음 출력을 실패하면 재시도 안함 (maxRetries = 1)
+            const p = typeof resp === 'string' ? sendChat(resp, null, 1) : sendChat(resp.msg, resp.proc, 1);
             p.then(ok => {
                 if (chkInput.logData) {
                     if (!ok) chkInput.logData.response = null;

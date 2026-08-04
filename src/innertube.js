@@ -563,8 +563,9 @@ function _waitForVerify(messageId) {
  * @param {function} [retryProc] - 재시도 시 대체 메시지 생성 함수.
  *   retryProc(attempt) → string|null. attempt는 1부터 시작.
  *   null 반환 시 재시도 중단. 생략 시 동일 메시지로 재시도.
+ * @param {number} [maxRetries] - 최대 시도 횟수 (기본값: cfg.yt.max_retries)
  */
-function sendChat(message, retryProc) {
+function sendChat(message, retryProc, maxRetries) {
     const { isBotMuted } = require('./web-server.js');
     if (isBotMuted && isBotMuted()) {
         console.log('🔇 [Muted] ' + message);
@@ -575,6 +576,7 @@ function sendChat(message, retryProc) {
         sendQueue.push({
             message: message,
             retryProc: retryProc || null,
+            maxRetries: typeof maxRetries === 'number' ? maxRetries : cfg.yt.max_retries,
             resolve: resolve
         });
         if (!queueRunning)
@@ -586,7 +588,8 @@ async function _processQueue() {
     queueRunning = true;
     while (sendQueue.length > 0) {
         var item = sendQueue.shift();
-        var ok = await _sendWithRetry(item.message, item.retryProc, cfg.yt.max_retries);
+        var retries = item.maxRetries !== undefined ? item.maxRetries : cfg.yt.max_retries;
+        var ok = await _sendWithRetry(item.message, item.retryProc, retries);
         item.resolve(ok);
         if (sendQueue.length > 0)
             await sleep(cfg.yt.send_delay);
