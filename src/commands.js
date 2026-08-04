@@ -206,15 +206,15 @@ async function handleCommand(type, text, displayName, _input) {
     if (group === cmd)
         return null;
 
-    // 5. 유효한 명령어임이 판별되었으므로 밴/경고 유저 차단 (index.js가 패널티를 갱신할 수 있도록 flag 설정)
+    // 5. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
+    if (isCooldown(cmd))
+        return null;
+
+    // 6. 유효한 명령어이며 쿨타임이 아닌 상태에서 밴/경고 유저 차단 (index.js가 패널티를 갱신할 수 있도록 flag 설정)
     if (_input && _input.ban) {
         _input.blockedCommand = true;
         return null;
     }
-
-    // 6. 사용하려는 명령어가 현재 쿨타임(도배 방지 대기시간) 상태인지 체크
-    if (isCooldown(cmd))
-        return null;
 
     // 7. 경고(Warns) 수치 기본 할당
     const customWarn = getWarnsValue(group);
