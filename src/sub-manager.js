@@ -46,6 +46,10 @@ function searchAndFormat(query, rtn) {
 
     searchInfo.sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
+        const zeroA = a.matchedIndices?.includes(1);
+        const zeroB = b.matchedIndices?.includes(1);
+        if (zeroA !== zeroB) return zeroA ? -1 : 1;
+
         const lenA = a.matchedIndices ? a.matchedIndices.length : 0;
         const lenB = b.matchedIndices ? b.matchedIndices.length : 0;
         if (lenB !== lenA) return lenB - lenA;
@@ -78,7 +82,7 @@ function searchAndFormat(query, rtn) {
                 const subSt = fromHHMMSS(pfSub.start);
                 const subEd = fromHHMMSS(pfSub.end);
                 const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subSt));
-                
+
                 let outOfbounds = subInfo.disable;
                 if (!outOfbounds && subInfo._editParsed) {
                     for (const et of subInfo._editParsed) {

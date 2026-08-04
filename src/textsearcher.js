@@ -143,9 +143,9 @@ function idsHash(arr) {
 
 // ── 스코어링 상수 ──
 const CHAR_EXACT_SCORE = 100;  // Tier 1: 글자 완전 포함
-const CHAR_FUZZY_CAP   = 85;  // Tier 2: 글자 퍼지 매칭 상한
-const JAMO_CAP         = 60;  // Tier 3: 자모 매칭 상한
-const THRESHOLD        = 30;  // 결과 포함 최소 점수
+const CHAR_FUZZY_CAP = 85;  // Tier 2: 글자 퍼지 매칭 상한
+const JAMO_CAP = 60;  // Tier 3: 자모 매칭 상한
+const THRESHOLD = 30;  // 결과 포함 최소 점수
 
 class KoreanSubSearchEngine {
     constructor(data) {
@@ -367,26 +367,47 @@ class KoreanSubSearchEngine {
             if (bestScore > THRESHOLD) {
                 const existing = resultsMap.get(s.key);
                 if (existing) {
-                    existing.matchedIndices.push(s.index);
+                    existing.allMatches.push({ index: s.index, score: bestScore });
                     if (bestScore > existing.score) existing.score = bestScore;
                 } else {
                     resultsMap.set(s.key, {
                         key: s.key,
                         score: bestScore,
-                        matchedIndices: [s.index],
+                        allMatches: [{ index: s.index, score: bestScore }],
                     });
                 }
             }
         }
 
         for (const res of resultsMap.values()) {
-            if (res.score < CHAR_EXACT_SCORE) {
-                const matchBonus = Math.min(10, Math.floor((res.matchedIndices.length - 1) * 0.4));
-                res.score = Math.min(CHAR_FUZZY_CAP, res.score + matchBonus);
+            // 각 key의 allMatches를 점수 내림차순 정렬
+            res.allMatches.sort((a, b) => b.score - a.score || a.index - b.index);
+        }
+
+        const results = [];
+        for (const res of resultsMap.values()) {
+            // 점수가 10점 이상 차이나는 경우 별도 entry로 분리
+            let i = 0;
+            while (i < res.allMatches.length) {
+                const topScore = res.allMatches[i].score;
+                const group = [];
+                while (i < res.allMatches.length && res.allMatches[i].score >= topScore - 10) {
+                    group.push(res.allMatches[i]);
+                    i++;
+                }
+
+                let groupScore = topScore;
+                const matchedIndices = group.map(m => m.index);
+
+                if (groupScore < CHAR_EXACT_SCORE) {
+                    const matchBonus = Math.min(10, Math.floor((matchedIndices.length - 1) * 0.4));
+                    groupScore = Math.min(CHAR_FUZZY_CAP, groupScore + matchBonus);
+                }
+
+                results.push({ key: res.key, score: groupScore, matchedIndices });
             }
         }
 
-        const results = Array.from(resultsMap.values());
         results.sort((a, b) => b.score - a.score);
         return results.slice(0, 50);
     }
