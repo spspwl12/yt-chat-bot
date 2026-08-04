@@ -54,7 +54,7 @@ module.exports = {
         found_time: (emoji, timestr) => `${emoji} 등장 시간은 ${timestr} 분 입니다. `,
         not_in_stream: `스트리밍에는 등장하지 않습니다.`,
         candidates: (aliases) => `(후보: ${aliases})`,
-        ambiguous_warning: `⚠️ 대사를 정확히 입력하세요.`,
+        ambiguous_warning: `⚠️ 여러 에피소드가 검색되었습니다.`,
         not_in_stream_short: `스트리밍X`,
     },
 
@@ -84,5 +84,6 @@ module.exports = {
     // ─── 쿨타임 안내 ─────────────────────────────────────────
     cooldown: {
         suffix: (minutes) => `(쿨타임 ${minutes}분)`,
+        user_warning: (name, minutes) => `${name}님은 ${minutes}분 뒤에 명령어 사용 가능합니다. (이 메시지는 단 한 번 표시됨)`,
     },
 };
