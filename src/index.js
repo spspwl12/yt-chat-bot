@@ -69,7 +69,8 @@ async function main() {
             isChatOwner: false,
             isModerator: false
         };
-        const chkInput = { warn: 0, ban: 0, channelId: msg.channelId, spamGuard };
+        const checkBan = spamGuard.confirm(msg.channelId);
+        const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
         const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
         if (resp) {
             // 웹 디버깅 가상입력에서는 처음 출력을 실패하면 재시도 안함 (maxRetries = 1)
@@ -81,6 +82,12 @@ async function main() {
                 }
                 if (ok && chkInput.onSuccess) chkInput.onSuccess();
             });
+        } else if (chkInput.blockedCommand) {
+            const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
+            if (banned) {
+                broadcastSpam();
+                spamGuard.checkAndSendUserCooldownWarning(msg.channelId, msg.displayName);
+            }
         } else if (chkInput.logData) {
             chkInput.logData.response = null;
             eventBus.emit('command_used', chkInput.logData);
@@ -130,6 +137,9 @@ async function main() {
                     const banned = await spamGuard.enforce(msg.channelId, msg.displayName);
                     if (banned) {
                         broadcastSpam();
+                        if (chkInput.blockedCommand) {
+                            spamGuard.checkAndSendUserCooldownWarning(msg.channelId, msg.displayName);
+                        }
                         continue;
                     }
                     

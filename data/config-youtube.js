@@ -13,6 +13,7 @@ module.exports = {
         spam_warn_limit: 10000,       // 봇이 몇번 경고를 하는지   ( 이 횟수가 넘어가면 밴됨 )
         penalty_duration_hrs: 24,   // 명령어 입력 기록 유지 시간 (기본 12시간)
         penalty_add_sec: 180,         // 명령어 입력 1회당 증가할 경고 해제 시간 (초)
+        enable_user_cooldown_warn: true, // 개인 쿨타임 걸린 유저에게 경고 메시지 출력 여부
         group_warns: {              // 명령어 그룹별 부여할 기본 Warns (경고/도배 패널티 수치)
             "greeting, help": 10,
             "episode, time, date": 0,

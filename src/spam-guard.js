@@ -4,6 +4,8 @@ const path2 = require('./path.js');
 const path = require('path');
 const BANNED_PATH = path2.findPath('../data/youtube-banned.json');
 const TRACKER_PATH = path2.findPath('../data/youtube-tracker.json') || path.join(__dirname, '../data', 'youtube-tracker.json');
+const cfg = require('../data/config-youtube.js');
+const msg = require('../data/config-messages.js');
 
 class SpamGuard {
     constructor(opts) {
@@ -57,6 +59,10 @@ class SpamGuard {
         if (r.warns > 0 && r.penaltyExpiresAt > 0 && Date.now() >= r.penaltyExpiresAt) {
             r.warns = 0;
             r.penaltyExpiresAt = 0;
+            r.cooldownWarned = false;
+        }
+        if (r.warns === 0) {
+            r.cooldownWarned = false;
         }
     }
 
@@ -253,6 +259,10 @@ class SpamGuard {
                     if (entry.warns > 0 && entry.penaltyExpiresAt > 0 && now >= entry.penaltyExpiresAt) {
                         entry.warns = 0;
                         entry.penaltyExpiresAt = 0;
+                        entry.cooldownWarned = false;
+                    }
+                    if (!entry.warns) {
+                        entry.cooldownWarned = false;
                     }
                     // searchHistory는 별도 만료 시간 적용 불가 (commands.js에서 관리)
                     // 유효한 데이터만 로드 (경고, 이력, 또는 검색 기록이 있는 경우)
@@ -284,7 +294,8 @@ class SpamGuard {
                     penaltyExpiresAt: entry.penaltyExpiresAt || 0,
                     displayName: entry.displayName || null,
                     lastWarnedAt: entry.lastWarnedAt || 0,
-                    searchBanned: entry.searchBanned || false
+                    searchBanned: entry.searchBanned || false,
+                    cooldownWarned: entry.cooldownWarned || false
                 };
                 if (searchHistory.length > 0) {
                     obj[channelId].searchHistory = searchHistory;
@@ -350,6 +361,34 @@ class SpamGuard {
             r.searchBanned = false;
             this._saveTrackerDebounced();
         }
+    }
+
+    /**
+     * 개인 쿨타임 걸린 유저에게 최초 1회 경고 메시지 전송
+     */
+    checkAndSendUserCooldownWarning(channelId, displayName) {
+        if (this.banned.has(channelId)) return false;
+        const enabled = (cfg.spam && cfg.spam.enable_user_cooldown_warn) || (cfg.cooldown && cfg.cooldown.enable_user_cooldown_warn);
+        if (!enabled) return false;
+
+        const r = this.tracker.get(channelId);
+        if (!r) return false;
+
+        const now = Date.now();
+        this._cleanupIfExpired(r);
+
+        if (r.warns > 0 && r.penaltyExpiresAt > now && !r.cooldownWarned) {
+            r.cooldownWarned = true;
+            this._saveTrackerDebounced();
+
+            const remainingMs = r.penaltyExpiresAt - now;
+            const remainingMin = Math.max(1, Math.ceil(remainingMs / (1000 * 60)));
+            const name = displayName || r.displayName || '유저';
+            if (msg.cooldown && msg.cooldown.user_warning)
+                sendChat(msg.cooldown.user_warning(name, remainingMin));
+            return true;
+        }
+        return false;
     }
 }
 
