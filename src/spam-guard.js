@@ -106,6 +106,7 @@ class SpamGuard {
                 this._refreshExpiry(r);
                 r.lastWarnedAt = now;
                 this._saveTrackerDebounced();
+                this._sendCooldownWarning(r, displayName);
             }
             return r.warns >= this.warnLimit ? 'ban' : 'warn';
         }
@@ -121,6 +122,7 @@ class SpamGuard {
         r.lastWarnedAt = now;
         this._refreshExpiry(r);
         this._saveTrackerDebounced();
+        this._sendCooldownWarning(r, displayName);
         return r.warns >= this.warnLimit ? 'ban' : 'warn';
     }
 
@@ -364,31 +366,35 @@ class SpamGuard {
     }
 
     /**
-     * 개인 쿨타임 걸린 유저에게 최초 1회 경고 메시지 전송
+     * 쿨다운 경고 메시지 전송 (내부용). 최초 1회만 전송.
+     */
+    _sendCooldownWarning(r, displayName) {
+        const enabled = (cfg.spam && cfg.spam.enable_user_cooldown_warn) || (cfg.cooldown && cfg.cooldown.enable_user_cooldown_warn);
+        if (!enabled || r.cooldownWarned) return;
+
+        r.cooldownWarned = true;
+        this._saveTrackerDebounced();
+
+        const remainingMs = r.penaltyExpiresAt - Date.now();
+        if (remainingMs <= 0) return;
+
+        const remainingMin = Math.max(1, Math.ceil(remainingMs / (1000 * 60)));
+        const name = displayName || r.displayName || '유저';
+        if (msg.cooldown && msg.cooldown.user_warning)
+            sendChat(msg.cooldown.user_warning(name, remainingMin));
+    }
+
+    /**
+     * 개인 쿨타임 걸린 유저에게 최초 1회 경고 메시지 전송.
+     * check() 내부에서 자동 호출되므로, 외부에서 수동 호출 시 사용.
      */
     checkAndSendUserCooldownWarning(channelId, displayName) {
         if (this.banned.has(channelId)) return false;
-        const enabled = (cfg.spam && cfg.spam.enable_user_cooldown_warn) || (cfg.cooldown && cfg.cooldown.enable_user_cooldown_warn);
-        if (!enabled) return false;
-
         const r = this.tracker.get(channelId);
-        if (!r) return false;
-
-        const now = Date.now();
-        this._cleanupIfExpired(r);
-
-        if (r.warns > 0 && r.penaltyExpiresAt > now && !r.cooldownWarned) {
-            r.cooldownWarned = true;
-            this._saveTrackerDebounced();
-
-            const remainingMs = r.penaltyExpiresAt - now;
-            const remainingMin = Math.max(1, Math.ceil(remainingMs / (1000 * 60)));
-            const name = displayName || r.displayName || '유저';
-            if (msg.cooldown && msg.cooldown.user_warning)
-                sendChat(msg.cooldown.user_warning(name, remainingMin));
-            return true;
-        }
-        return false;
+        if (!r || r.cooldownWarned) return false;
+        // check(0)으로 쿨다운 상태 확인 (내부에서 _sendCooldownWarning 호출됨)
+        const result = this.check(channelId, 0, displayName);
+        return result === 'warn';
     }
 }
 
