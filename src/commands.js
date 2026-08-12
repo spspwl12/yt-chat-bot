@@ -874,7 +874,7 @@ function printTimeTable(rtn, change, cmd, limitLength = cfg.timetable.default_li
         const e = videoInfo[currentIdx];
         if (!e.disable) {
             if (i === 0) {
-                str = `(${toUnicodeNumber(e.alias)} 화)`;
+                str = insertSpaces(`${toUnicodeNumber(e.alias)}화)${e.shorten}`, change);
                 currentIdx = (currentIdx + 1) % n;
                 continue;
             }
@@ -883,9 +883,9 @@ function printTimeTable(rtn, change, cmd, limitLength = cfg.timetable.default_li
             if (!pdate)
                 pdate = fdate;
 
-            // 출력 포맷 가공: '[23:45] 혹은 [내일00:15]' 형식으로 시간표 헤더 작성
-            const hdr = `[${formatDate(fdate, pdate)}]`.replace(/ /g, '');
-            // 에피소드 이름과 결합 ('→[23:45]에피소드명')
+            // 출력 포맷 가공: '23:45)' 혹은 '12일00:15)' 형식으로 시간표 헤더 작성
+            const hdr = `${formatDate(fdate, pdate, true)})`.replace(/ /g, '');
+            // 에피소드 이름과 결합 ('→23:45)에피소드명')
             const candidate = insertSpaces((str ? "→" : "") + hdr + e.shorten, change);
 
             // 누적된 시간표 문자열의 총 길이가 채팅 제한치(limitLength)를 넘으면 그만 붙이고 즉시 반환
@@ -956,12 +956,12 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd) {
     const makeMsg = (change) => {
         // 현재 회차를 무조건 맨 앞에 앵커로 표시
         const currentAlias = toUnicodeNumber(currentInfo.alias);
-        let str = `(${currentAlias}화)`;
+        let str = `${currentAlias}화`;
         let pdate = null;
 
         // 요청된 회차들을 시간순으로 출력
         for (const entry of entries) {
-            const hdr = `[${formatDate(entry.futureDate, pdate, true)}]`.replace(/ /g, '');
+            const hdr = `${formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
             const unicodeAlias = toUnicodeNumber(entry.alias);
             const candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
             if (str.length + candidate.length >= limitLength) break;
