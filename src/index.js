@@ -17,6 +17,7 @@ const cfg = require('../data/config-youtube.js');
 const { startServer, broadcastChat, broadcastSpam } = require('./web-server.js');
 const chatHistory = require('./chat-history.js');
 const { startSchedulePoster } = require('./schedule_poster.js');
+const statsTracker = require('./stats-db.js');
 
 const spamGuard = new SpamGuard({
     windowSec: cfg.spam.spam_window_sec || 10,
@@ -67,8 +68,10 @@ async function main() {
             displayName: 'WebAdmin',
             text: text,
             isChatOwner: false,
-            isModerator: false
+            isModerator: false,
+            timestamp: Date.now()
         };
+        statsTracker.recordChatMessage(msg);
         const checkBan = spamGuard.confirm(msg.channelId);
         const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
         const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
@@ -126,7 +129,13 @@ async function main() {
 
             for (let i = 0; i < messages.length; i++) {
                 const msg = messages[i];
-                if (msg.isChatOwner || msg.isModerator || !msg.text || !msg.channelId)
+                if (!msg.text || !msg.channelId)
+                    continue;
+
+                // 유저 채팅 스탯 실시간 기록
+                statsTracker.recordChatMessage(msg);
+
+                if (msg.isChatOwner || msg.isModerator)
                     continue;
                 const checkBan = spamGuard.confirm(msg.channelId);
                 if (checkBan >= 2)
@@ -188,11 +197,13 @@ function sleep(ms) {
 process.on('SIGINT', function () {
     originalLog('\n⏹️  종료...');
     running = false;
+    statsTracker.close();
     process.exit();
 });
 
 process.on('SIGTERM', function () {
     running = false;
+    statsTracker.close();
 });
 
 main().catch(function (err) {

@@ -24,6 +24,7 @@ try { videoMetadata = require('../data/video-metadata.json'); }
 catch (e) { console.warn('⚠️ [경고] video-metadata.json 파일이 없습니다. 방송 메타데이터 관련 기능이 비활성화됩니다.'); }
 
 const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
+const statsTracker = require('./stats-db.js');
 const musicSearcher = new TextSearchEngine(musics);
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -59,7 +60,8 @@ const COMMAND_GROUPS = {
     'first': ['!첫화', '!첫회', '!처음화', '!처음회', '!처음편', '!첫편'],
     'last': ['!마지막', '!마지막화', '!마지막회', '!마지막편', '!최종화', '!최종회', '!최종편', '!막화', '!막회'],
     'date': ['!날짜'],
-    'time': ['!시간', '!타임', '!남은시간']
+    'time': ['!시간', '!타임', '!남은시간'],
+    'stats': ['!스탯', '!스텟', '!내정보', '!내스탯', '!내스텟', '!stats', '!stat']
 };
 
 /**
@@ -332,7 +334,53 @@ async function handleCommand(type, text, displayName, _input) {
         return _emitLog(handleDateCommand(rtn, cmd, args, _input));
     }
 
+    // 유저 스탯/시청시간/출석 조회
+    if (group === 'stats') {
+        return _emitLog(handleStatsCommand(cmd, displayName, _input));
+    }
+
     return null;
+}
+
+function handleStatsCommand(cmd, displayName, _input) {
+    if (cfg.stats && !cfg.stats.enable) {
+        return returnWarning(msg.error.stats_disabled, cmd, _input);
+    }
+
+    const channelId = _input && _input.channelId;
+    if (!channelId) {
+        return returnWarning(msg.error.stats_not_found, cmd, _input);
+    }
+
+    const stats = statsTracker.getUserStats(channelId, displayName);
+    if (!stats) {
+        return returnWarning(msg.error.stats_not_found, cmd, _input);
+    }
+
+    setCooldown(cmd, 0, _input);
+
+    const makeMsg = (attempt) => {
+        const spaces = " ".repeat(attempt);
+        const builtMsg = msg.stats.user_stats(
+            stats.name,
+            stats.totalMsgs,
+            stats.totalRank,
+            stats.daysCount,
+            stats.todayMsgs,
+            stats.todayRank,
+            stats.todayWatchStr,
+            stats.todayWatchRank,
+            stats.totalWatchStr,
+            stats.totalWatchRank,
+            getCooldownMsg(cmd)
+        );
+        return `${builtMsg}${spaces}`;
+    };
+
+    return {
+        msg: makeMsg(0),
+        proc: (attempt) => makeMsg(attempt)
+    };
 }
 
 const subtt = videoSubManager.getSubtitles();

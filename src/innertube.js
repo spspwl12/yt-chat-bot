@@ -480,12 +480,16 @@ async function fetchChat(continuation) {
             if (iconType === 'MODERATOR') isModerator = true;
         }
 
+        var timestampUsec = renderer.timestampUsec;
+        var timestamp = timestampUsec ? Math.floor(parseInt(timestampUsec, 10) / 1000) : Date.now();
+
         messages.push({
             text: text,
             displayName: (renderer.authorName && renderer.authorName.simpleText) || '',
             channelId: renderer.authorExternalChannelId || '',
             isChatOwner: isChatOwner,
             isModerator: isModerator,
+            timestamp: timestamp,
             contextMenu: (renderer.contextMenuEndpoint
                 && renderer.contextMenuEndpoint.liveChatItemContextMenuEndpoint
                 && renderer.contextMenuEndpoint.liveChatItemContextMenuEndpoint.params) || null,
