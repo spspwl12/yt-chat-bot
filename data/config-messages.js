@@ -12,6 +12,8 @@ module.exports = {
         music_disabled: `⚠️ 음악 검색 기능이 비활성화되어 있습니다.`,
         music_not_found: `⚠️ 검색된 노래가 없습니다. 정확히 입력해주세요.`,
         music_none_playing: (historyMin) => `⚠️ ${historyMin}분 이내에 재생된 음악이 없습니다.`,
+        stats_disabled: `⚠️ 스탯 기능이 비활성화되어 있습니다.`,
+        stats_not_found: `⚠️ 스탯 정보를 찾을 수 없습니다.`,
         next_episode_not_found: (label) => `⚠️ ${label} 회차 정보를 확인할 수 없습니다.`,
         date_missing: `⚠️ 날짜나 시간을 입력하세요. (예: !날짜 19시 30분, !날짜 11/12)`,
         date_invalid_format: `⚠️ 날짜 형식을 인식하지 못했습니다.`,
@@ -21,10 +23,9 @@ module.exports = {
 
     // ─── 도움말 ────────────────────────────────────────────────
     help: {
-        main: `ℹ️ 명령어: !몇화, !다음화, !시간표, !첫화, !마지막화, !날짜, !음악 ` +
-            `ℹ️ !몇화 사용법: !몇화 64화, !몇화 31 64 72 121, !몇화 괜히똥쌌네` +
-            `ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 개인 쿨타임이 적용됩니다. (최대 327시간)` +
-            `ℹ️ 쿨타임이 걸린 상태에서 명령어를 사용할 경우, 쿨타임이 초기화되면서 동시에 늘어납니다.`,
+        main: `ℹ️ 명령어: !몇화, !다음화, !시간표, !첫화, !마지막화, !날짜` +
+            `ℹ️ !몇화 사용법: !몇화 64화, !몇화 20 24 64 65, !몇화 고자라니` +
+            `ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 개인 쿨타임이 적용됩니다. (최대 100시간)`,
     },
 
     // ─── 에피소드 / 회차 안내 ─────────────────────────────────
@@ -50,8 +51,8 @@ module.exports = {
     // ─── 대사 검색 결과 ───────────────────────────────────────
     subtitle: {
         found_definitive: (prefixEmoji, unicodenum, title, message, unicodescore, cooldownMsg) =>
-            `${prefixEmoji} 요청하신 대사는 "${unicodenum}. ${title}" 에 등장하며 ${message} 정확도: ${unicodescore}% ${cooldownMsg}`,
-        found_time: (emoji, timestr) => `${emoji} 등장 시간은 ${timestr} 분 입니다. `,
+            `${prefixEmoji} 요청하신 대사는 "${unicodenum}. ${title}" 에 등장하며 ${message} 대사 정확도: ${unicodescore}% ${cooldownMsg}`,
+        found_time: (emoji, timestr) => `${emoji} 대사를 말하는 시각은 ${timestr} 분 입니다. `,
         not_in_stream: `스트리밍에는 등장하지 않습니다.`,
         candidates: (aliases) => `(후보: ${aliases})`,
         ambiguous_warning: `⚠️ 여러 에피소드가 검색되었습니다.`,
@@ -81,9 +82,15 @@ module.exports = {
             `🎬 "${unicodenum}. ${title}" 방영중 ${timestr}초 남음 ${cooldownMsg}`,
     },
 
+    // ─── 유저 스탯 조회 결과 ───────────────────────────────────
+    stats: {
+        user_stats: (name, totalMsgs, totalRank, daysCount, todayMsgs, todayRank, todayWatchStr, todayWatchRank, totalWatchStr, totalWatchRank, cooldownMsg) =>
+            `📊 [${name}님의 스탯] 총 채팅 메시지 수: ${totalMsgs}개 (${totalRank}위) | 총 채팅 일수: ${daysCount}일 | 오늘 메시지 채팅 수: ${todayMsgs}개 (${todayRank}위) | 오늘 라이브 시청시간: ${todayWatchStr} (${todayWatchRank}위) | 총 라이브 시청시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
+    },
+
     // ─── 쿨타임 안내 ─────────────────────────────────────────
     cooldown: {
         suffix: (minutes) => `(쿨타임 ${minutes}분)`,
-        user_warning: (name, minutes) => `${name}님은 ${minutes}분 뒤에 명령어 사용 가능합니다. (이 메시지는 단 한 번 표시됨)`,
+        user_warning: (name, minutes) => `${name} 님은 ${minutes}분 뒤에 명령어 사용 가능합니다.`,
     },
 };
