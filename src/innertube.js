@@ -295,9 +295,8 @@ function makeContext() {
 // ═══════════════════════════════════════
 
 async function initSession(videoId, chatMode) {
-    // chatMode: 'top' = 주요 채팅 (기본), 'live' = 실시간 채팅
-    chatMode = chatMode || 'top';
-    var chatModeIndex = chatMode === 'live' ? 1 : 0;
+    // chatMode: 'live' = 실시간 채팅 (기본 - 모든 메시지), 'top' = 주요 채팅 (인기 메시지만)
+    chatMode = chatMode || (cfg.yt && cfg.yt.chat_mode) || 'live';
     var chatModeLabel = chatMode === 'live' ? '실시간 채팅' : '주요 채팅';
 
     currentVideoId = videoId;
@@ -338,10 +337,30 @@ async function initSession(videoId, chatMode) {
                 && header.viewSelector
                 && header.viewSelector.sortFilterSubMenuRenderer
                 && header.viewSelector.sortFilterSubMenuRenderer.subMenuItems;
-            if (subItems && subItems.length > chatModeIndex) {
-                publicCont = subItems[chatModeIndex].continuation
-                    && subItems[chatModeIndex].continuation.reloadContinuationData
-                    && subItems[chatModeIndex].continuation.reloadContinuationData.continuation;
+
+            if (subItems && subItems.length > 0) {
+                var selectedItem = null;
+                if (chatMode === 'live') {
+                    // 실시간 채팅 탐색 (문구 또는 index 1)
+                    selectedItem = subItems.find(item => {
+                        var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
+                        return title.includes('실시간') || title.includes('live') || title.includes('all');
+                    });
+                    if (!selectedItem && subItems.length > 1) {
+                        selectedItem = subItems[1];
+                    }
+                } else {
+                    selectedItem = subItems.find(item => {
+                        var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
+                        return title.includes('주요') || title.includes('top');
+                    });
+                }
+                if (!selectedItem) selectedItem = subItems[0];
+
+                publicCont = selectedItem.continuation
+                    && selectedItem.continuation.reloadContinuationData
+                    && selectedItem.continuation.reloadContinuationData.continuation;
+
                 if (publicCont) {
                     console.log('✅ ' + chatModeLabel + ' continuation 획득');
                 }
@@ -434,27 +453,32 @@ async function fetchChat(continuation) {
     });
 
     var liveChatCont = data.continuationContents && data.continuationContents.liveChatContinuation;
-    if (!liveChatCont) return { messages: [], continuation: null };
+    if (!liveChatCont) return { messages: [], continuation: null, timeoutMs: 2000 };
 
-    // 다음 continuation
+    // 다음 continuation 및 timeoutMs
     var nextCont = null;
+    var timeoutMs = 2000;
     var conts = liveChatCont.continuations;
     if (conts) {
         for (var i = 0; i < conts.length; i++) {
             var c = conts[i];
-            nextCont = (c.timedContinuationData && c.timedContinuationData.continuation)
-                || (c.invalidationContinuationData && c.invalidationContinuationData.continuation)
-                || null;
+            if (c.timedContinuationData) {
+                nextCont = c.timedContinuationData.continuation;
+                if (c.timedContinuationData.timeoutMs) {
+                    timeoutMs = c.timedContinuationData.timeoutMs;
+                }
+            } else if (c.invalidationContinuationData) {
+                nextCont = c.invalidationContinuationData.continuation;
+                if (c.invalidationContinuationData.timeoutMs) {
+                    timeoutMs = c.invalidationContinuationData.timeoutMs;
+                }
+            }
             if (nextCont) break;
         }
     }
 
     // 메시지 파싱
     var actions = liveChatCont.actions || [];
-
-    // ★ 확인 큐 체크 (sendChat에서 보낸 메시지 ID 검증)
-    _checkVerifyQueue(actions);
-
     var messages = [];
 
     for (var i = 0; i < actions.length; i++) {
@@ -484,6 +508,7 @@ async function fetchChat(continuation) {
         var timestamp = timestampUsec ? Math.floor(parseInt(timestampUsec, 10) / 1000) : Date.now();
 
         messages.push({
+            id: renderer.id || null,
             text: text,
             displayName: (renderer.authorName && renderer.authorName.simpleText) || '',
             channelId: renderer.authorExternalChannelId || '',
@@ -496,7 +521,10 @@ async function fetchChat(continuation) {
         });
     }
 
-    return { messages: messages, continuation: nextCont };
+    // ★ 확인 큐 체크 (sendChat에서 보낸 메시지 검증)
+    _checkVerifyQueue(actions, messages);
+
+    return { messages: messages, continuation: nextCont, timeoutMs: timeoutMs };
 }
 
 function getSendParams() { return sendParams; }
@@ -508,42 +536,87 @@ function getSendParams() { return sendParams; }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 /**
- * 확인 큐: fetchChat이 매 폴링마다 여기서 ID를 찾아 resolve 해준다
- * { id: string, resolve: function, timer: timeout }
+ * 확인 큐: fetchChat이 매 폴링마다 여기서 ID/내용을 찾아 resolve 해준다
+ * { id: string, text: string, resolve: function, timer: timeout }
  */
 var verifyQueue = [];
 
+function hasPendingVerify() {
+    return verifyQueue.length > 0;
+}
+
 /**
- * fetchChat 결과에서 확인 큐의 메시지 ID를 체크 (fetchChat 내부에서 호출)
+ * fetchChat 결과에서 확인 큐의 메시지를 다각도로 체크 (fetchChat 내부에서 호출)
  */
-function _checkVerifyQueue(actions) {
+function _checkVerifyQueue(actions, messages) {
     if (verifyQueue.length === 0) return;
 
     actions = actions || [];
+    messages = messages || [];
 
     for (var j = verifyQueue.length - 1; j >= 0; j--) {
-        const obj = actions.find(e => {
-            const str = JSON.stringify(e);
-            return str.includes(verifyQueue[j].id) &&
-                (str.includes('"message"') || str.includes("'message'"));
-        });
+        const item = verifyQueue[j];
+        let found = false;
 
-        if (obj) {
-            clearTimeout(verifyQueue[j].timer);
-            verifyQueue[j].resolve(true);
+        // 1. 메시지 ID 매칭
+        if (item.id) {
+            // raw actions 문자열 내 ID 검색
+            const actionMatch = actions.find(e => {
+                const str = typeof e === 'string' ? e : JSON.stringify(e);
+                return str.includes(item.id);
+            });
+            if (actionMatch) found = true;
+
+            // 파싱된 메시지 id 검색
+            if (!found) {
+                const msgIdMatch = messages.find(m => m.id && m.id === item.id);
+                if (msgIdMatch) found = true;
+            }
+        }
+
+        // 2. 메시지 내용(text) 및 작성자(봇 채널) 매칭
+        if (!found && item.text) {
+            const cleanTarget = item.text.trim().replace(/\s+/g, ' ');
+
+            // 파싱된 messages 배열에서 탐색
+            const msgMatch = messages.find(m => {
+                const cleanMsg = (m.text || '').trim().replace(/\s+/g, ' ');
+                const isMyChannel = myChannelId && m.channelId === myChannelId;
+                const textMatch = cleanMsg === cleanTarget || cleanMsg.includes(cleanTarget) || cleanTarget.includes(cleanMsg);
+                return (isMyChannel && textMatch) || (cleanMsg.length > 5 && cleanMsg === cleanTarget);
+            });
+            if (msgMatch) found = true;
+
+            // actions 객체 내 텍스트 매칭
+            if (!found) {
+                const actTextMatch = actions.find(e => {
+                    const str = typeof e === 'string' ? e : JSON.stringify(e);
+                    return str.includes(cleanTarget) && (myChannelId ? str.includes(myChannelId) : true);
+                });
+                if (actTextMatch) found = true;
+            }
+        }
+
+        if (found) {
+            clearTimeout(item.timer);
+            item.resolve(true);
             verifyQueue.splice(j, 1);
         }
     }
 }
 
 /**
- * 확인 큐에 메시지 ID 등록. fetchChat이 해당 ID를 발견하면 resolve(true).
+ * 확인 큐에 메시지 등록. fetchChat이 해당 ID/텍스트를 발견하면 resolve(true).
  * 타임아웃 시 resolve(false).
  */
-function _waitForVerify(messageId) {
+function _waitForVerify(verifyData) {
     return new Promise(function (resolve) {
+        var id = typeof verifyData === 'string' ? verifyData : (verifyData && verifyData.id);
+        var text = typeof verifyData === 'object' && verifyData ? verifyData.text : null;
+
         var entry = {
-            id: messageId,
+            id: id,
+            text: text,
             resolve: resolve,
             timer: setTimeout(function () {
                 // 타임아웃 → 큐에서 제거하고 false 반환
@@ -554,7 +627,7 @@ function _waitForVerify(messageId) {
                     }
                 }
                 resolve(false);
-            }, cfg.yt.verify_timeout),
+            }, cfg.yt.verify_timeout || 10000),
         };
         verifyQueue.push(entry);
     });
@@ -623,8 +696,12 @@ async function _sendWithRetry(message, retryProc, retries) {
             return false;
         }
 
-        if (result.id) {
-            var verified = await _waitForVerify(result.id);
+        if (result.id || result.deleteParams) {
+            var verified = await _waitForVerify({
+                id: result.id,
+                text: text,
+                deleteParams: result.deleteParams
+            });
             if (verified) {
                 console.log('💬 [봇] ' + text);
                 return true;
@@ -1009,4 +1086,4 @@ async function postCommunityText(text) {
     }
 }
 
-module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser, postCommunityText };
+module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser, postCommunityText, hasPendingVerify };

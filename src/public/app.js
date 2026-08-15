@@ -308,6 +308,10 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
             if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
             if (targetId === 'tab-commands') ws.send(JSON.stringify({ action: 'getCommandLogs' }));
             if (targetId === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
+            if (targetId === 'tab-stats') {
+                loadStatsOverview();
+                searchUserStats();
+            }
             if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({ action: 'getVideoInfo' }));
             if (targetId === 'tab-config') ws.send(JSON.stringify({ action: 'getConfig' }));
             if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
@@ -634,6 +638,19 @@ function handleWSMessage(msg) {
         case 'stateAtHistory_data':
             tlHandleStateAtHistory(payload);
             break;
+
+        // ── 유저 통계 뷰어 ──
+        case 'userStatsOverview_data':
+            renderStatsOverview(payload);
+            break;
+
+        case 'userStatsSearch_data':
+            renderStatsSearchResults(payload);
+            break;
+
+        case 'userStatsDetail_data':
+            renderStatsUserDetail(payload);
+            break;
     }
 }
 
@@ -727,11 +744,14 @@ function createChatElement(c) {
     return div;
 }
 
+const MAX_CHAT_DOM_ELEMENTS = 100;
+
 function renderChats(chats) {
     const container = document.getElementById('chat-container');
     container.innerHTML = '';
     chats.sort((a, b) => b.timestamp - a.timestamp);
-    chats.forEach(c => container.appendChild(createChatElement(c)));
+    const slice = chats.slice(0, MAX_CHAT_DOM_ELEMENTS);
+    slice.forEach(c => container.appendChild(createChatElement(c)));
 }
 
 function appendChats(chatsArr) {
@@ -739,6 +759,9 @@ function appendChats(chatsArr) {
     chatsArr.forEach(c => {
         container.insertBefore(createChatElement(c), container.firstChild);
     });
+    while (container.children.length > MAX_CHAT_DOM_ELEMENTS) {
+        container.removeChild(container.lastChild);
+    }
 }
 
 // ── Sub-tab switching ──
@@ -807,18 +830,31 @@ function renderSpamWarnTable() {
                     </td>
                     <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td style="white-space:nowrap;" data-action-idx="${i}">
-                        <button class="btn btn-sm" style="background:var(--info); margin-right:4px;" onclick="showUserDetail('${u.channelId}')">상세</button>
-                    </td>
+                    <td data-action-idx="${i}"></td>
                 `;
         tbody.appendChild(tr);
 
         // 이스케이프 없이 DOM API로 버튼 추가
         const actionCell = tr.querySelector(`[data-action-idx="${i}"]`);
+        const group = document.createElement('div');
+        group.className = 'action-cell-btn-group';
+
+        const detailBtn = document.createElement('button');
+        detailBtn.className = 'btn btn-sm';
+        detailBtn.style.background = 'var(--info)';
+        detailBtn.textContent = '상세';
+        detailBtn.addEventListener('click', () => showUserDetail(u.channelId));
+        group.appendChild(detailBtn);
+
+        const hideBtn = document.createElement('button');
+        hideBtn.className = 'btn btn-ban btn-sm';
+        hideBtn.style.background = '#ef4444';
+        hideBtn.textContent = '유저 숨기기';
+        hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
+        group.appendChild(hideBtn);
 
         const searchBtn = document.createElement('button');
         searchBtn.className = 'btn btn-sm';
-        searchBtn.style.marginRight = '4px';
         if (u.searchBanned) {
             searchBtn.style.background = 'var(--secondary)';
             searchBtn.textContent = '검색 허용';
@@ -828,13 +864,16 @@ function renderSpamWarnTable() {
             searchBtn.textContent = '검색 차단';
             searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
         }
-        actionCell.appendChild(searchBtn);
+        group.appendChild(searchBtn);
 
         const spamBtn = document.createElement('button');
         spamBtn.className = 'btn btn-ban btn-sm';
+        spamBtn.style.background = '#f59e0b';
         spamBtn.textContent = '스팸 추가';
         spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
-        actionCell.appendChild(spamBtn);
+        group.appendChild(spamBtn);
+
+        actionCell.appendChild(group);
     });
 }
 
@@ -851,15 +890,23 @@ function renderSpamBanTable() {
                     <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
                     <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
                     <td style="color:var(--text-dim); font-size:0.8rem;">${u.bannedAt || '—'}</td>
-                    <td style="white-space:nowrap;" data-ban-action-idx="${i}"></td>
+                    <td data-ban-action-idx="${i}"></td>
                 `;
         tbody.appendChild(tr);
 
         const actionCell = tr.querySelector(`[data-ban-action-idx="${i}"]`);
+        const group = document.createElement('div');
+        group.className = 'action-cell-btn-group';
+
+        const hideBtn = document.createElement('button');
+        hideBtn.className = 'btn btn-ban btn-sm';
+        hideBtn.style.background = '#ef4444';
+        hideBtn.textContent = '유저 숨기기';
+        hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
+        group.appendChild(hideBtn);
 
         const searchBtn = document.createElement('button');
         searchBtn.className = 'btn btn-sm';
-        searchBtn.style.marginRight = '4px';
         if (u.searchBanned) {
             searchBtn.style.background = 'var(--secondary)';
             searchBtn.textContent = '검색 허용';
@@ -869,13 +916,15 @@ function renderSpamBanTable() {
             searchBtn.textContent = '검색 차단';
             searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
         }
-        actionCell.appendChild(searchBtn);
+        group.appendChild(searchBtn);
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'btn btn-ban btn-sm';
         removeBtn.textContent = 'Remove';
         removeBtn.addEventListener('click', () => execDeleteSpam(u.channelId));
-        actionCell.appendChild(removeBtn);
+        group.appendChild(removeBtn);
+
+        actionCell.appendChild(group);
     });
 }
 
@@ -1004,12 +1053,12 @@ function groupBadge(g) {
 function createCmdLogRow(d) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-                <td>${fmtTime(d.time)}</td>
-                <td style="font-weight:600; color:#fcd34d;">${escapeHtml(d.user)}</td>
-                <td style="color:#a78bfa; font-weight:600;">${escapeHtml(d.cmd)}</td>
-                <td><span class="badge ${groupBadge(d.group)}">${d.group}</span></td>
-                <td class="truncate">${escapeHtml(d.args) || '<span style="color:var(--text-dim)">—</span>'}</td>
-                <td class="truncate" style="font-size:0.75rem; color:var(--text-dim);">${escapeHtml(d.response) || '—'}</td>
+                <td style="white-space:nowrap; vertical-align:top; width:90px;">${fmtTime(d.time)}</td>
+                <td style="font-weight:600; color:#fcd34d; white-space:nowrap; vertical-align:top; width:140px;">${escapeHtml(d.user)}</td>
+                <td style="color:#a78bfa; font-weight:600; white-space:nowrap; vertical-align:top; width:90px;">${escapeHtml(d.cmd)}</td>
+                <td style="white-space:nowrap; vertical-align:top; width:80px;"><span class="badge ${groupBadge(d.group)}">${d.group}</span></td>
+                <td style="vertical-align:top; word-break:break-word; max-width:130px; width:130px;">${escapeHtml(d.args) || '<span style="color:var(--text-dim)">—</span>'}</td>
+                <td style="vertical-align:top; word-break:break-word; max-width:360px; font-size:0.84rem; color:var(--text-main); line-height:1.45;">${escapeHtml(d.response) || '<span style="color:var(--text-dim)">—</span>'}</td>
             `;
     return tr;
 }
@@ -1040,14 +1089,14 @@ function renderSchedule(schedule) {
         const tstr = dt.toLocaleTimeString('ko-KR');
 
         if (s.isCurrent) {
-            tr.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            tr.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+            tr.style.borderLeft = '4px solid #ef4444';
         }
 
         tr.innerHTML = `
                     <td style="color:var(--text-dim);">${dstr}</td>
                     <td style="font-weight:600; color:var(--info);">${tstr}</td>
-                    <td style="color:#fcd34d;">${escapeHtml(s.alias)} 화 - ${escapeHtml(s.title)}</td>
-                    <td>${s.isCurrent ? '<span class="badge badge-red">ON AIR</span>' : ''}</td>
+                    <td style="color:#fcd34d; font-weight:${s.isCurrent ? '700' : '500'};">${escapeHtml(s.alias)} 화 - ${escapeHtml(s.title)}</td>
                 `;
         tbody.appendChild(tr);
     });
@@ -1154,6 +1203,19 @@ function adjustUsage(channelId, sign) {
         ws.send(JSON.stringify({ action: 'adjustUsage', payload: { channelId, delta } }));
     }
 }
+
+document.getElementById('btn-add-hide')?.addEventListener('click', () => {
+    const channelId = document.getElementById('spam-channel').value.trim();
+    const displayName = document.getElementById('spam-name').value.trim() || 'Unknown';
+
+    if (!channelId) return showToast('Channel ID는 필수입니다.', true);
+
+    execBan(displayName, channelId);
+
+    document.getElementById('spam-channel').value = '';
+    document.getElementById('spam-name').value = '';
+    document.getElementById('spam-reason').value = '';
+});
 
 document.getElementById('btn-add-spam').addEventListener('click', () => {
     const channelId = document.getElementById('spam-channel').value.trim();
@@ -1404,9 +1466,24 @@ function saveVideoMatchingConfig() {
 }
 
 function saveSearchRawConfig() {
-    const content = document.getElementById('val-search').value;
+    const el = document.getElementById('val-search');
+    const content = el ? el.value : '';
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: content } }));
+    }
+}
+
+function saveConfig(target) {
+    let content = '';
+    if (target === 'youtube') {
+        const el = document.getElementById('val-youtube');
+        content = el ? el.value : '';
+    } else if (target === 'search') {
+        const el = document.getElementById('val-search');
+        content = el ? el.value : '';
+    }
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'saveConfig', payload: { target, content } }));
     }
 }
 
@@ -1617,6 +1694,244 @@ if (vmPreviewArea && vmConfigArea) {
         }
     });
     ro.observe(vmPreviewArea);
+}
+
+// ══════════════════════════════════════════════
+//  User Statistics Viewer Logic
+// ══════════════════════════════════════════════
+let statsSearchDebounceTimer = null;
+let currentSelectedChannelId = null;
+
+function loadStatsOverview() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'getUserStatsOverview' }));
+    }
+}
+
+let statsCurrentPage = 1;
+let statsPageLimit = 100;
+let statsTotalCount = 0;
+
+function changeStatsPage(delta) {
+    const maxPage = Math.max(1, Math.ceil(statsTotalCount / statsPageLimit));
+    const targetPage = Math.max(1, Math.min(maxPage, statsCurrentPage + delta));
+    if (targetPage !== statsCurrentPage) {
+        searchUserStats(targetPage);
+    }
+}
+
+function onChangeStatsPageLimit() {
+    const sel = document.getElementById('stats-page-limit');
+    if (sel) {
+        statsPageLimit = parseInt(sel.value, 10) || 100;
+        searchUserStats(1);
+    }
+}
+
+function onStatsSearchInput() {
+    clearTimeout(statsSearchDebounceTimer);
+    statsSearchDebounceTimer = setTimeout(() => {
+        searchUserStats(1);
+    }, 250);
+}
+
+function searchUserStats(page = 1) {
+    statsCurrentPage = page;
+    const input = document.getElementById('stats-search-input');
+    const sortSelect = document.getElementById('stats-sort-by');
+    const query = input ? input.value.trim() : '';
+    const sortBy = sortSelect ? sortSelect.value : 'total_messages';
+
+    const statusEl = document.getElementById('stats-search-status');
+    if (statusEl) statusEl.textContent = '검색 중...';
+
+    const offset = (statsCurrentPage - 1) * statsPageLimit;
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            action: 'searchUserStats',
+            payload: { query, sortBy, sortOrder: 'DESC', limit: statsPageLimit, offset }
+        }));
+    }
+}
+
+function renderStatsOverview(data) {
+    if (!data) return;
+    const setTxt = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setTxt('stats-ov-users', `${(data.totalUsers || 0).toLocaleString()}명`);
+    setTxt('stats-ov-msgs', `${(data.totalMessages || 0).toLocaleString()}개`);
+    setTxt('stats-ov-watch', data.totalWatchStr || '0분');
+    setTxt('stats-ov-today-users', `${(data.todayUsers || 0).toLocaleString()}명`);
+    setTxt('stats-ov-today-msgs', `${(data.todayMessages || 0).toLocaleString()}개`);
+}
+
+function renderStatsSearchResults(data) {
+    const statusEl = document.getElementById('stats-search-status');
+    const countEl = document.getElementById('stats-user-count');
+    const tbody = document.getElementById('stats-users-tbody');
+
+    if (!tbody) return;
+    if (statusEl) statusEl.textContent = '';
+    statsTotalCount = data.total || 0;
+    if (countEl) countEl.textContent = statsTotalCount.toLocaleString();
+
+    // Update pagination indicators
+    const maxPage = Math.max(1, Math.ceil(statsTotalCount / statsPageLimit));
+    const pageInfoEl = document.getElementById('stats-page-info');
+    if (pageInfoEl) pageInfoEl.textContent = `${statsCurrentPage} / ${maxPage} (총 ${statsTotalCount.toLocaleString()}명)`;
+    const prevBtn = document.getElementById('btn-stats-prev');
+    const nextBtn = document.getElementById('btn-stats-next');
+    if (prevBtn) prevBtn.disabled = statsCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = statsCurrentPage >= maxPage;
+
+    const users = data.users || [];
+    if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 40px;">${data.query ? '검색 결과가 없습니다.' : '기록된 유저가 없습니다.'}</td></tr>`;
+        return;
+    }
+
+    const sortBy = data.sortBy || 'total_messages';
+
+    tbody.innerHTML = users.map((u, idx) => {
+        let displayRank = (statsCurrentPage - 1) * statsPageLimit + idx + 1;
+        if (sortBy === 'total_messages') displayRank = u.totalMessagesRank;
+        else if (sortBy === 'total_watch_seconds') displayRank = u.totalWatchRank;
+        else if (sortBy === 'today_messages') displayRank = u.todayMessagesRank;
+        else if (sortBy === 'today_watch_seconds') displayRank = u.todayWatchRank;
+
+        let rankBadgeClass = 'stats-rank-badge';
+        if (displayRank === 1) rankBadgeClass += ' stats-rank-1';
+        else if (displayRank === 2) rankBadgeClass += ' stats-rank-2';
+        else if (displayRank === 3) rankBadgeClass += ' stats-rank-3';
+
+        const rankIcon = displayRank === 1 ? '🥇' : (displayRank === 2 ? '🥈' : (displayRank === 3 ? '🥉' : displayRank));
+        const isSelected = u.channelId === currentSelectedChannelId ? 'selected' : '';
+        const lastDate = u.lastChatDate ? u.lastChatDate : (u.lastChatTime ? tlFmtShort(u.lastChatTime) : '--');
+
+        return `
+            <tr class="stats-user-row ${isSelected}" onclick="showStatsDetail('${escapeHtml(u.channelId)}')">
+                <td style="text-align: center;">
+                    <span class="${rankBadgeClass}">${rankIcon}</span>
+                </td>
+                <td>
+                    <div style="font-weight: 600; color: #fcd34d; font-size: 0.9rem;">${escapeHtml(u.displayName)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">${escapeHtml(u.channelId)}</div>
+                </td>
+                <td style="text-align: right; font-weight: 600; color: #f472b6;">
+                    ${(u.totalMessages || 0).toLocaleString()}개
+                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.totalMessagesRank || 1).toLocaleString()}위</div>
+                </td>
+                <td style="text-align: right; font-weight: 600; color: #34d399;">
+                    ${u.totalWatchStr || '0분'}
+                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.totalWatchRank || 1).toLocaleString()}위</div>
+                </td>
+                <td style="text-align: right; font-weight: 500; color: #a78bfa;">
+                    ${(u.todayMessages || 0).toLocaleString()}개
+                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.todayMessagesRank || 1).toLocaleString()}위</div>
+                </td>
+                <td style="text-align: right; font-weight: 500; color: #fbbf24;">
+                    ${u.todayWatchStr || '0분'}
+                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.todayWatchRank || 1).toLocaleString()}위</div>
+                </td>
+                <td style="text-align: center; color: #60a5fa; font-weight: 600;">
+                    ${(u.activeDays || 0).toLocaleString()}일
+                </td>
+                <td style="text-align: center; font-size: 0.75rem; color: var(--text-dim);">
+                    ${lastDate}
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); showStatsDetail('${escapeHtml(u.channelId)}')" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">조회</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showStatsDetail(channelId) {
+    if (!channelId) return;
+    currentSelectedChannelId = channelId;
+
+    document.querySelectorAll('.stats-user-row').forEach(tr => tr.classList.remove('selected'));
+    const rows = document.querySelectorAll('.stats-user-row');
+    rows.forEach(tr => {
+        if (tr.innerHTML.includes(channelId)) tr.classList.add('selected');
+    });
+
+    const card = document.getElementById('stats-detail-card');
+    const layout = document.querySelector('.stats-layout-wrap');
+    if (card) card.style.display = 'block';
+    if (layout) layout.classList.add('has-detail');
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            action: 'getUserStatsDetail',
+            payload: { channelId }
+        }));
+    }
+}
+
+function closeStatsDetail() {
+    currentSelectedChannelId = null;
+    document.querySelectorAll('.stats-user-row').forEach(tr => tr.classList.remove('selected'));
+    const card = document.getElementById('stats-detail-card');
+    const layout = document.querySelector('.stats-layout-wrap');
+    if (card) card.style.display = 'none';
+    if (layout) layout.classList.remove('has-detail');
+}
+
+function renderStatsUserDetail(data) {
+    if (!data) return;
+
+    const setTxt = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setTxt('stats-detail-name', data.displayName || '시청자');
+    setTxt('stats-detail-channel', data.channelId || '--');
+
+    setTxt('stats-detail-total-msgs', `${(data.totalMessages || 0).toLocaleString()}개`);
+    setTxt('stats-detail-total-msgs-rank', `전체 ${(data.totalMessagesRank || 1).toLocaleString()}위`);
+
+    setTxt('stats-detail-total-watch', data.totalWatchStr || '0분');
+    setTxt('stats-detail-total-watch-rank', `전체 ${(data.totalWatchRank || 1).toLocaleString()}위`);
+
+    setTxt('stats-detail-today-msgs', `${(data.todayMessages || 0).toLocaleString()}개`);
+    setTxt('stats-detail-today-msgs-rank', `오늘 ${(data.todayMessagesRank || 1).toLocaleString()}위`);
+
+    setTxt('stats-detail-today-watch', data.todayWatchStr || '0분');
+    setTxt('stats-detail-today-watch-rank', `오늘 ${(data.todayWatchRank || 1).toLocaleString()}위`);
+
+    setTxt('stats-detail-active-days', `${(data.daysCount || 0).toLocaleString()}일`);
+
+    if (data.lastChatTime) {
+        const d = new Date(data.lastChatTime);
+        setTxt('stats-detail-last-active', `${d.toLocaleTimeString('ko-KR')}`);
+        setTxt('stats-detail-last-date', data.lastChatDate || `${d.toLocaleDateString('ko-KR')}`);
+    } else {
+        setTxt('stats-detail-last-active', '--');
+        setTxt('stats-detail-last-date', '--');
+    }
+
+    const historyTbody = document.getElementById('stats-detail-daily-tbody');
+    if (historyTbody) {
+        const list = data.dailyHistory || [];
+        if (list.length === 0) {
+            historyTbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-dim); padding: 15px;">활동 이력이 없습니다.</td></tr>`;
+        } else {
+            historyTbody.innerHTML = list.map(item => `
+                <tr>
+                    <td style="font-weight: 500; color: var(--text-main); font-family: monospace;">${item.date}</td>
+                    <td style="text-align: right; color: #a78bfa; font-weight: 600;">${(item.messageCount || 0).toLocaleString()}개</td>
+                    <td style="text-align: right; color: #34d399; font-weight: 600;">${item.watchStr || '0분'}</td>
+                </tr>
+            `).join('');
+        }
+    }
 }
 
 // Bootstrap

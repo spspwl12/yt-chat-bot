@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 
 <body>
@@ -78,6 +78,7 @@
         <button class="nav-btn" data-target="tab-spam"><span class="nav-icon">🛡️</span> Spam Users</button>
         <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> pHash Logs</button>
         <button class="nav-btn" data-target="tab-commands"><span class="nav-icon">📋</span> Command Logs</button>
+        <button class="nav-btn" data-target="tab-stats"><span class="nav-icon">📈</span> User Stats</button>
         <button class="nav-btn" data-target="tab-schedule"><span class="nav-icon">📅</span> Schedule</button>
         <button class="nav-btn" data-target="tab-videoinfo"><span class="nav-icon">📊</span> Video Info</button>
         <button class="nav-btn" data-target="tab-videomatching"><span class="nav-icon">🎬</span> Video Matching</button>
@@ -87,7 +88,6 @@
             <div id="status-dot" class="status-dot"></div>
             <span id="status-text">Disconnected</span>
         </div>
-    </div>
     </div>
 
     <div class="content">
@@ -125,11 +125,12 @@
                 </div>
             </div>
             <div
-                style="display:flex; gap:12px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--surface-border);">
-                <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600;">🛠️ 디버깅:</span>
+                style="display:flex; gap:10px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--surface-border); flex-wrap: nowrap;">
+                <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;">🛠️ 디버깅:</span>
                 <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)"
+                    style="flex: 1; min-width: 120px;"
                     onkeydown="if(event.key==='Enter') sendSimulatedChat()">
-                <button class="btn" onclick="sendSimulatedChat()">가상 입력</button>
+                <button class="btn" onclick="sendSimulatedChat()" style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
             </div>
             <div style="display:flex; gap:12px; margin-top: 20px;">
                 <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
@@ -150,14 +151,34 @@
         <div id="tab-spam" class="panel">
             <h2>🛡️ Spam Management</h2>
 
-            <div class="section-card glass">
-                <h3 style="margin-top:0; margin-bottom: 14px; font-size:1rem;">Manual Add Block</h3>
-                <div class="add-spam-form">
-                    <input type="text" id="spam-name" class="form-input" placeholder="Display Name (Optional)">
-                    <input type="text" id="spam-channel" class="form-input" placeholder="Channel ID (Required)">
-                    <input type="text" id="spam-reason" class="form-input" placeholder="Reason">
-                    <button class="btn" id="btn-add-spam">스팸 추가</button>
-                    <button class="btn" id="btn-add-search-ban" style="background-color:#8b5cf6;">검색 차단</button>
+            <div class="section-card glass" style="margin-bottom: 20px; border-left: 4px solid var(--primary);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">🛡️</span>
+                        <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-main);">Manual Add Block (수동 차단 / 유저 관리)</h3>
+                    </div>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">지정한 유저를 차단 또는 검색 기능에서 제한합니다.</span>
+                </div>
+                
+                <div class="manual-block-grid">
+                    <div class="manual-field-group">
+                        <label class="manual-label">Display Name <span style="color:var(--text-dim); font-weight:normal;">(선택)</span></label>
+                        <input type="text" id="spam-name" class="form-input" placeholder="유저 닉네임">
+                    </div>
+                    <div class="manual-field-group" style="flex: 1.4;">
+                        <label class="manual-label">Channel ID <span style="color:#ef4444;">*필수</span></label>
+                        <input type="text" id="spam-channel" class="form-input" placeholder="UC... 또는 채널 고유 ID">
+                    </div>
+                    <div class="manual-field-group" style="flex: 1.2;">
+                        <label class="manual-label">Reason <span style="color:var(--text-dim); font-weight:normal;">(사유)</span></label>
+                        <input type="text" id="spam-reason" class="form-input" placeholder="도배 / 봇 오남용 등">
+                    </div>
+                </div>
+
+                <div class="manual-block-actions" style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+                    <button class="btn btn-ban" id="btn-add-hide" style="background-color: #ef4444; font-weight: 600;">🚫 유저 숨기기</button>
+                    <button class="btn" id="btn-add-spam" style="background-color: #f59e0b; font-weight: 600;">🛡️ 스팸 등록</button>
+                    <button class="btn" id="btn-add-search-ban" style="background-color: #8b5cf6; font-weight: 600;">🔍 대사검색 차단</button>
                 </div>
             </div>
 
@@ -262,6 +283,30 @@
             </div>
         </div>
 
+        <!-- Lastquery History -->
+        <div id="tab-lastquery" class="panel">
+            <h2>📜 Last Query History</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                유저들의 !대사/!몇화 검색 질의 이력 (최근 1,000건, 실시간 수집 및 복원)
+            </p>
+            <div class="log-container glass">
+                <div class="log-scroll" id="lastquery-log-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 15%">Time</th>
+                                <th style="width: 20%">User</th>
+                                <th style="width: 15%">Command</th>
+                                <th style="width: 50%">Query (대사/검색어)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lastquery-log-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Command Logs -->
         <div id="tab-commands" class="panel">
             <h2>📋 Command Usage Logs</h2>
@@ -273,17 +318,180 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>User</th>
-                                <th>Command</th>
-                                <th>Group</th>
-                                <th>Args</th>
-                                <th>Response</th>
+                                <th style="width: 90px;">Time</th>
+                                <th style="width: 140px;">User</th>
+                                <th style="width: 90px;">Command</th>
+                                <th style="width: 80px;">Group</th>
+                                <th style="width: 130px;">Args</th>
+                                <th style="max-width: 360px; width: 35%;">Response</th>
                             </tr>
                         </thead>
                         <tbody id="cmd-log-tbody">
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Statistics Viewer -->
+        <div id="tab-stats" class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                <h2 style="margin: 0;">📈 User Statistics Viewer</h2>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-sm" onclick="loadStatsOverview(); searchUserStats(1);" style="background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); color: #c084fc;">🔄 새로고침</button>
+                </div>
+            </div>
+
+            <!-- Overview Stat Cards -->
+            <div class="status-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+                <div class="status-card glass">
+                    <h3>👥 총 등록 유저</h3>
+                    <p id="stats-ov-users" style="background: linear-gradient(90deg, #38bdf8, #0284c7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0명</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>💬 총 누적 채팅</h3>
+                    <p id="stats-ov-msgs" style="background: linear-gradient(90deg, #f472b6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0개</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>📅 오늘 활동 유저</h3>
+                    <p id="stats-ov-today-users" style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0명</p>
+                </div>
+                <div class="status-card glass">
+                    <h3>💬 오늘 채팅 수</h3>
+                    <p id="stats-ov-today-msgs" style="background: linear-gradient(90deg, #a78bfa, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0개</p>
+                </div>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="section-card glass" style="margin-bottom: 20px; padding: 16px;">
+                <div class="stats-search-bar-wrap" style="display: flex; gap: 12px; align-items: center; width: 100%;">
+                    <div style="flex: 1; width: 100%;">
+                        <input type="text" id="stats-search-input" class="form-input stats-search-input-field" placeholder="🔍 닉네임 또는 채널 ID 검색 (실시간 검색)" oninput="onStatsSearchInput()" onkeydown="if(event.key==='Enter') searchUserStats(1)">
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                        <label style="font-size: 0.82rem; color: var(--text-dim); white-space: nowrap;">정렬:</label>
+                        <select id="stats-sort-by" class="form-input" style="width: auto; min-width: 170px; padding: 8px 12px; cursor: pointer;" onchange="searchUserStats(1)">
+                            <option value="total_messages">💬 총 채팅 많은순</option>
+                            <option value="total_watch_seconds">⏱️ 총 시청시간 긴순</option>
+                            <option value="today_messages">💬 오늘 채팅 많은순</option>
+                            <option value="today_watch_seconds">⏱️ 오늘 시청시간 긴순</option>
+                            <option value="active_days">📅 출석 일수 많은순</option>
+                            <option value="last_chat_time">🕒 최근 활동순</option>
+                        </select>
+                        <button class="btn" onclick="searchUserStats(1)" style="white-space: nowrap;">검색</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Split View: User List on Left, User Detail on Right -->
+            <div class="stats-layout-wrap">
+                <!-- User Table/List -->
+                <div class="section-card glass stats-table-card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+                    <div style="padding: 14px 18px; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; font-size: 0.95rem; color: var(--text-main); font-weight: 600;">📋 유저 목록 (<span id="stats-user-count">0</span>명)</h3>
+                        <span id="stats-search-status" style="font-size: 0.8rem; color: var(--text-dim);"></span>
+                    </div>
+                    <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                        <table class="data-table" id="stats-users-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px; text-align: center;">순위</th>
+                                    <th>유저명 / 채널 ID</th>
+                                    <th style="text-align: right;">총 채팅</th>
+                                    <th style="text-align: right;">총 시청시간</th>
+                                    <th style="text-align: right;">오늘 채팅</th>
+                                    <th style="text-align: right;">오늘 시청</th>
+                                    <th style="text-align: center;">출석</th>
+                                    <th style="text-align: center;">최근 활동</th>
+                                    <th style="text-align: center;">상세</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-users-tbody">
+                                <tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 40px;">유저 통계 데이터를 불러오는 중...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div id="stats-pagination" style="padding: 10px 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.15); flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <span style="font-size: 0.8rem; color: var(--text-dim);">표시 단위:</span>
+                            <select id="stats-page-limit" class="form-input" style="width: auto; padding: 4px 8px; font-size: 0.8rem; cursor: pointer;" onchange="onChangeStatsPageLimit()">
+                                <option value="50">50명씩</option>
+                                <option value="100" selected>100명씩</option>
+                                <option value="200">200명씩</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-sm" id="btn-stats-prev" onclick="changeStatsPage(-1)" style="padding: 4px 10px; font-size: 0.8rem;">◀ 이전</button>
+                            <span id="stats-page-info" style="font-size: 0.82rem; color: var(--text-main); font-weight: 500;">1 / 1</span>
+                            <button class="btn btn-sm" id="btn-stats-next" onclick="changeStatsPage(1)" style="padding: 4px 10px; font-size: 0.8rem;">다음 ▶</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Quick Detail Card -->
+                <div class="section-card glass stats-detail-card" id="stats-detail-card" style="padding: 20px; display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                        <div>
+                            <h3 id="stats-detail-name" style="margin: 0 0 4px 0; font-size: 1.2rem; color: #fcd34d; font-weight: 700;">--</h3>
+                            <div id="stats-detail-channel" style="font-size: 0.75rem; color: var(--text-dim); font-family: monospace; word-break: break-all;">--</div>
+                        </div>
+                        <button class="btn btn-sm" onclick="closeStatsDetail()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--surface-border);">✕ 닫기</button>
+                    </div>
+
+                    <!-- Mini Stat Metric Badges -->
+                    <div class="stats-metric-grid">
+                        <div class="stats-metric-box">
+                            <div class="metric-label">총 채팅 메시지</div>
+                            <div class="metric-value" id="stats-detail-total-msgs" style="color: #f472b6;">--</div>
+                            <div class="metric-rank" id="stats-detail-total-msgs-rank">전체 --위</div>
+                        </div>
+                        <div class="stats-metric-box">
+                            <div class="metric-label">총 라이브 시청시간</div>
+                            <div class="metric-value" id="stats-detail-total-watch" style="color: #34d399;">--</div>
+                            <div class="metric-rank" id="stats-detail-total-watch-rank">전체 --위</div>
+                        </div>
+                        <div class="stats-metric-box">
+                            <div class="metric-label">오늘 채팅 메시지</div>
+                            <div class="metric-value" id="stats-detail-today-msgs" style="color: #a78bfa;">--</div>
+                            <div class="metric-rank" id="stats-detail-today-msgs-rank">오늘 --위</div>
+                        </div>
+                        <div class="stats-metric-box">
+                            <div class="metric-label">오늘 라이브 시청시간</div>
+                            <div class="metric-value" id="stats-detail-today-watch" style="color: #fbbf24;">--</div>
+                            <div class="metric-rank" id="stats-detail-today-watch-rank">오늘 --위</div>
+                        </div>
+                        <div class="stats-metric-box">
+                            <div class="metric-label">총 출석 일수</div>
+                            <div class="metric-value" id="stats-detail-active-days" style="color: #60a5fa;">--일</div>
+                            <div class="metric-rank">24시간 기준</div>
+                        </div>
+                        <div class="stats-metric-box">
+                            <div class="metric-label">최근 활동 시각</div>
+                            <div class="metric-value" id="stats-detail-last-active" style="font-size: 0.88rem; color: var(--text-main);">--</div>
+                            <div class="metric-rank" id="stats-detail-last-date">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Daily History Table -->
+                    <h4 style="margin: 16px 0 10px 0; font-size: 0.88rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> 최근 일자별 활동 이력 (최대 60일)
+                    </h4>
+                    <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--surface-border); border-radius: 8px;">
+                        <table class="data-table" style="font-size: 0.8rem;">
+                            <thead>
+                                <tr>
+                                    <th>날짜</th>
+                                    <th style="text-align: right;">채팅 수</th>
+                                    <th style="text-align: right;">시청시간</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-detail-daily-tbody">
+                                <tr><td colspan="3" style="text-align: center; color: var(--text-dim); padding: 15px;">기록 없음</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -299,10 +507,9 @@
                     <table>
                         <thead>
                             <tr>
-                                <th style="width: 15%">Date</th>
-                                <th style="width: 15%">Time</th>
-                                <th style="width: 55%">Episode</th>
-                                <th style="width: 15%">Status</th>
+                                <th style="width: 20%">Date</th>
+                                <th style="width: 20%">Time</th>
+                                <th style="width: 60%">Episode</th>
                             </tr>
                         </thead>
                         <tbody id="schedule-tbody">
@@ -515,7 +722,7 @@
                     <h3>config-youtube.js</h3>
                     <button class="btn" onclick="saveConfig('youtube')">Save Changes</button>
                 </div>
-                <textarea id="val-youtube" class="code-editor" spellcheck="false"></textarea>
+                <textarea id="val-youtube" class="code-editor" spellcheck="false" style="min-height: 720px; height: 75vh;"></textarea>
             </div>
         </div>
     </div>
@@ -531,7 +738,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=6"></script>
 
     <div id="increment-context-menu" class="glass"
         style="display: none; position: fixed; z-index: 10000; border-radius: 8px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-direction: column; gap: 2px;">

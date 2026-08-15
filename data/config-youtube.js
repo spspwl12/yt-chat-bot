@@ -19,7 +19,8 @@ module.exports = {
             "episode, time, date": 0,
             "next, nextnext, first, last": 0,
             "timetable": 10,
-            "music": 2
+            "music": 2,
+            "stats": 1
         }
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
@@ -32,8 +33,15 @@ module.exports = {
             "episode, time, date": 1,
             "next, nextnext, first, last": 1,
             "timetable": 2,
-            "music": 2
+            "music": 2,
+            "stats": 1
         }
+    },
+    // ─── 유저 스탯 설정 ──────────────────────────────────────────
+    stats: {
+        enable: true,                   // 스탯 기능 사용 여부
+        db_path: "../data/chat_stats.db", // sqlite3 DB 파일 경로
+        watch_threshold_min: 10,        // 라이브 시청시간 판정 기준 (분) - 이 시간 이내 연속 채팅 시 시청시간 누적
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {

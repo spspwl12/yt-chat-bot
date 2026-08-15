@@ -10,7 +10,7 @@ console.log = function (...args) {
     originalLog(timeStr, ...args);
 };
 
-const { initSession, fetchChat, sendChat, getSendParams } = require('./innertube.js');
+const { initSession, fetchChat, sendChat, getSendParams, hasPendingVerify } = require('./innertube.js');
 const { initCommand, handleCommand } = require('./commands.js');
 const { SpamGuard } = require('./spam-guard.js');
 const cfg = require('../data/config-youtube.js');
@@ -80,7 +80,9 @@ async function main() {
             const p = typeof resp === 'string' ? sendChat(resp, null, 1) : sendChat(resp.msg, resp.proc, 1);
             p.then(ok => {
                 if (chkInput.logData) {
-                    if (!ok) chkInput.logData.response = null;
+                    if (!ok && chkInput.logData.response) {
+                        chkInput.logData.response = `[전송실패] ${chkInput.logData.response}`;
+                    }
                     eventBus.emit('command_used', chkInput.logData);
                 }
                 if (ok && chkInput.onSuccess) chkInput.onSuccess();
@@ -91,8 +93,14 @@ async function main() {
                 broadcastSpam();
                 spamGuard.checkAndSendUserCooldownWarning(msg.channelId, msg.displayName);
             }
+            if (chkInput.logData) {
+                chkInput.logData.response = '[명령어 차단됨]';
+                eventBus.emit('command_used', chkInput.logData);
+            }
         } else if (chkInput.logData) {
-            chkInput.logData.response = null;
+            if (!chkInput.logData.response) {
+                chkInput.logData.response = '[응답 없음 / 쿨타임 또는 무시]';
+            }
             eventBus.emit('command_used', chkInput.logData);
         }
     });
@@ -117,7 +125,7 @@ async function main() {
             if (isFirstFetch) {
                 isFirstFetch = false;
                 console.log('📨 기존 메시지 스킵 — 대기 중...\n');
-                await sleep(4000);
+                await sleep(result.timeoutMs || 2000);
                 continue;
             }
 
@@ -160,7 +168,9 @@ async function main() {
                     const p = typeof resp === 'string' ? sendChat(resp) : sendChat(resp.msg, resp.proc);
                     p.then(ok => {
                         if (chkInput.logData) {
-                            if (!ok) chkInput.logData.response = null;
+                            if (!ok && chkInput.logData.response) {
+                                chkInput.logData.response = `[전송실패] ${chkInput.logData.response}`;
+                            }
                             eventBus.emit('command_used', chkInput.logData);
                         }
                         if (ok && chkInput.onSuccess) {
@@ -168,7 +178,9 @@ async function main() {
                         }
                     });
                 } else if (chkInput.logData) {
-                    chkInput.logData.response = null;
+                    if (!chkInput.logData.response) {
+                        chkInput.logData.response = '[응답 없음 / 쿨타임 또는 무시]';
+                    }
                     eventBus.emit('command_used', chkInput.logData);
                 }
                 if (chkInput.warn > 0) {
@@ -177,7 +189,13 @@ async function main() {
                 }
             }
 
-            await sleep(4000);
+            // 대기 시간: 유튜브가 권장하는 timeoutMs 기반, 검증 큐가 대기 중이면 1초 내로 빠르게 폴링
+            let delayMs = (result && result.timeoutMs) || 2000;
+            if (hasPendingVerify && hasPendingVerify()) {
+                delayMs = Math.min(delayMs, 1000);
+            }
+            delayMs = Math.max(800, Math.min(delayMs, 3000));
+            await sleep(delayMs);
         } catch (err) {
             if (!running)
                 break;

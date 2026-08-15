@@ -12,6 +12,7 @@ const { extractLatestSegmentFrame } = require('./video-matcher/live-downloader.j
 const cfgYoutube = require('../data/config-youtube.js');
 const eventBus = require('./event-bus.js');
 const commandsLib = require('./commands.js');
+const statsTracker = require('./stats-db.js');
 
 let spamGuardRef = null;
 let getEpisodeInfoRef = null;
@@ -560,6 +561,23 @@ async function handleAction(client, req) {
             }
         }));
     }
+    // ── 새 기능: 유저 통계 개요 조회 ──
+    else if (action === 'getUserStatsOverview') {
+        const overview = statsTracker ? statsTracker.getGlobalOverview() : null;
+        sendWSFrame(client, JSON.stringify({ action: 'userStatsOverview_data', payload: overview }));
+    }
+    // ── 새 기능: 유저 통계 검색 및 랭킹 정렬 ──
+    else if (action === 'searchUserStats') {
+        const { query, sortBy, sortOrder, limit, offset } = payload || {};
+        const result = statsTracker ? statsTracker.searchUsers({ query, sortBy, sortOrder, limit: limit || 50, offset: offset || 0 }) : { users: [], total: 0 };
+        sendWSFrame(client, JSON.stringify({ action: 'userStatsSearch_data', payload: result }));
+    }
+    // ── 새 기능: 유저 통계 상세 및 일자별 히스토리 ──
+    else if (action === 'getUserStatsDetail') {
+        const { channelId } = payload || {};
+        const detail = statsTracker ? statsTracker.getUserDetail(channelId) : null;
+        sendWSFrame(client, JSON.stringify({ action: 'userStatsDetail_data', payload: detail }));
+    }
 }
 
 function startServer(port, spamGuard, getEpisodeInfo) {
@@ -569,9 +587,11 @@ function startServer(port, spamGuard, getEpisodeInfo) {
     const server = http.createServer((req, res) => {
         // 대시보드 정적 호스팅
         if (req.method === 'GET') {
-            let filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
-            if (req.url === '/dashboard.html') filePath = path.join(__dirname, 'public', 'index.html');
+            const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+            let pathname = parsedUrl.pathname;
+            if (pathname === '/') pathname = '/index.html';
 
+            let filePath = path.join(__dirname, 'public', pathname);
             const ext = path.extname(filePath).toLowerCase();
             const mimeTypes = {
                 '.html': 'text/html; charset=utf-8',
@@ -585,7 +605,10 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                         res.writeHead(404, { 'Content-Type': 'text/plain' });
                         res.end('Not Found');
                     } else {
-                        res.writeHead(200, { 'Content-Type': mimeTypes[ext] });
+                        res.writeHead(200, {
+                            'Content-Type': mimeTypes[ext],
+                            'Cache-Control': 'no-cache, no-store, must-revalidate'
+                        });
                         res.end(data);
                     }
                 });

@@ -245,8 +245,8 @@ async function handleCommand(type, text, displayName, _input) {
             cmd: cmd,
             group: group,
             args: args.length > 0 ? args[0] : null,
-            response: typeof response === 'string' ? response.slice(0, 120) :
-                (response && response.msg ? response.msg.slice(0, 120) : null),
+            response: typeof response === 'string' ? response :
+                (response && response.msg ? response.msg : null),
         };
         return response;
     };
