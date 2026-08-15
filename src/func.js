@@ -1,26 +1,31 @@
 const fs = require('fs');
 const path = require('path');
-const profanitySet = require('../data/profanity-list.js');
+const configManager = require('./config-manager.js');
+const profanitySet = configManager.profanitySet;
 
+let lastSetSize = -1;
 let cachedProfanityRegex = null;
 let cachedProfanityTestRegex = null;
 
-function getProfanityRegex() {
-    if (!cachedProfanityRegex) {
+function _ensureProfanityRegex() {
+    if (!cachedProfanityRegex || profanitySet.size !== lastSetSize) {
+        lastSetSize = profanitySet.size;
         const sortedList = Array.from(profanitySet)
             .filter(w => typeof w === 'string' && w.trim().length > 0)
             .sort((a, b) => b.length - a.length);
         const escaped = sortedList.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        cachedProfanityRegex = new RegExp(escaped.join('|'), 'gi');
-        cachedProfanityTestRegex = new RegExp(escaped.join('|'), 'i');
+        cachedProfanityRegex = escaped.length > 0 ? new RegExp(escaped.join('|'), 'gi') : /(?!)/;
+        cachedProfanityTestRegex = escaped.length > 0 ? new RegExp(escaped.join('|'), 'i') : /(?!)/;
     }
+}
+
+function getProfanityRegex() {
+    _ensureProfanityRegex();
     return cachedProfanityRegex;
 }
 
 function getProfanityTestRegex() {
-    if (!cachedProfanityTestRegex) {
-        getProfanityRegex();
-    }
+    _ensureProfanityRegex();
     return cachedProfanityTestRegex;
 }
 

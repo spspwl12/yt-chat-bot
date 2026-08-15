@@ -83,6 +83,9 @@
         <button class="nav-btn" data-target="tab-videoinfo"><span class="nav-icon">📊</span> Video Info</button>
         <button class="nav-btn" data-target="tab-videomatching"><span class="nav-icon">🎬</span> Video Matching</button>
         <button class="nav-btn" data-target="tab-config-messages"><span class="nav-icon">💬</span> Message Config</button>
+        <button class="nav-btn" data-target="tab-config-profanity"><span class="nav-icon">🛡️</span> Profanity Filter</button>
+        <button class="nav-btn" data-target="tab-config-music"><span class="nav-icon">🎵</span> Music Data</button>
+        <button class="nav-btn" data-target="tab-config-metadata"><span class="nav-icon">🏷️</span> Video Metadata</button>
         <button class="nav-btn" data-target="tab-config"><span class="nav-icon">⚙️</span> Configuration</button>
 
         <div class="conn-status">
@@ -733,13 +736,75 @@
             </div>
         </div>
 
+        <!-- Profanity Filter Editor -->
+        <div id="tab-config-profanity" class="panel">
+            <h2>🛡️ Profanity Filter Editor</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                profanity-list.js 직접 편집 (저장 즉시 재부팅 없이 실시간 적용)
+            </p>
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>profanity-list.js (비속어 / 욕설 차단 목록)</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="reloadProfanityListFromServer()" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn" onclick="saveProfanityList()" style="box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);">💾 Save Changes (즉시 적용)</button>
+                    </div>
+                </div>
+                <textarea id="val-profanity" class="code-editor" spellcheck="false" style="min-height: 720px; height: 75vh;"></textarea>
+            </div>
+        </div>
+
+        <!-- Music Data Editor -->
+        <div id="tab-config-music" class="panel">
+            <h2>🎵 Music Data Editor</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                video-music.json 직접 편집 (저장 즉시 재부팅 없이 실시간 음악 검색 엔진 적용)
+            </p>
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>video-music.json (음악 / 노래 데이터베이스)</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="formatJson('val-music')" style="background:var(--surface-border);" title="JSON 예쁘게 정렬">Format JSON</button>
+                        <button class="btn btn-sm" onclick="reloadMusicDataFromServer()" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn" onclick="saveMusicData()" style="box-shadow: 0 3px 10px rgba(168, 85, 247, 0.3);">💾 Save Changes (즉시 적용)</button>
+                    </div>
+                </div>
+                <textarea id="val-music" class="code-editor" spellcheck="false" style="min-height: 720px; height: 75vh;"></textarea>
+            </div>
+        </div>
+
+        <!-- Video Metadata Editor -->
+        <div id="tab-config-metadata" class="panel">
+            <h2>🏷️ Video Metadata Editor</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                video-metadata.json 직접 편집 (저장 즉시 재부팅 없이 실시간 적용)
+            </p>
+            <div class="config-block glass">
+                <div class="config-block-header">
+                    <h3>video-metadata.json (방송 회차 메타데이터)</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="formatJson('val-metadata')" style="background:var(--surface-border);" title="JSON 예쁘게 정렬">Format JSON</button>
+                        <button class="btn btn-sm" onclick="reloadMetadataFromServer()" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn" onclick="saveMetadata()" style="box-shadow: 0 3px 10px rgba(14, 165, 233, 0.3);">💾 Save Changes (즉시 적용)</button>
+                    </div>
+                </div>
+                <textarea id="val-metadata" class="code-editor" spellcheck="false" style="min-height: 720px; height: 75vh;"></textarea>
+            </div>
+        </div>
+
         <div id="tab-config" class="panel">
             <h2>⚙️ Configuration Control</h2>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                config-youtube.js 직접 편집 (저장 즉시 재부팅 없이 실시간 적용)
+            </p>
 
             <div class="config-block glass">
                 <div class="config-block-header">
-                    <h3>config-youtube.js</h3>
-                    <button class="btn" onclick="saveConfig('youtube')">Save Changes</button>
+                    <h3>config-youtube.js (Bot Configuration)</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="reloadConfigFromServer('youtube')" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn" onclick="saveConfig('youtube')" style="box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">💾 Save Changes (즉시 적용)</button>
+                    </div>
                 </div>
                 <textarea id="val-youtube" class="code-editor" spellcheck="false" style="min-height: 720px; height: 75vh;"></textarea>
             </div>

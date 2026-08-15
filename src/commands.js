@@ -4,12 +4,10 @@ const TextSearchEngine = require('./textsearcher.js');
 const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const greeting_lib = require('./greeting.js');
-const schCfg = require('../data/config-search.js');
+const configManager = require('./config-manager.js');
+const { cfg, msg, schCfg, musics, videoMetadata, videoMetaMap } = configManager;
 const videoSubManager = require('./sub-manager.js');
 
-let musics = {};
-try { musics = require('../data/video-music.json'); }
-catch (e) { console.warn('⚠️ [경고] video-music.json 파일이 없습니다. 음악 검색 기능이 비활성화됩니다.'); }
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
 const path = require('path');
@@ -19,20 +17,8 @@ const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
     toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate, hasProfanity, maskProfanity } = require('./func.js');
 
 const videoInfo = search_lib.videoInfo;
-let videoMetadata = [];
-try { videoMetadata = require('../data/video-metadata.json'); }
-catch (e) { console.warn('⚠️ [경고] video-metadata.json 파일이 없습니다. 방송 메타데이터 관련 기능이 비활성화됩니다.'); }
-
-const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
 const statsTracker = require('./stats-db.js');
-const musicSearcher = new TextSearchEngine(musics);
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
-
-// ─── 설정 로드 (data/config-youtube.json) ─────────────────────
-const cfg = require('../data/config-youtube.js');
-
-// ─── 봇 출력 메시지 로드 ─────────────────────────────────────
-const msg = require('../data/config-messages.js');
 
 // ─── JSON 파일 누락 시 연관 기능 강제 비활성화 ───
 if (!videoSubManager.hasSubtitles() && cfg.input) {
@@ -1288,7 +1274,7 @@ async function handleMusicCommand(rtn, cmd, args, _input) {
 
     const query = args.join(' ');
 
-    const searchInfo = musicSearcher.search(query);
+    const searchInfo = configManager.getMusicSearcher().search(query);
     if (searchInfo && searchInfo.length > 0) {
         searchInfo.sort((a, b) => b.score - a.score);
 
@@ -1431,24 +1417,4 @@ function getCooldownState() {
     return state;
 }
 
-function reloadMessages() {
-    try {
-        const msgPath = path.join(__dirname, '../data/config-messages.js');
-        delete require.cache[require.resolve(msgPath)];
-        const fresh = require(msgPath);
-        for (const k of Object.keys(msg)) {
-            delete msg[k];
-        }
-        Object.assign(msg, fresh);
-        if (require.cache[require.resolve(msgPath)]) {
-            require.cache[require.resolve(msgPath)].exports = msg;
-        }
-        console.log('[commands] config-messages.js 리로드 완료');
-        return true;
-    } catch (e) {
-        console.error('[commands] config-messages.js 리로드 실패:', e);
-        throw e;
-    }
-}
-
-module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState, reloadMessages };
+module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState, reloadMessages: configManager.reloadMessages };

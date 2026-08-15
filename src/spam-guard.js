@@ -4,8 +4,8 @@ const path2 = require('./path.js');
 const path = require('path');
 const BANNED_PATH = path2.findPath('../data/youtube-banned.json');
 const TRACKER_PATH = path2.findPath('../data/youtube-tracker.json') || path.join(__dirname, '../data', 'youtube-tracker.json');
-const cfg = require('../data/config-youtube.js');
-const msg = require('../data/config-messages.js');
+const configManager = require('./config-manager.js');
+const { cfg, msg } = configManager;
 
 class SpamGuard {
     constructor(opts) {

@@ -1,0 +1,319 @@
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+// ─── 파일 경로 정의 ─────────────────────────────────────────
+const PATHS = {
+    youtube: path.join(__dirname, '../data/config-youtube.js'),
+    messages: path.join(__dirname, '../data/config-messages.js'),
+    search: path.join(__dirname, '../data/config-search.js'),
+    profanity: path.join(__dirname, '../data/profanity-list.js'),
+    videoInfo: path.join(__dirname, '../data/video-info.json'),
+    videoSub: path.join(__dirname, '../data/video-sub.json'),
+    videoMusic: path.join(__dirname, '../data/video-music.json'),
+    videoMetadata: path.join(__dirname, '../data/video-metadata.json'),
+};
+
+// ─── 설정 및 데이터 메모리 인스턴스 (In-Place 갱신용) ─────────────
+const cfgYoutube = require(PATHS.youtube);
+const cfgMessages = require(PATHS.messages);
+const cfgSearch = require(PATHS.search);
+const profanitySet = require(PATHS.profanity);
+
+let musics = {};
+try {
+    musics = require(PATHS.videoMusic);
+} catch {
+    console.warn('⚠️ [ConfigManager] video-music.json 파일이 없습니다.');
+}
+
+let videoMetadata = [];
+try {
+    videoMetadata = require(PATHS.videoMetadata);
+} catch {
+    console.warn('⚠️ [ConfigManager] video-metadata.json 파일이 없습니다.');
+}
+
+const TextSearchEngine = require('./textsearcher.js');
+let musicSearcher = new TextSearchEngine(musics);
+const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
+
+/**
+ * JS 코드 문법 및 module.exports 유효성 검증
+ */
+function validateJS(code, filename = 'config.js') {
+    const script = new vm.Script(code, { filename });
+    const sandbox = { module: { exports: {} }, exports: {}, Set };
+    vm.createContext(sandbox);
+    script.runInContext(sandbox);
+    if (!sandbox.module.exports) {
+        throw new Error('module.exports 가 정의되지 않았습니다.');
+    }
+    return sandbox.module.exports;
+}
+
+/**
+ * require.cache 갱신 헬퍼
+ */
+function updateRequireCache(filePath, targetExport) {
+    try {
+        const resolved = require.resolve(filePath);
+        if (require.cache[resolved]) {
+            require.cache[resolved].exports = targetExport;
+        }
+    } catch { }
+}
+
+// ─── 개별 리로드 로직 ────────────────────────────────────────
+
+function reloadYoutubeConfig() {
+    try {
+        const resolved = require.resolve(PATHS.youtube);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.youtube);
+
+        for (const k of Object.keys(cfgYoutube)) {
+            delete cfgYoutube[k];
+        }
+        Object.assign(cfgYoutube, fresh);
+        updateRequireCache(PATHS.youtube, cfgYoutube);
+
+        console.log('[ConfigManager] config-youtube.js 리로드 완료');
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] config-youtube.js 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadMessagesConfig() {
+    try {
+        const resolved = require.resolve(PATHS.messages);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.messages);
+
+        for (const k of Object.keys(cfgMessages)) {
+            delete cfgMessages[k];
+        }
+        Object.assign(cfgMessages, fresh);
+        updateRequireCache(PATHS.messages, cfgMessages);
+
+        console.log('[ConfigManager] config-messages.js 리로드 완료');
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] config-messages.js 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadSearchConfig() {
+    try {
+        const resolved = require.resolve(PATHS.search);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.search);
+
+        for (const k of Object.keys(cfgSearch)) {
+            delete cfgSearch[k];
+        }
+        Object.assign(cfgSearch, fresh);
+        updateRequireCache(PATHS.search, cfgSearch);
+
+        console.log('[ConfigManager] config-search.js 리로드 완료');
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] config-search.js 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadProfanityList() {
+    try {
+        const resolved = require.resolve(PATHS.profanity);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.profanity);
+
+        profanitySet.clear();
+        for (const word of fresh) {
+            profanitySet.add(word);
+        }
+        updateRequireCache(PATHS.profanity, profanitySet);
+
+        console.log(`[ConfigManager] profanity-list.js 리로드 완료 (${profanitySet.size}개 단어)`);
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] profanity-list.js 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadVideoInfo() {
+    try {
+        const search_lib = require('./video-matcher/search.js');
+        const success = search_lib.reloadVideoInfo();
+        return success;
+    } catch (e) {
+        console.error('[ConfigManager] video-info.json 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadVideoSub() {
+    try {
+        const subManager = require('./sub-manager.js');
+        const success = subManager.reloadVideoSub();
+        return success;
+    } catch (e) {
+        console.error('[ConfigManager] video-sub.json 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadVideoMusic() {
+    try {
+        const resolved = require.resolve(PATHS.videoMusic);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.videoMusic);
+
+        for (const k of Object.keys(musics)) {
+            delete musics[k];
+        }
+        Object.assign(musics, fresh);
+        updateRequireCache(PATHS.videoMusic, musics);
+
+        musicSearcher = new TextSearchEngine(musics);
+
+        console.log(`[ConfigManager] video-music.json 리로드 완료`);
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] video-music.json 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+function reloadVideoMetadata() {
+    try {
+        const resolved = require.resolve(PATHS.videoMetadata);
+        delete require.cache[resolved];
+        const fresh = require(PATHS.videoMetadata);
+
+        videoMetadata.length = 0;
+        videoMetadata.push(...fresh);
+        updateRequireCache(PATHS.videoMetadata, videoMetadata);
+
+        videoMetaMap.clear();
+        videoMetadata.forEach(m => videoMetaMap.set(m.name, m));
+
+        console.log(`[ConfigManager] video-metadata.json 리로드 완료`);
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] video-metadata.json 리로드 실패:', e.message);
+        throw e;
+    }
+}
+
+/**
+ * 모든 설정 및 데이터 파일 일괄 리로드
+ */
+function reloadAll() {
+    reloadYoutubeConfig();
+    reloadMessagesConfig();
+    reloadSearchConfig();
+    reloadProfanityList();
+    reloadVideoInfo();
+    reloadVideoSub();
+    reloadVideoMusic();
+    reloadVideoMetadata();
+    return true;
+}
+
+/**
+ * 설정/데이터 파일 검증 후 저장 및 실시간 핫리로드 수행
+ * @param {'youtube'|'messages'|'search'|'profanity'|'videoInfo'|'videoSub'|'videoMusic'|'videoMetadata'} target 
+ * @param {string} content 
+ */
+function validateAndSaveConfig(target, content) {
+    const filePath = PATHS[target];
+    if (!filePath) {
+        throw new Error(`알 수 없는 대상입니다: ${target}`);
+    }
+
+    const cleanContent = (content || '').replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+
+    // 1. 형식별 사전 검증
+    if (filePath.endsWith('.js')) {
+        validateJS(cleanContent, path.basename(filePath));
+    } else if (filePath.endsWith('.json')) {
+        JSON.parse(cleanContent);
+    }
+
+    // 2. 파일 저장
+    fs.writeFileSync(filePath, cleanContent, 'utf8');
+
+    // 3. 해당 타겟 리로드
+    switch (target) {
+        case 'youtube':
+            reloadYoutubeConfig();
+            break;
+        case 'messages':
+            reloadMessagesConfig();
+            break;
+        case 'search':
+            reloadSearchConfig();
+            break;
+        case 'profanity':
+            reloadProfanityList();
+            break;
+        case 'videoInfo':
+            reloadVideoInfo();
+            break;
+        case 'videoSub':
+            reloadVideoSub();
+            break;
+        case 'videoMusic':
+            reloadVideoMusic();
+            break;
+        case 'videoMetadata':
+            reloadVideoMetadata();
+            break;
+    }
+
+    return true;
+}
+
+module.exports = {
+    // 경로
+    PATHS,
+
+    // 설정 객체 및 데이터 인스턴스
+    cfgYoutube,
+    cfgMessages,
+    cfgSearch,
+    profanitySet,
+    musics,
+    videoMetadata,
+    musicSearcher,
+    videoMetaMap,
+    getMusicSearcher: () => musicSearcher,
+    getVideoMetaMap: () => videoMetaMap,
+
+    // 단축 별칭
+    cfg: cfgYoutube,
+    msg: cfgMessages,
+    schCfg: cfgSearch,
+
+    // 리로드 함수
+    reloadYoutubeConfig,
+    reloadMessagesConfig,
+    reloadMessages: reloadMessagesConfig, // alias
+    reloadSearchConfig,
+    reloadProfanityList,
+    reloadVideoInfo,
+    reloadVideoSub,
+    reloadVideoMusic,
+    reloadVideoMetadata,
+    reloadAll,
+
+    // 검증 및 저장
+    validateJS,
+    validateAndSaveConfig
+};

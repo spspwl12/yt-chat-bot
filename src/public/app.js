@@ -316,6 +316,9 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
             if (targetId === 'tab-config') ws.send(JSON.stringify({ action: 'getConfig' }));
             if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
             if (targetId === 'tab-config-messages') ws.send(JSON.stringify({ action: 'getConfigMessages' }));
+            if (targetId === 'tab-config-profanity') ws.send(JSON.stringify({ action: 'getProfanityList' }));
+            if (targetId === 'tab-config-music') ws.send(JSON.stringify({ action: 'getVideoMusic' }));
+            if (targetId === 'tab-config-metadata') ws.send(JSON.stringify({ action: 'getVideoMetadata' }));
         }
     });
 });
@@ -531,7 +534,7 @@ function handleWSMessage(msg) {
         case 'saveConfig_result':
             const statusEl = document.getElementById('vm-save-status');
             if (payload.success) {
-                showToast('설정 저장 완료! 재시작 시 적용됩니다.');
+                showToast('설정 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
                 if (statusEl) {
                     statusEl.textContent = '✓ 저장 완료';
                     statusEl.style.display = '';
@@ -599,6 +602,48 @@ function handleWSMessage(msg) {
                 showToast('config-messages.js 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
             } else {
                 showToast('메시지 설정 저장 실패: ' + payload.error, true);
+            }
+            break;
+
+        case 'profanityList_data':
+            if (document.getElementById('val-profanity')) {
+                document.getElementById('val-profanity').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            break;
+
+        case 'saveProfanityList_result':
+            if (payload.success) {
+                showToast('profanity-list.js 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
+            } else {
+                showToast('욕설 필터 저장 실패: ' + payload.error, true);
+            }
+            break;
+
+        case 'videoMusic_data':
+            if (document.getElementById('val-music')) {
+                document.getElementById('val-music').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            break;
+
+        case 'saveVideoMusic_result':
+            if (payload.success) {
+                showToast('video-music.json 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
+            } else {
+                showToast('음악 데이터 저장 실패: ' + payload.error, true);
+            }
+            break;
+
+        case 'videoMetadata_data':
+            if (document.getElementById('val-metadata')) {
+                document.getElementById('val-metadata').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            break;
+
+        case 'saveVideoMetadata_result':
+            if (payload.success) {
+                showToast('video-metadata.json 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
+            } else {
+                showToast('메타데이터 저장 실패: ' + payload.error, true);
             }
             break;
 
@@ -1318,6 +1363,72 @@ window.reloadConfigMessagesFromServer = function () {
     }
 };
 
+window.saveProfanityList = function () {
+    const el = document.getElementById('val-profanity');
+    const content = el ? el.value : '';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'saveProfanityList', payload: { content } }));
+    } else {
+        showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+};
+
+window.reloadProfanityListFromServer = function () {
+    if (confirm('서버의 profanity-list.js 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getProfanityList' }));
+            showToast('profanity-list.js 불러오는 중...');
+        }
+    }
+};
+
+window.reloadConfigFromServer = function (target) {
+    if (confirm(`서버의 config-${target}.js 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?`)) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getConfig' }));
+            showToast(`config-${target}.js 불러오는 중...`);
+        }
+    }
+};
+
+window.saveMusicData = function () {
+    const el = document.getElementById('val-music');
+    const content = el ? el.value : '';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'saveVideoMusic', payload: { content } }));
+    } else {
+        showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+};
+
+window.reloadMusicDataFromServer = function () {
+    if (confirm('서버의 video-music.json 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getVideoMusic' }));
+            showToast('video-music.json 불러오는 중...');
+        }
+    }
+};
+
+window.saveMetadata = function () {
+    const el = document.getElementById('val-metadata');
+    const content = el ? el.value : '';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'saveVideoMetadata', payload: { content } }));
+    } else {
+        showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+};
+
+window.reloadMetadataFromServer = function () {
+    if (confirm('서버의 video-metadata.json 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getVideoMetadata' }));
+            showToast('video-metadata.json 불러오는 중...');
+        }
+    }
+};
+
 window.rebootBot = function () {
     if (confirm('정말로 봇을 재부팅하시겠습니까? (설정 반영 등에 필요합니다)\n\n※ 서버/콘솔 외부 환경에서 자동 재시작(PM2, 스크립트 반복문 등) 기능이 켜져 있어야 다시 켜집니다.')) {
         ws.send(JSON.stringify({ action: 'reboot_bot' }));
@@ -1337,6 +1448,9 @@ document.querySelectorAll('textarea.code-editor').forEach(ta => {
         } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
             if (this.id === 'val-messages') saveConfigMessages();
+            else if (this.id === 'val-profanity') saveProfanityList();
+            else if (this.id === 'val-music') saveMusicData();
+            else if (this.id === 'val-metadata') saveMetadata();
             else if (this.id === 'val-videoinfo') saveVideoInfo();
             else if (this.id === 'val-youtube') saveConfig('youtube');
             else if (this.id === 'val-search') saveSearchRawConfig();

@@ -10,7 +10,8 @@ const chatHistory = require('./chat-history.js');
 const { banUser, blockUser } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
 const { extractLatestSegmentFrame } = require('./video-matcher/live-downloader.js');
-const cfgYoutube = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfgYoutube } = configManager;
 const eventBus = require('./event-bus.js');
 const commandsLib = require('./commands.js');
 const statsTracker = require('./stats-db.js');
@@ -408,18 +409,14 @@ async function handleAction(client, req) {
         broadcastSpam();
     }
     else if (action === 'getConfig') {
-        const cfgYoutubeText = fs.readFileSync(path.join(__dirname, '../data', 'config-youtube.js'), 'utf8');
-        const cfgSearchText = fs.readFileSync(path.join(__dirname, '../data', 'config-search.js'), 'utf8');
+        const cfgYoutubeText = fs.readFileSync(configManager.PATHS.youtube, 'utf8');
+        const cfgSearchText = fs.readFileSync(configManager.PATHS.search, 'utf8');
         sendWSFrame(client, JSON.stringify({ action: 'config_data', payload: { youtube: cfgYoutubeText, search: cfgSearchText } }));
     }
     else if (action === 'saveConfig') {
         const { target, content } = payload;
         try {
-            if (target === 'youtube') {
-                fs.writeFileSync(path.join(__dirname, '../data', 'config-youtube.js'), content, 'utf8');
-            } else if (target === 'search') {
-                fs.writeFileSync(path.join(__dirname, '../data', 'config-search.js'), content, 'utf8');
-            }
+            configManager.validateAndSaveConfig(target, content);
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: true } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveConfig_result', payload: { success: false, error: e.message } }));
@@ -429,11 +426,11 @@ async function handleAction(client, req) {
         const result = await extractLatestSegmentFrame();
         sendWSFrame(client, JSON.stringify({ action: 'liveFrame_result', payload: result }));
     }
-    // ── 새 기능: video-info.json 편집 ──
+    // ── video-info.json 편집 ──
     else if (action === 'getVideoInfo') {
         try {
-            const viText = fs.readFileSync(path.join(__dirname, '../data', 'video-info.json'), 'utf8')
-                .replace(/^\uFEFF/, '').trim(); // BOM 및 앞뒤 공백 제거
+            const viText = fs.readFileSync(configManager.PATHS.videoInfo, 'utf8')
+                .replace(/^\uFEFF/, '').trim();
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: viText }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'videoInfo_data', payload: '[]' }));
@@ -442,21 +439,16 @@ async function handleAction(client, req) {
     else if (action === 'saveVideoInfo') {
         const { content } = payload;
         try {
-            // BOM, \r, 앞뒤 공백 제거 후 JSON 유효성 검증
-            const cleanContent = content.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
-            JSON.parse(cleanContent);
-            fs.writeFileSync(path.join(__dirname, '../data', 'video-info.json'), cleanContent, 'utf8');
-            // 재부팅 없이 즉시 메모리에 반영
-            const reloaded = search_lib.reloadVideoInfo();
-            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true, reloaded } }));
+            configManager.validateAndSaveConfig('videoInfo', content);
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
         }
     }
-    // ── config-messages.js 조회 및 즉시 반영 편집 ──
+    // ── config-messages.js 조회 및 편집 ──
     else if (action === 'getConfigMessages') {
         try {
-            const msgText = fs.readFileSync(path.join(__dirname, '../data', 'config-messages.js'), 'utf8')
+            const msgText = fs.readFileSync(configManager.PATHS.messages, 'utf8')
                 .replace(/^\uFEFF/, '').trim();
             sendWSFrame(client, JSON.stringify({ action: 'configMessages_data', payload: msgText }));
         } catch (e) {
@@ -466,34 +458,77 @@ async function handleAction(client, req) {
     else if (action === 'saveConfigMessages') {
         const { content } = payload;
         try {
-            const cleanContent = (content || '').replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
-
-            // 1. JS 문법 및 module.exports 유효성 검사 (샌드박스 VM)
-            const script = new vm.Script(cleanContent, { filename: 'config-messages.js' });
-            const sandbox = { module: { exports: {} }, exports: {} };
-            vm.createContext(sandbox);
-            script.runInContext(sandbox);
-
-            if (!sandbox.module.exports || typeof sandbox.module.exports !== 'object') {
-                throw new Error('module.exports 가 올바른 객체 형식이 아닙니다.');
-            }
-
-            // 2. 파일 저장
-            fs.writeFileSync(path.join(__dirname, '../data', 'config-messages.js'), cleanContent, 'utf8');
-
-            // 3. 재부팅 없이 메모리 핫리로드
-            commandsLib.reloadMessages();
-
+            configManager.validateAndSaveConfig('messages', content);
             sendWSFrame(client, JSON.stringify({ action: 'saveConfigMessages_result', payload: { success: true } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveConfigMessages_result', payload: { success: false, error: e.message } }));
         }
     }
-    // ── 새 기능: video-sub.json 리로드 ──
+    // ── profanity-list.js 조회 및 편집 ──
+    else if (action === 'getProfanityList') {
+        try {
+            const profText = fs.readFileSync(configManager.PATHS.profanity, 'utf8')
+                .replace(/^\uFEFF/, '').trim();
+            sendWSFrame(client, JSON.stringify({ action: 'profanityList_data', payload: profText }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'profanityList_data', payload: 'module.exports = new Set([]);' }));
+        }
+    }
+    else if (action === 'saveProfanityList') {
+        const { content } = payload;
+        try {
+            configManager.validateAndSaveConfig('profanity', content);
+            sendWSFrame(client, JSON.stringify({ action: 'saveProfanityList_result', payload: { success: true } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveProfanityList_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── video-music.json 조회 및 편집 ──
+    else if (action === 'getVideoMusic') {
+        try {
+            const musicText = fs.readFileSync(configManager.PATHS.videoMusic, 'utf8')
+                .replace(/^\uFEFF/, '').trim();
+            sendWSFrame(client, JSON.stringify({ action: 'videoMusic_data', payload: musicText }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'videoMusic_data', payload: '{}' }));
+        }
+    }
+    else if (action === 'saveVideoMusic') {
+        const { content } = payload;
+        try {
+            configManager.validateAndSaveConfig('videoMusic', content);
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoMusic_result', payload: { success: true } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoMusic_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── video-metadata.json 조회 및 편집 ──
+    else if (action === 'getVideoMetadata') {
+        try {
+            const metaText = fs.readFileSync(configManager.PATHS.videoMetadata, 'utf8')
+                .replace(/^\uFEFF/, '').trim();
+            sendWSFrame(client, JSON.stringify({ action: 'videoMetadata_data', payload: metaText }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'videoMetadata_data', payload: '[]' }));
+        }
+    }
+    else if (action === 'saveVideoMetadata') {
+        const { content } = payload;
+        try {
+            configManager.validateAndSaveConfig('videoMetadata', content);
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoMetadata_result', payload: { success: true } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoMetadata_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── video-sub.json 리로드 ──
     else if (action === 'reloadVideoSub') {
-        const videoSubManager = require('./sub-manager.js');
-        const success = videoSubManager.reloadVideoSub();
-        sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success } }));
+        try {
+            const success = configManager.reloadVideoSub();
+            sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success: false, error: e.message } }));
+        }
     }
     // ── 새 기능: 봇 재부팅 (설정 리로드) ──
     else if (action === 'reboot_bot') {
