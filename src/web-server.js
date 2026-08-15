@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const vm = require('vm');
 
 
 const chatHistory = require('./chat-history.js');
@@ -450,6 +451,42 @@ async function handleAction(client, req) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: true, reloaded } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoInfo_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── config-messages.js 조회 및 즉시 반영 편집 ──
+    else if (action === 'getConfigMessages') {
+        try {
+            const msgText = fs.readFileSync(path.join(__dirname, '../data', 'config-messages.js'), 'utf8')
+                .replace(/^\uFEFF/, '').trim();
+            sendWSFrame(client, JSON.stringify({ action: 'configMessages_data', payload: msgText }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'configMessages_data', payload: 'module.exports = {};' }));
+        }
+    }
+    else if (action === 'saveConfigMessages') {
+        const { content } = payload;
+        try {
+            const cleanContent = (content || '').replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+
+            // 1. JS 문법 및 module.exports 유효성 검사 (샌드박스 VM)
+            const script = new vm.Script(cleanContent, { filename: 'config-messages.js' });
+            const sandbox = { module: { exports: {} }, exports: {} };
+            vm.createContext(sandbox);
+            script.runInContext(sandbox);
+
+            if (!sandbox.module.exports || typeof sandbox.module.exports !== 'object') {
+                throw new Error('module.exports 가 올바른 객체 형식이 아닙니다.');
+            }
+
+            // 2. 파일 저장
+            fs.writeFileSync(path.join(__dirname, '../data', 'config-messages.js'), cleanContent, 'utf8');
+
+            // 3. 재부팅 없이 메모리 핫리로드
+            commandsLib.reloadMessages();
+
+            sendWSFrame(client, JSON.stringify({ action: 'saveConfigMessages_result', payload: { success: true } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveConfigMessages_result', payload: { success: false, error: e.message } }));
         }
     }
     // ── 새 기능: video-sub.json 리로드 ──

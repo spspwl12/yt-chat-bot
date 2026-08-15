@@ -315,6 +315,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
             if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({ action: 'getVideoInfo' }));
             if (targetId === 'tab-config') ws.send(JSON.stringify({ action: 'getConfig' }));
             if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
+            if (targetId === 'tab-config-messages') ws.send(JSON.stringify({ action: 'getConfigMessages' }));
         }
     });
 });
@@ -585,6 +586,20 @@ function handleWSMessage(msg) {
         case 'saveVideoInfo_result':
             if (payload.success) showToast('video-info.json 저장 완료! 즉시 적용되었습니다.');
             else showToast('저장 실패: ' + payload.error, true);
+            break;
+
+        case 'configMessages_data':
+            if (document.getElementById('val-messages')) {
+                document.getElementById('val-messages').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            break;
+
+        case 'saveConfigMessages_result':
+            if (payload.success) {
+                showToast('config-messages.js 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
+            } else {
+                showToast('메시지 설정 저장 실패: ' + payload.error, true);
+            }
             break;
 
         case 'search_logs':
@@ -1284,12 +1299,50 @@ window.formatVideoInfo = function () {
     }
 };
 
+window.saveConfigMessages = function () {
+    const el = document.getElementById('val-messages');
+    const content = el ? el.value : '';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'saveConfigMessages', payload: { content } }));
+    } else {
+        showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+};
+
+window.reloadConfigMessagesFromServer = function () {
+    if (confirm('서버의 config-messages.js 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getConfigMessages' }));
+            showToast('config-messages.js 불러오는 중...');
+        }
+    }
+};
+
 window.rebootBot = function () {
     if (confirm('정말로 봇을 재부팅하시겠습니까? (설정 반영 등에 필요합니다)\n\n※ 서버/콘솔 외부 환경에서 자동 재시작(PM2, 스크립트 반복문 등) 기능이 켜져 있어야 다시 켜집니다.')) {
         ws.send(JSON.stringify({ action: 'reboot_bot' }));
         showToast('재부팅 명령을 전송했습니다. 연결이 곧 끊어집니다.', true);
     }
 };
+
+// ── Code Editor Enhancements (Tab indent & Ctrl+S) ──
+document.querySelectorAll('textarea.code-editor').forEach(ta => {
+    ta.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (this.id === 'val-messages') saveConfigMessages();
+            else if (this.id === 'val-videoinfo') saveVideoInfo();
+            else if (this.id === 'val-youtube') saveConfig('youtube');
+            else if (this.id === 'val-search') saveSearchRawConfig();
+        }
+    });
+});
 
 // ── User Detail Modal ──
 function showUserDetail(channelId) {

@@ -12,6 +12,7 @@ try { musics = require('../data/video-music.json'); }
 catch (e) { console.warn('⚠️ [경고] video-music.json 파일이 없습니다. 음악 검색 기능이 비활성화됩니다.'); }
 const lastQuery = require(schCfg.searcher.lastquery_path);
 const fs = require('fs');
+const path = require('path');
 const eventBus = require('./event-bus.js');
 const { sendChat } = require('./innertube.js');
 const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
@@ -483,8 +484,12 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
         return returnWarning(msg.error.search_disabled, cmd, _input);
     }
 
+    if (_input && _input.warn >= 1) {
+        return null;
+    }
+
     const trackerInfo = _input.spamGuard && _input.spamGuard.tracker.get(_input.channelId);
-    if (trackerInfo && trackerInfo.searchBanned) {
+    if (trackerInfo && (trackerInfo.searchBanned || trackerInfo.warns >= 1)) {
         return null;
     }
 
@@ -1426,4 +1431,24 @@ function getCooldownState() {
     return state;
 }
 
-module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState };
+function reloadMessages() {
+    try {
+        const msgPath = path.join(__dirname, '../data/config-messages.js');
+        delete require.cache[require.resolve(msgPath)];
+        const fresh = require(msgPath);
+        for (const k of Object.keys(msg)) {
+            delete msg[k];
+        }
+        Object.assign(msg, fresh);
+        if (require.cache[require.resolve(msgPath)]) {
+            require.cache[require.resolve(msgPath)].exports = msg;
+        }
+        console.log('[commands] config-messages.js 리로드 완료');
+        return true;
+    } catch (e) {
+        console.error('[commands] config-messages.js 리로드 실패:', e);
+        throw e;
+    }
+}
+
+module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState, reloadMessages };
