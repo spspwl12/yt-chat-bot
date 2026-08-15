@@ -536,10 +536,6 @@ function getSendParams() { return sendParams; }
 
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-/**
- * 확인 큐: fetchChat이 매 폴링마다 여기서 ID를 찾아 resolve 해준다
- * { id: string, resolve: function, timer: timeout }
- */
 var verifyQueue = [];
 
 function hasPendingVerify() {
@@ -555,11 +551,10 @@ function _checkVerifyQueue(actions) {
     actions = actions || [];
 
     for (var j = verifyQueue.length - 1; j >= 0; j--) {
-        const targetId = verifyQueue[j].id;
         const obj = actions.find(e => {
             const str = JSON.stringify(e);
-            return targetId && str.includes(targetId) &&
-                (str.includes('"message"') || str.includes("'message'") || str.includes('addChatItemAction'));
+            return str.includes(verifyQueue[j].id) &&
+                (str.includes('"message"') || str.includes("'message'"));
         });
 
         if (obj) {
@@ -588,7 +583,7 @@ function _waitForVerify(messageId) {
                     }
                 }
                 resolve(false);
-            }, cfg.yt.verify_timeout || 10000),
+            }, cfg.yt.verify_timeout),
         };
         verifyQueue.push(entry);
     });
