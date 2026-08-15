@@ -407,7 +407,7 @@ async function initSession(videoId, chatMode) {
             console.log('📡 봇 채널 ID 확인 중 (account_menu)...');
             var accUrl = '/youtubei/v1/account/account_menu?key=' + innertubeApiKey + '&prettyPrint=false';
             var accRes = await h2Post(accUrl, authHeaders(), { context: makeContext() });
-            
+
             function findMyChannel(obj) {
                 if (!obj || typeof obj !== 'object') return;
                 // account_menu 안에서 "내 채널" 혹은 "Your channel" 항목의 browseId 탐색
@@ -479,6 +479,10 @@ async function fetchChat(continuation) {
 
     // 메시지 파싱
     var actions = liveChatCont.actions || [];
+
+    // ★ 확인 큐 체크 (sendChat에서 보낸 메시지 ID 검증)
+    _checkVerifyQueue(actions);
+
     var messages = [];
 
     for (var i = 0; i < actions.length; i++) {
@@ -521,9 +525,6 @@ async function fetchChat(continuation) {
         });
     }
 
-    // ★ 확인 큐 체크 (sendChat에서 보낸 메시지 검증)
-    _checkVerifyQueue(actions, messages);
-
     return { messages: messages, continuation: nextCont, timeoutMs: timeoutMs };
 }
 
@@ -536,8 +537,8 @@ function getSendParams() { return sendParams; }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 /**
- * 확인 큐: fetchChat이 매 폴링마다 여기서 ID/내용을 찾아 resolve 해준다
- * { id: string, text: string, resolve: function, timer: timeout }
+ * 확인 큐: fetchChat이 매 폴링마다 여기서 ID를 찾아 resolve 해준다
+ * { id: string, resolve: function, timer: timeout }
  */
 var verifyQueue = [];
 
@@ -546,77 +547,37 @@ function hasPendingVerify() {
 }
 
 /**
- * fetchChat 결과에서 확인 큐의 메시지를 다각도로 체크 (fetchChat 내부에서 호출)
+ * fetchChat 결과에서 확인 큐의 메시지 ID를 체크 (fetchChat 내부에서 호출)
  */
-function _checkVerifyQueue(actions, messages) {
+function _checkVerifyQueue(actions) {
     if (verifyQueue.length === 0) return;
 
     actions = actions || [];
-    messages = messages || [];
 
     for (var j = verifyQueue.length - 1; j >= 0; j--) {
-        const item = verifyQueue[j];
-        let found = false;
+        const targetId = verifyQueue[j].id;
+        const obj = actions.find(e => {
+            const str = JSON.stringify(e);
+            return targetId && str.includes(targetId) &&
+                (str.includes('"message"') || str.includes("'message'") || str.includes('addChatItemAction'));
+        });
 
-        // 1. 메시지 ID 매칭
-        if (item.id) {
-            // raw actions 문자열 내 ID 검색
-            const actionMatch = actions.find(e => {
-                const str = typeof e === 'string' ? e : JSON.stringify(e);
-                return str.includes(item.id);
-            });
-            if (actionMatch) found = true;
-
-            // 파싱된 메시지 id 검색
-            if (!found) {
-                const msgIdMatch = messages.find(m => m.id && m.id === item.id);
-                if (msgIdMatch) found = true;
-            }
-        }
-
-        // 2. 메시지 내용(text) 및 작성자(봇 채널) 매칭
-        if (!found && item.text) {
-            const cleanTarget = item.text.trim().replace(/\s+/g, ' ');
-
-            // 파싱된 messages 배열에서 탐색
-            const msgMatch = messages.find(m => {
-                const cleanMsg = (m.text || '').trim().replace(/\s+/g, ' ');
-                const isMyChannel = myChannelId && m.channelId === myChannelId;
-                const textMatch = cleanMsg === cleanTarget || cleanMsg.includes(cleanTarget) || cleanTarget.includes(cleanMsg);
-                return (isMyChannel && textMatch) || (cleanMsg.length > 5 && cleanMsg === cleanTarget);
-            });
-            if (msgMatch) found = true;
-
-            // actions 객체 내 텍스트 매칭
-            if (!found) {
-                const actTextMatch = actions.find(e => {
-                    const str = typeof e === 'string' ? e : JSON.stringify(e);
-                    return str.includes(cleanTarget) && (myChannelId ? str.includes(myChannelId) : true);
-                });
-                if (actTextMatch) found = true;
-            }
-        }
-
-        if (found) {
-            clearTimeout(item.timer);
-            item.resolve(true);
+        if (obj) {
+            clearTimeout(verifyQueue[j].timer);
+            verifyQueue[j].resolve(true);
             verifyQueue.splice(j, 1);
         }
     }
 }
 
 /**
- * 확인 큐에 메시지 등록. fetchChat이 해당 ID/텍스트를 발견하면 resolve(true).
+ * 확인 큐에 메시지 ID 등록. fetchChat이 해당 ID를 발견하면 resolve(true).
  * 타임아웃 시 resolve(false).
  */
-function _waitForVerify(verifyData) {
+function _waitForVerify(messageId) {
     return new Promise(function (resolve) {
-        var id = typeof verifyData === 'string' ? verifyData : (verifyData && verifyData.id);
-        var text = typeof verifyData === 'object' && verifyData ? verifyData.text : null;
-
         var entry = {
-            id: id,
-            text: text,
+            id: messageId,
             resolve: resolve,
             timer: setTimeout(function () {
                 // 타임아웃 → 큐에서 제거하고 false 반환
@@ -696,12 +657,8 @@ async function _sendWithRetry(message, retryProc, retries) {
             return false;
         }
 
-        if (result.id || result.deleteParams) {
-            var verified = await _waitForVerify({
-                id: result.id,
-                text: text,
-                deleteParams: result.deleteParams
-            });
+        if (result && result.id) {
+            var verified = await _waitForVerify(result.id);
             if (verified) {
                 console.log('💬 [봇] ' + text);
                 return true;
