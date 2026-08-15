@@ -1,5 +1,50 @@
 const fs = require('fs');
 const path = require('path');
+const profanitySet = require('../data/profanity-list.js');
+
+let cachedProfanityRegex = null;
+let cachedProfanityTestRegex = null;
+
+function getProfanityRegex() {
+    if (!cachedProfanityRegex) {
+        const sortedList = Array.from(profanitySet)
+            .filter(w => typeof w === 'string' && w.trim().length > 0)
+            .sort((a, b) => b.length - a.length);
+        const escaped = sortedList.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        cachedProfanityRegex = new RegExp(escaped.join('|'), 'gi');
+        cachedProfanityTestRegex = new RegExp(escaped.join('|'), 'i');
+    }
+    return cachedProfanityRegex;
+}
+
+function getProfanityTestRegex() {
+    if (!cachedProfanityTestRegex) {
+        getProfanityRegex();
+    }
+    return cachedProfanityTestRegex;
+}
+
+/**
+ * 텍스트에 비속어 목록(profanity-list.js)에 포함된 단어가 있는지 여부를 확인합니다.
+ * @param {string} text - 검사할 문자열
+ * @returns {boolean} 비속어 포함 여부
+ */
+function hasProfanity(text) {
+    if (!text || typeof text !== 'string') return false;
+    return getProfanityTestRegex().test(text);
+}
+
+/**
+ * 텍스트(예: 닉네임)에 비속어 목록(profanity-list.js)에 포함된 단어가 있을 경우
+ * 해당 단어를 길이만큼 '*' 문자로 마스킹하여 반환합니다.
+ * @param {string} text - 검사 및 마스킹할 문자열
+ * @returns {string} 마스킹된 문자열
+ */
+function maskProfanity(text) {
+    if (!text || typeof text !== 'string') return text || '';
+    const regex = getProfanityRegex();
+    return text.replace(regex, match => '*'.repeat(match.length));
+}
 
 async function runWithoutLogs(fn, ...args) {
     const methods = Object.keys(console).filter(key => typeof console[key] === 'function');
@@ -285,5 +330,7 @@ module.exports = {
     insertSpaces,
     filterText,
     shortenTextByRatio,
-    parseKoreanDate
+    parseKoreanDate,
+    hasProfanity,
+    maskProfanity
 };

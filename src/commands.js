@@ -15,9 +15,8 @@ const fs = require('fs');
 const eventBus = require('./event-bus.js');
 const { sendChat } = require('./innertube.js');
 const { insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
-    toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate } = require('./func.js');
+    toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate, hasProfanity, maskProfanity } = require('./func.js');
 
-const profanitySet = require('../data/profanity-list.js');
 const videoInfo = search_lib.videoInfo;
 let videoMetadata = [];
 try { videoMetadata = require('../data/video-metadata.json'); }
@@ -262,7 +261,7 @@ async function handleCommand(type, text, displayName, _input) {
             return null;
         }
         setCooldown(cmd, 0, _input);
-        return _emitLog(greeting_lib(displayName));
+        return _emitLog(greeting_lib(maskProfanity(displayName)));
     }
 
     // 봇 도움말/가이드 출력
@@ -359,10 +358,12 @@ function handleStatsCommand(cmd, displayName, _input) {
 
     setCooldown(cmd, 0, _input);
 
+    const cleanName = maskProfanity(stats.name);
+
     const makeMsg = (attempt) => {
         const spaces = " ".repeat(attempt);
         const builtMsg = msg.stats.user_stats(
-            stats.name,
+            cleanName,
             stats.totalMsgs,
             stats.totalRank,
             stats.daysCount,
@@ -493,10 +494,8 @@ async function handleEpisodeCommand(rtn, cmd, args, _input) {
 
     // 비속어 필터링: 검색어에 비속어가 포함되어 있으면 즉시 차단
     const searchText = filterText(query);
-    for (const word of profanitySet) {
-        if (searchText.includes(word)) {
-            return returnWarning(msg.error.search_profanity, cmd, _input);
-        }
+    if (hasProfanity(searchText)) {
+        return returnWarning(msg.error.search_profanity, cmd, _input);
     }
 
     const baseWarn = cfg.subtitle_score.warn_base || 10;
