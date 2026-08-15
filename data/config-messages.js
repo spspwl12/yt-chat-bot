@@ -85,7 +85,7 @@ module.exports = {
     // ─── 유저 스탯 조회 결과 ───────────────────────────────────
     stats: {
         user_stats: (name, totalMsgs, totalRank, daysCount, todayMsgs, todayRank, todayWatchStr, todayWatchRank, totalWatchStr, totalWatchRank, cooldownMsg) =>
-            `📊 [${name}님의 스탯] 총 채팅 메시지 수: ${totalMsgs}개 (${totalRank}위) | 총 채팅 일수: ${daysCount}일 | 오늘 메시지 채팅 수: ${todayMsgs}개 (${todayRank}위) | 오늘 라이브 시청시간: ${todayWatchStr} (${todayWatchRank}위) | 총 라이브 시청시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
+            `📊 [${name} 님의 스탯] 출석: ${daysCount}일 | 채팅수: ${todayMsgs}개 (${todayRank}위) | 시청시간: ${todayWatchStr} (${todayWatchRank}위) | 총 채팅수: ${totalMsgs}개 (${totalRank}위) | 총 시청시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
     },
 
     // ─── 쿨타임 안내 ─────────────────────────────────────────

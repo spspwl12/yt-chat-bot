@@ -39,7 +39,7 @@ async function main() {
     process.chdir(__dirname);
 
     console.log('🎬 비디오: ' + cfg.yt.video_id);
-    const session = await initSession(cfg.yt.video_id);
+    const session = await initSession(cfg.yt.video_id, 'top');
     let continuation = session.continuation;
 
     const canSend = !!getSendParams();
@@ -159,7 +159,7 @@ async function main() {
                         }
                         continue;
                     }
-                    
+
                     if (!resp) continue; // blockedCommand 였지만 혹시 모를 통과 상황 방어
 
                     if (chkInput.triggerCooldown) {
