@@ -105,7 +105,7 @@ module.exports = {
     },
     // ─── AI 설정 (대사 검색 폴백) ────────────────────────────────────
     ai: {
-        enable: true,                   // AI 폴백 기능 사용 여부
+        enable: false,                   // AI 폴백 기능 사용 여부
         url: "http://url:port/q?n={query}",  // GET 요청 URL ({query}는 query_template 결과로 치환)
         query_template: `웹 검색해서 웬만해선 그들을 막을 수 없다 시트콤 "{query}" 몇화`,  // {query}는 사용자 입력으로 치환 후 URL에 삽입
         response_path: "response",   // 응답 JSON에서 실제 문자열이 들어있는 경로 (예: "data.answer", "result.text")
