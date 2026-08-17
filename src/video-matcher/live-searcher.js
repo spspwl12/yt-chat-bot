@@ -43,6 +43,10 @@ class LiveSearcher extends EventEmitter {
         this._lastResultTime = 0;   // 마지막으로 결과를 받은 시각 (ms)
     }
 
+    isRunning() {
+        return this._running;
+    }
+
     start() {
         if (this._running) return;
         this._running = true;
@@ -56,6 +60,15 @@ class LiveSearcher extends EventEmitter {
         this._killDaemon();
         this._queue.length = 0;
         console.log('🔍 LiveSearcher 중지');
+    }
+
+    restart() {
+        if (!this._running) return;
+        console.log('🔍 LiveSearcher 재시작 중...');
+        this._clearWatchdog();
+        this._killDaemon();
+        this._queue.length = 0;
+        this._spawnDaemon();
     }
 
     /**

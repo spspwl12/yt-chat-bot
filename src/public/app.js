@@ -443,12 +443,18 @@ function handleWSMessage(msg) {
             if (payload.botMuted !== undefined) {
                 updateMuteBtn(payload.botMuted);
             }
+            if (payload.ytdlpRunning !== undefined) {
+                updateYtdlpBtn(payload.ytdlpRunning);
+            }
             if (payload.cooldownState) {
                 renderCooldowns(payload.cooldownState);
             }
             break;
         case 'mute_state':
             updateMuteBtn(payload);
+            break;
+        case 'ytdlp_state':
+            updateYtdlpBtn(payload);
             break;
 
         case 'chat_history':
@@ -509,6 +515,13 @@ function handleWSMessage(msg) {
 
                 if (searchConfigObj.searcher) {
                     setVal('vm-search-url', searchConfigObj.searcher.youtube_url);
+                }
+
+                if (searchConfigObj.ytdlp) {
+                    const cmdVal = Array.isArray(searchConfigObj.ytdlp.commandLine)
+                        ? JSON.stringify(searchConfigObj.ytdlp.commandLine)
+                        : (searchConfigObj.ytdlp.commandLine || '');
+                    setVal('vm-ytdlp-cmdline', cmdVal);
                 }
 
                 window._currentSearchConfig = searchConfigObj;
@@ -1198,6 +1211,7 @@ let isMutedUI = false;
 function updateMuteBtn(muted) {
     isMutedUI = muted;
     const btn = document.getElementById('btn-toggle-mute');
+    if (!btn) return;
     if (muted) {
         btn.innerText = 'Bot Muted: ON (말 못함)';
         btn.style.backgroundColor = 'var(--error)';
@@ -1212,6 +1226,29 @@ document.getElementById('btn-toggle-mute').addEventListener('click', () => {
         ws.send(JSON.stringify({ action: 'setMute', payload: !isMutedUI }));
     }
 });
+
+let isYtdlpRunningUI = true;
+function updateYtdlpBtn(running) {
+    isYtdlpRunningUI = running;
+    const btn = document.getElementById('btn-toggle-ytdlp');
+    if (!btn) return;
+    if (running) {
+        btn.innerText = 'yt-dlp: ON (다운로드 중)';
+        btn.style.backgroundColor = 'var(--secondary)';
+    } else {
+        btn.innerText = 'yt-dlp: OFF (중지됨)';
+        btn.style.backgroundColor = 'var(--error)';
+    }
+}
+
+const btnToggleYtdlp = document.getElementById('btn-toggle-ytdlp');
+if (btnToggleYtdlp) {
+    btnToggleYtdlp.addEventListener('click', () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'setYtdlp', payload: !isYtdlpRunningUI }));
+        }
+    });
+}
 
 function execDeleteSpam(channelId) {
     if (!confirm('이 유저를 밴 목록에서 제거합니까?')) return;
@@ -1626,19 +1663,51 @@ function saveVideoMatchingConfig() {
     if (!cfg.searcher) cfg.searcher = {};
     cfg.searcher.youtube_url = document.getElementById('vm-search-url').value.trim();
 
+    const ytdlpCmdEl = document.getElementById('vm-ytdlp-cmdline');
+    if (ytdlpCmdEl) {
+        const cmdValRaw = ytdlpCmdEl.value.trim();
+        let parsedArr = [];
+        if (cmdValRaw.startsWith('[') && cmdValRaw.endsWith(']')) {
+            try { parsedArr = JSON.parse(cmdValRaw); } catch (_) { }
+        } else if (cmdValRaw) {
+            parsedArr = cmdValRaw.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(s => s.replace(/^"|"$/g, '')) || [];
+        }
+
+        const cmdLineJson = JSON.stringify(parsedArr);
+        if (/ytdlp\s*:\s*\{[\s\S]*?commandLine\s*:\s*\[[^\]]*\]/.test(text)) {
+            text = text.replace(/(ytdlp\s*:\s*\{[\s\S]*?commandLine\s*:\s*)\[[^\]]*\]/, `$1${cmdLineJson}`);
+        } else if (/ytdlp\s*:\s*\{/.test(text)) {
+            text = text.replace(/(ytdlp\s*:\s*\{)/, `$1\n        commandLine: ${cmdLineJson},`);
+        }
+
+        if (!cfg.ytdlp) cfg.ytdlp = {};
+        cfg.ytdlp.commandLine = parsedArr;
+    }
+
     if (ws && ws.readyState === WebSocket.OPEN) {
         document.getElementById('val-search').value = text;
         ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: text } }));
     }
 }
 
-function saveSearchRawConfig() {
+window.reloadConfigSearchFromServer = function () {
+    if (confirm('서버의 config-search.js 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'getConfig' }));
+            showToast('config-search.js 불러오는 중...');
+        }
+    }
+};
+
+window.saveSearchRawConfig = function () {
     const el = document.getElementById('val-search');
     const content = el ? el.value : '';
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: content } }));
+    } else {
+        showToast('WebSocket 연결이 끊겨있습니다.', true);
     }
-}
+};
 
 function saveConfig(target) {
     let content = '';

@@ -262,6 +262,7 @@ async function handleAction(client, req) {
                 episodeAlias: episodeAlias,
                 videoId: cfgYoutube.yt ? cfgYoutube.yt.video_id : null,
                 botMuted: botMuted,
+                ytdlpRunning: commandsLib.isYtdlpRunning ? commandsLib.isYtdlpRunning() : false,
                 cooldownState: commandsLib.getCooldownState()
             }
         }));
@@ -270,6 +271,13 @@ async function handleAction(client, req) {
         botMuted = payload;
         saveMuteState();
         broadcastMsg({ action: 'mute_state', payload: botMuted });
+    }
+    else if (action === 'setYtdlp') {
+        const start = payload === true;
+        if (commandsLib.setYtdlpRunning) {
+            const isRunning = commandsLib.setYtdlpRunning(start);
+            broadcastMsg({ action: 'ytdlp_state', payload: isRunning });
+        }
     }
     else if (action === 'getChat') {
         sendWSFrame(client, JSON.stringify({ action: 'chat_history', payload: chatHistory.getMessages() }));
@@ -760,4 +768,9 @@ function broadcastChat(chatObj) {
     broadcastMsg({ action: 'chat_push', payload: Array.isArray(chatObj) ? chatObj : [chatObj] });
 }
 
-module.exports = { startServer, broadcastChat, broadcastSpam, isBotMuted };
+function broadcastYtdlpState() {
+    const isRunning = commandsLib.isYtdlpRunning ? commandsLib.isYtdlpRunning() : false;
+    broadcastMsg({ action: 'ytdlp_state', payload: isRunning });
+}
+
+module.exports = { startServer, broadcastChat, broadcastSpam, broadcastYtdlpState, isBotMuted };

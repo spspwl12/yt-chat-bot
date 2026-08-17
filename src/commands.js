@@ -1077,6 +1077,44 @@ function printNumEpisode(rtn, num, cmd) {
     };
 }
 
+const YTDLP_STATE_FILE = path.join(__dirname, '../data', 'ytdlp-state.json');
+let ytdlpEnabled = true;
+try {
+    ytdlpEnabled = JSON.parse(fs.readFileSync(YTDLP_STATE_FILE, 'utf8')).enabled !== false;
+} catch { }
+
+function saveYtdlpState() {
+    try {
+        fs.writeFileSync(YTDLP_STATE_FILE, JSON.stringify({ enabled: ytdlpEnabled }), 'utf8');
+    } catch { }
+}
+
+let globalDownloader = null;
+let globalSearcher = null;
+
+function isYtdlpRunning() {
+    if (globalDownloader) {
+        return globalDownloader.isRunning();
+    }
+    return ytdlpEnabled;
+}
+
+function setYtdlpRunning(start) {
+    ytdlpEnabled = start === true;
+    saveYtdlpState();
+    if (!globalDownloader) return ytdlpEnabled;
+    if (ytdlpEnabled) {
+        if (!globalDownloader.isRunning()) {
+            globalDownloader.start();
+        }
+    } else {
+        if (globalDownloader.isRunning()) {
+            globalDownloader.stop();
+        }
+    }
+    return globalDownloader.isRunning();
+}
+
 /**
  * 봇 기동 시 최초 1회만 실행.
  * LiveDownloader + LiveSearcher를 시작하고 이벤트 핸들러를 등록.
@@ -1090,9 +1128,11 @@ function initCommand() {
 
     // LiveDownloader 초기화 (실시간 20초 세그먼트 연속 다운로드)
     const downloader = new LiveDownloader(schCfg, cfg.sync);
+    globalDownloader = downloader;
 
     // LiveSearcher 초기화 (searcher.exe 데몬 상시 구동)
     const searcher = new LiveSearcher(schCfg, cfg.sync);
+    globalSearcher = searcher;
 
     // 이벤트 연결: 세그먼트 다운로드 완료 → searcher 큐에 추가
     downloader.on('segment', (segmentInfo) => {
@@ -1115,12 +1155,35 @@ function initCommand() {
     setTimeout(() => {
         searcher.start();    // 데몬 먼저 시작 (DB 로드 시간 필요)
         setTimeout(() => {
-            downloader.start(); // 데몬 준비 후 다운로더 시작
+            if (ytdlpEnabled) {
+                downloader.start(); // 저장된 설정이 ON일 때만 다운로더 시작
+            } else {
+                console.log('📥 [Commands] yt-dlp가 OFF 상태로 저장되어 있어 자동 시작하지 않습니다.');
+            }
+            try {
+                const { broadcastYtdlpState } = require('./web-server.js');
+                if (broadcastYtdlpState) broadcastYtdlpState();
+            } catch (_) { }
         }, cfg.sync.init_delay_ms);
     }, 1000);
 
     // 에피소드 전환 안내 메시지를 체크하는 타이머 활성화
     setInterval(noticeChangeEpisode, cfg.notice.check_interval_ms);
+
+    // config-search.js 실시간 핫리로드 이벤트 처리
+    eventBus.on('search_config_reloaded', () => {
+        console.log('🔄 [Commands] search_config_reloaded 이벤트 수신: 파이프라인 실시간 즉시 갱신');
+        if (ytdlpEnabled && globalDownloader && globalDownloader.isRunning()) {
+            globalDownloader.restart();
+            try {
+                const { broadcastYtdlpState } = require('./web-server.js');
+                if (broadcastYtdlpState) broadcastYtdlpState();
+            } catch (_) { }
+        }
+        if (globalSearcher && globalSearcher.isRunning()) {
+            globalSearcher.restart();
+        }
+    });
 
     // 프로세스 종료 시 정리
     const cleanup = () => {
@@ -1417,4 +1480,4 @@ function getCooldownState() {
     return state;
 }
 
-module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState, reloadMessages: configManager.reloadMessages };
+module.exports = { initCommand, handleCommand, getEpisodeInfo, getCooldownState, isYtdlpRunning, setYtdlpRunning, reloadMessages: configManager.reloadMessages };

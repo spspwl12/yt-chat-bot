@@ -136,9 +136,10 @@
                     onkeydown="if(event.key==='Enter') sendSimulatedChat()">
                 <button class="btn" onclick="sendSimulatedChat()" style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
             </div>
-            <div style="display:flex; gap:12px; margin-top: 20px;">
+            <div style="display:flex; gap:12px; margin-top: 20px; flex-wrap: wrap;">
                 <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
                     OFF</button>
+                <button class="btn" id="btn-toggle-ytdlp" style="background-color: var(--secondary);">yt-dlp: ON (다운로드 중)</button>
                 <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot
                     Bot</button>
             </div>
@@ -553,7 +554,7 @@
                 </button>
                 <button class="btn" onclick="saveVideoMatchingConfig()"
                     style="background: var(--secondary); box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
-                    <span>💾</span> 설정 저장
+                    <span>💾</span> 설정 저장 (즉시 적용)
                 </button>
                 <span id="vm-save-status" class="vm-status-badge" style="display:none;"></span>
                 <div
@@ -699,10 +700,15 @@
                                 <span>Early Exit (빠른 종료)</span>
                             </label>
                         </div>
-                        <div class="vm-field">
+                        <div class="vm-field" style="margin-bottom:12px;">
                             <label>YouTube Live Stream URL</label>
                             <input type="text" id="vm-search-url" class="input-text"
                                 placeholder="https://www.youtube.com/watch?v=...">
+                        </div>
+                        <div class="vm-field">
+                            <label>yt-dlp Custom CLI Arguments</label>
+                            <input type="text" id="vm-ytdlp-cmdline" class="input-text"
+                                placeholder='["--cookies", "../data/cookies.txt"]'>
                         </div>
                     </div>
 
@@ -711,10 +717,13 @@
 
             <div class="config-block glass" style="margin-top: 20px;">
                 <div class="config-block-header">
-                    <h3>config-search.js (Raw JS)</h3>
-                    <button class="btn" onclick="saveSearchRawConfig()">Save Changes</button>
+                    <h3>config-search.js (Video Matching &amp; Downloader Configuration)</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="reloadConfigSearchFromServer()" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn" onclick="saveSearchRawConfig()" style="box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);">💾 Save Changes (즉시 적용)</button>
+                    </div>
                 </div>
-                <textarea id="val-search" class="code-editor" spellcheck="false" style="min-height: 250px;"></textarea>
+                <textarea id="val-search" class="code-editor" spellcheck="false" style="min-height: 400px;"></textarea>
             </div>
         </div>
 

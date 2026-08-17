@@ -5,7 +5,9 @@ module.exports = {
         inputOptions: []                   // 추가 입력 옵션
     },
     ytdlp: {
-        path: "../data/yt-dlp.exe"                    // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
+        path: "../data/yt-dlp.exe", // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
+        // 추가 전달할 yt-dlp CLI 인자 배열 (예: ["--cookies", "../data/cookies.txt"])
+        commandLine: ["--cookies", "../data/cookies.txt"] 
     },
     searcher: {
         path: "../data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로

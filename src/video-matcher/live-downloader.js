@@ -41,6 +41,10 @@ class LiveDownloader extends EventEmitter {
         this._watchdogTimer = null;
     }
 
+    isRunning() {
+        return this._running;
+    }
+
     start() {
         if (this._running) return;
         this._running = true;
@@ -57,6 +61,16 @@ class LiveDownloader extends EventEmitter {
         this._closeWatcher();
         this._cleanupOldSegments();
         console.log('📥 LiveDownloader 중지');
+    }
+
+    restart() {
+        if (!this._running) return;
+        console.log('📥 LiveDownloader 재시작 중...');
+        this._clearWatchdog();
+        this._killProcesses();
+        this._closeWatcher();
+        this._cleanupOldSegments();
+        this._startPipeline();
     }
 
     /**
@@ -84,12 +98,23 @@ class LiveDownloader extends EventEmitter {
         console.log('📥 파이프라인 시작: yt-dlp → ffmpeg (segment)');
 
         // ── yt-dlp: 라이브 스트림을 stdout으로 연속 출력 ──
-        this._ytdlp = spawn(this._config.ytdlp.path, [
+        const rawCustomArgs = (this._config.ytdlp && (this._config.ytdlp.commandLine || this._config.ytdlp.args || this._config.ytdlp.options)) || [];
+        let customArgs = [];
+        if (Array.isArray(rawCustomArgs)) {
+            customArgs = rawCustomArgs.map(String).filter(Boolean);
+        } else if (typeof rawCustomArgs === 'string' && rawCustomArgs.trim()) {
+            customArgs = rawCustomArgs.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(s => s.replace(/^"|"$/g, '')) || [];
+        }
+
+        const ytdlpArgs = [
             '-f', 'best[height<=1080]',
             '-o', '-',
             '--no-part',
+            ...customArgs,
             this._config.searcher.youtube_url
-        ], { stdio: ['ignore', 'pipe', 'pipe'] });
+        ];
+
+        this._ytdlp = spawn(this._config.ytdlp.path, ytdlpArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
 
         // ── ffmpeg: stdin에서 읽어 20초 단위 세그먼트 파일 생성 & 2초마다 썸네일 업데이트 ──
         const tempPreview = path.resolve(__dirname, '../../data/temp_preview.jpg');

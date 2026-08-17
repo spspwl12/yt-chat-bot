@@ -119,6 +119,10 @@ function reloadSearchConfig() {
         updateRequireCache(PATHS.search, cfgSearch);
 
         console.log('[ConfigManager] config-search.js 리로드 완료');
+        try {
+            const eventBus = require('./event-bus.js');
+            eventBus.emit('search_config_reloaded', cfgSearch);
+        } catch (_) { }
         return true;
     } catch (e) {
         console.error('[ConfigManager] config-search.js 리로드 실패:', e.message);
