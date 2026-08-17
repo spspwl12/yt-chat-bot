@@ -6,8 +6,13 @@ module.exports = {
     },
     ytdlp: {
         path: "../data/yt-dlp.exe", // yt-dlp 실행 파일 경로 (유튜브 영상 다운로드용)
+        logLevel: "error",            // yt-dlp 로그 출력 수준: "all" | "warning" | "error" | "none"
         // 추가 전달할 yt-dlp CLI 인자 배열 (예: ["--cookies", "../data/cookies.txt"])
-        commandLine: ["--cookies", "../data/cookies.txt"] 
+        commandLine: [
+            "-f", "best[height<=1080]",
+            "-o", "-",
+            "--no-part",
+        ]
     },
     searcher: {
         path: "../data/searcher.exe",                                // C++ 등 외부 검색 엔진 실행 파일 경로

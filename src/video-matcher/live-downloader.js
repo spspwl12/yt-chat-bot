@@ -8,9 +8,44 @@
  */
 
 const { EventEmitter } = require('events');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+/**
+ * 프로세스 및 하위 프로세스 트리 강제 종료 및 스트림 정리
+ */
+function killProcessTree(proc) {
+    if (!proc || !proc.pid) return;
+    try {
+        proc.removeAllListeners();
+        if (proc.stdout) {
+            proc.stdout.removeAllListeners();
+            proc.stdout.destroy();
+        }
+        if (proc.stderr) {
+            proc.stderr.removeAllListeners();
+            proc.stderr.destroy();
+        }
+        if (proc.stdin) {
+            proc.stdin.removeAllListeners();
+            proc.stdin.destroy();
+        }
+    } catch (_) { }
+
+    const pid = proc.pid;
+    if (process.platform === 'win32') {
+        try {
+            exec(`taskkill /pid ${pid} /T /F`, () => { });
+        } catch (_) { }
+    } else {
+        try {
+            process.kill(-pid, 'SIGKILL');
+        } catch (_) {
+            try { proc.kill('SIGKILL'); } catch (_) { }
+        }
+    }
+}
 
 class LiveDownloader extends EventEmitter {
     /**
@@ -111,9 +146,6 @@ class LiveDownloader extends EventEmitter {
         }
 
         const ytdlpArgs = [
-            '-f', 'best[height<=1080]',
-            '-o', '-',
-            '--no-part',
             ...customArgs,
             this._config.searcher.youtube_url
         ];
@@ -149,6 +181,7 @@ class LiveDownloader extends EventEmitter {
         // ── yt-dlp stderr 모니터링 (config.ytdlp.logLevel 기준 필터링) ──
         const logLevel = (this._config.ytdlp && this._config.ytdlp.logLevel) || 'error';
         this._ytdlp.stderr.on('data', (data) => {
+            if (gen !== this._pipelineGen) return;
             const msg = data.toString().trim();
             if (!msg) return;
             if (logLevel === 'all') {
@@ -158,10 +191,22 @@ class LiveDownloader extends EventEmitter {
             } else if (logLevel === 'error') {
                 if (msg.startsWith('ERROR:')) console.error('📥 yt-dlp:', msg);
             }
-            // logLevel === 'none' → 출력 안 함
+
+            // 세그먼트 실패로 인한 스트림 영구 중단 감지 시 빠른 재시작 트리거
+            if (msg.includes('failed too many times, skipping')) {
+                if (gen !== this._pipelineGen || this._restarting || !this._running) return;
+                console.warn('📥 HLS 세그먼트 오류 감지 → 파이프라인 자동 복구 트리거');
+                setTimeout(() => {
+                    if (gen !== this._pipelineGen) return;
+                    this._flushLastSegment(segmentDir);
+                    this._killProcesses();
+                    this._scheduleRestart();
+                }, 1000);
+            }
         });
 
         this._ffmpeg.stderr.on('data', (data) => {
+            if (gen !== this._pipelineGen) return;
             const msg = data.toString().trim();
             if (msg.toLowerCase().includes('error')) {
                 console.error('📥 ffmpeg:', msg.substring(0, 200));
@@ -176,17 +221,20 @@ class LiveDownloader extends EventEmitter {
         let ffmpegExited = false;
 
         this._ytdlp.on('exit', (code, signal) => {
+            if (gen !== this._pipelineGen) return;
             ytdlpExited = true;
             console.log(`📥 yt-dlp 종료 (code=${code}, signal=${signal})`);
             if (this._running && !this._restarting) {
+                // ffmpeg가 마지막 세그먼트를 플러시할 시간을 줌 (yt-dlp stdout EOF 후 ffmpeg이 데이터 쓰기 완료하는 데 필요)
                 setTimeout(() => {
-                    // 세대가 바뀌었으면 이미 재시작됐으므로 무시
                     if (gen !== this._pipelineGen) return;
+                    // 마지막으로 기록된 미처리 세그먼트 강제 emit
+                    this._flushLastSegment(segmentDir);
                     if (!ffmpegExited && this._ffmpeg) {
-                        try { this._ffmpeg.kill('SIGTERM'); } catch (_) { }
+                        try { killProcessTree(this._ffmpeg); } catch (_) { }
                     }
                     this._scheduleRestart();
-                }, 2000);
+                }, 3000);
             }
         });
 
@@ -344,19 +392,11 @@ class LiveDownloader extends EventEmitter {
             try { this._ytdlp.stdout.unpipe(this._ffmpeg.stdin); } catch (_) { }
         }
         if (this._ytdlp) {
-            try {
-                this._ytdlp.removeAllListeners('exit');
-                this._ytdlp.removeAllListeners('error');
-                this._ytdlp.kill('SIGTERM');
-            } catch (_) { }
+            killProcessTree(this._ytdlp);
             this._ytdlp = null;
         }
         if (this._ffmpeg) {
-            try {
-                this._ffmpeg.removeAllListeners('exit');
-                this._ffmpeg.removeAllListeners('error');
-                this._ffmpeg.kill('SIGTERM');
-            } catch (_) { }
+            killProcessTree(this._ffmpeg);
             this._ffmpeg = null;
         }
     }
@@ -385,6 +425,50 @@ class LiveDownloader extends EventEmitter {
                 }
             }
         } catch (_) { }
+    }
+
+    /**
+     * yt-dlp 종료 시 마지막으로 기록된 미처리 세그먼트를 강제 emit.
+     * watcher는 N+1 파일이 생길 때 N을 emit하는데,
+     * yt-dlp가 종료되면 마지막 세그먼트는 영원히 emit되지 않음.
+     */
+    _flushLastSegment(segmentDir) {
+        try {
+            const files = fs.readdirSync(segmentDir)
+                .filter(f => f.startsWith('live_segment_') && f.endsWith('.mp4'))
+                .sort();
+
+            if (files.length === 0) return;
+
+            // 미처리 세그먼트 중 가장 높은 번호 emit
+            for (let i = files.length - 1; i >= 0; i--) {
+                const file = files[i];
+                const match = file.match(/live_segment_(\d+)\.mp4/);
+                if (!match) continue;
+                const segNum = parseInt(match[1], 10);
+                if (this._processedSegments.has(segNum)) continue;
+
+                const filePath = path.join(segmentDir, file);
+                let stat;
+                try { stat = fs.statSync(filePath); } catch (_) { continue; }
+                if (stat.size < 1024) continue;
+
+                this._processedSegments.add(segNum);
+                const segmentInfo = {
+                    path: filePath,
+                    st: stat.birthtimeMs,
+                    ed: Date.now(),
+                    size: stat.size,
+                    segmentId: this._segmentCounter++
+                };
+                console.log(`📥 마지막 세그먼트 emit: ${file} (${stat.size}B)`);
+                this.emit('segment', segmentInfo);
+                this._restartCount = 0;
+                break;
+            }
+        } catch (e) {
+            console.error('📥 _flushLastSegment 오류:', e.message);
+        }
     }
 }
 

@@ -169,9 +169,8 @@ class LiveSearcher extends EventEmitter {
         // searcher.exe --daemon 실행 인자 구성
         const args = [
             '--daemon',
-            ...this._config.searcher.commandLine // 이제 config-search.js의 commandLine에 클립 경로 플레이스홀더가 없으므로 전부 전달
+            ...this._config.searcher.commandLine
         ];
-
 
         console.log(`🔍 데몬 시작: ${this._config.searcher.path} ${args.join(' ')}`);
 
@@ -185,11 +184,15 @@ class LiveSearcher extends EventEmitter {
         // stdout 처리: JSON 결과 + __RESULT_END__ 구분자
         const rl = readline.createInterface({ input: daemon.stdout });
         rl.on('line', (line) => {
-            if (line.trim() === '__RESULT_END__') {
+            const trimmed = line.trim();
+            if (trimmed === '__RESULT_END__') {
                 // JSON 결과 완성
                 this._onResult(this._jsonBuffer.trim());
                 this._jsonBuffer = '';
             } else {
+                if (!this._ready && trimmed.startsWith('{') && trimmed.includes('"error"')) {
+                    console.error('🔍 데몬 오류 (stdout):', trimmed);
+                }
                 this._jsonBuffer += line + '\n';
             }
         });
