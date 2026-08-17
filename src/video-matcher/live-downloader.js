@@ -36,6 +36,7 @@ class LiveDownloader extends EventEmitter {
         // 재시작 관리
         this._restartCount = 0;
         this._restarting = false;
+        this._pipelineGen = 0;  // 파이프라인 세대 카운터 (중첩 재시작 방지)
 
         // Watchdog
         this._watchdogTimer = null;
@@ -78,6 +79,9 @@ class LiveDownloader extends EventEmitter {
      */
     _startPipeline() {
         if (!this._running) return;
+
+        // 파이프라인 세대 증가: 이전 세대의 지연된 exit 핸들러가 재시작을 트리거하지 못하도록 함
+        const gen = ++this._pipelineGen;
 
         const segmentDir = this._getSegmentDir();
         const duration = this._syncCfg.segment_duration_max || 20;
@@ -142,17 +146,23 @@ class LiveDownloader extends EventEmitter {
         this._ffmpeg.stdin.on('error', () => { });
         this._ytdlp.stdout.on('error', () => { });
 
-        // ── stderr 모니터링 ──
+        // ── yt-dlp stderr 모니터링 (config.ytdlp.logLevel 기준 필터링) ──
+        const logLevel = (this._config.ytdlp && this._config.ytdlp.logLevel) || 'error';
         this._ytdlp.stderr.on('data', (data) => {
             const msg = data.toString().trim();
-            if (msg.startsWith('ERROR:')) {
-                console.error('📥 yt-dlp:', msg);
+            if (!msg) return;
+            if (logLevel === 'all') {
+                console.log('📥 yt-dlp:', msg);
+            } else if (logLevel === 'warning') {
+                if (msg.startsWith('ERROR:') || msg.startsWith('WARNING:')) console.log('📥 yt-dlp:', msg);
+            } else if (logLevel === 'error') {
+                if (msg.startsWith('ERROR:')) console.error('📥 yt-dlp:', msg);
             }
+            // logLevel === 'none' → 출력 안 함
         });
 
         this._ffmpeg.stderr.on('data', (data) => {
             const msg = data.toString().trim();
-            // ffmpeg는 stderr에 많은 로그를 출력하므로 에러만 로깅
             if (msg.toLowerCase().includes('error')) {
                 console.error('📥 ffmpeg:', msg.substring(0, 200));
             }
@@ -161,17 +171,17 @@ class LiveDownloader extends EventEmitter {
         // ── 세그먼트 파일 감시 시작 ──
         this._setupWatcher(segmentDir);
 
-        // ── 프로세스 종료 핸들링 ──
+        // ── 프로세스 종료 핸들링 (세대 체크로 중첩 재시작 방지) ──
         let ytdlpExited = false;
         let ffmpegExited = false;
 
         this._ytdlp.on('exit', (code, signal) => {
             ytdlpExited = true;
             console.log(`📥 yt-dlp 종료 (code=${code}, signal=${signal})`);
-            // yt-dlp 종료 → ffmpeg stdin 닫힘 → ffmpeg도 곧 종료됨
             if (this._running && !this._restarting) {
-                // ffmpeg가 아직 안 죽었으면 잠시 대기 후 재시작
                 setTimeout(() => {
+                    // 세대가 바뀌었으면 이미 재시작됐으므로 무시
+                    if (gen !== this._pipelineGen) return;
                     if (!ffmpegExited && this._ffmpeg) {
                         try { this._ffmpeg.kill('SIGTERM'); } catch (_) { }
                     }
@@ -183,8 +193,9 @@ class LiveDownloader extends EventEmitter {
         this._ffmpeg.on('exit', (code, signal) => {
             ffmpegExited = true;
             console.log(`📥 ffmpeg 종료 (code=${code}, signal=${signal})`);
+            // 세대가 바뀌었으면 이미 재시작됐으므로 무시
+            if (gen !== this._pipelineGen) return;
             if (this._running && !this._restarting && !ytdlpExited) {
-                // ffmpeg만 죽은 경우 → yt-dlp도 종료 후 재시작
                 if (this._ytdlp) {
                     try { this._ytdlp.kill('SIGTERM'); } catch (_) { }
                 }
@@ -333,11 +344,19 @@ class LiveDownloader extends EventEmitter {
             try { this._ytdlp.stdout.unpipe(this._ffmpeg.stdin); } catch (_) { }
         }
         if (this._ytdlp) {
-            try { this._ytdlp.kill('SIGTERM'); } catch (_) { }
+            try {
+                this._ytdlp.removeAllListeners('exit');
+                this._ytdlp.removeAllListeners('error');
+                this._ytdlp.kill('SIGTERM');
+            } catch (_) { }
             this._ytdlp = null;
         }
         if (this._ffmpeg) {
-            try { this._ffmpeg.kill('SIGTERM'); } catch (_) { }
+            try {
+                this._ffmpeg.removeAllListeners('exit');
+                this._ffmpeg.removeAllListeners('error');
+                this._ffmpeg.kill('SIGTERM');
+            } catch (_) { }
             this._ffmpeg = null;
         }
     }

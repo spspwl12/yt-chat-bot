@@ -1102,17 +1102,24 @@ function isYtdlpRunning() {
 function setYtdlpRunning(start) {
     ytdlpEnabled = start === true;
     saveYtdlpState();
-    if (!globalDownloader) return ytdlpEnabled;
     if (ytdlpEnabled) {
-        if (!globalDownloader.isRunning()) {
+        // ON: searcher 먼저 시작, 이후 downloader 시작
+        if (globalSearcher && !globalSearcher.isRunning()) {
+            globalSearcher.start();
+        }
+        if (globalDownloader && !globalDownloader.isRunning()) {
             globalDownloader.start();
         }
     } else {
-        if (globalDownloader.isRunning()) {
+        // OFF: downloader 먼저 종료, 이후 searcher 종료
+        if (globalDownloader && globalDownloader.isRunning()) {
             globalDownloader.stop();
         }
+        if (globalSearcher && globalSearcher.isRunning()) {
+            globalSearcher.stop();
+        }
     }
-    return globalDownloader.isRunning();
+    return globalDownloader ? globalDownloader.isRunning() : false;
 }
 
 /**
@@ -1153,18 +1160,22 @@ function initCommand() {
 
     // 초기 지연 후 시작
     setTimeout(() => {
-        searcher.start();    // 데몬 먼저 시작 (DB 로드 시간 필요)
-        setTimeout(() => {
-            if (ytdlpEnabled) {
-                downloader.start(); // 저장된 설정이 ON일 때만 다운로더 시작
-            } else {
-                console.log('📥 [Commands] yt-dlp가 OFF 상태로 저장되어 있어 자동 시작하지 않습니다.');
-            }
+        if (ytdlpEnabled) {
+            searcher.start();    // 데몬 먼저 시작 (DB 로드 시간 필요)
+            setTimeout(() => {
+                downloader.start(); // 데몬 준비 후 다운로더 시작
+                try {
+                    const { broadcastYtdlpState } = require('./web-server.js');
+                    if (broadcastYtdlpState) broadcastYtdlpState();
+                } catch (_) { }
+            }, cfg.sync.init_delay_ms);
+        } else {
+            console.log('📥 [Commands] yt-dlp가 OFF 상태로 저장되어 있어 searcher/downloader 자동 시작하지 않습니다.');
             try {
                 const { broadcastYtdlpState } = require('./web-server.js');
                 if (broadcastYtdlpState) broadcastYtdlpState();
             } catch (_) { }
-        }, cfg.sync.init_delay_ms);
+        }
     }, 1000);
 
     // 에피소드 전환 안내 메시지를 체크하는 타이머 활성화
@@ -1173,7 +1184,8 @@ function initCommand() {
     // config-search.js 실시간 핫리로드 이벤트 처리
     eventBus.on('search_config_reloaded', () => {
         console.log('🔄 [Commands] search_config_reloaded 이벤트 수신: 파이프라인 실시간 즉시 갱신');
-        if (ytdlpEnabled && globalDownloader && globalDownloader.isRunning()) {
+        if (!ytdlpEnabled) return; // OFF 상태이면 아무것도 건드리지 않음
+        if (globalDownloader && globalDownloader.isRunning()) {
             globalDownloader.restart();
             try {
                 const { broadcastYtdlpState } = require('./web-server.js');

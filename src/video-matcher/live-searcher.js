@@ -303,11 +303,13 @@ class LiveSearcher extends EventEmitter {
     _killDaemon() {
         if (this._daemon) {
             try {
+                this._daemon.removeAllListeners('exit');
+                this._daemon.removeAllListeners('error');
                 this._daemon.stdin.write('quit\n');
                 // 정상 종료 대기 후 강제 종료
                 setTimeout(() => {
-                    try { this._daemon.kill('SIGTERM'); } catch (_) { }
-                }, 2000);
+                    try { if (this._daemon) this._daemon.kill('SIGTERM'); } catch (_) { }
+                }, 1000);
             } catch (_) {
                 try { this._daemon.kill('SIGTERM'); } catch (_2) { }
             }
