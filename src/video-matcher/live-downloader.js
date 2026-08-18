@@ -193,7 +193,8 @@ class LiveDownloader extends EventEmitter {
             }
 
             // 세그먼트 실패로 인한 스트림 영구 중단 감지 시 빠른 재시작 트리거
-            if (msg.includes('failed too many times, skipping')) {
+            if (msg.includes('failed too many times, skipping') ||
+                msg.includes('HTTP error 403')) {
                 if (gen !== this._pipelineGen || this._restarting || !this._running) return;
                 console.warn('📥 HLS 세그먼트 오류 감지 → 파이프라인 자동 복구 트리거');
                 setTimeout(() => {
