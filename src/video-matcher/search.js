@@ -378,10 +378,15 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
         : mJson.dbTimestamp;
 
     delete mJson.filepath;
-    const searchLog = { ...mJson, realTimestamp };
+    const liveTime = getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
+    const searchLog = {
+        ...mJson,
+        realTimestamp,
+        now: liveTime ? liveTime.now : null
+    };
     eventBus.emit('search_result', searchLog);
 
-    return getLiveVideoTime(realTimestamp, streamPhash, mJson.filename);
+    return liveTime;
 }
 
 /**

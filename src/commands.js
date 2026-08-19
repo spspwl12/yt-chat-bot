@@ -736,44 +736,37 @@ function onMatchResult(rtn) {
     if (!rtn)
         return;
 
-    const minConsecutive = (schCfg.sync && schCfg.sync.min_consecutive) || 4;
+    const tolerance = (schCfg.sync && schCfg.sync.tolerance_sec) || 60;
 
-    // 서치 엔진 결과물(rtn) 누적 (동기화 신뢰도를 높이고자 여러 번 샘플링)
-    tempQuery.push(rtn);
+    // 1. tempQuery의 마지막 요소와 현재 rtn 비교하여 연속성 검증
+    if (tempQuery.length > 0) {
+        const last = tempQuery[tempQuery.length - 1];
 
-    // 샘플이 min_consecutive개 이상 모였을 때 연속성 검증 로직 실행
-    if (tempQuery.length >= minConsecutive) {
-        // 최근 minConsecutive개가 모두 연속적으로 일치하는지 확인
-        let consecutiveCount = 1;
-        let adopted = tempQuery[0];
+        const isIndexMatch = rtn.index === last.index;
+        const isTimeValid = Math.abs(rtn.now - last.now) <= tolerance;
 
-        for (let i = 1; i < tempQuery.length; i++) {
-            const prev = tempQuery[i - 1];
-            const curr = tempQuery[i];
-
-            if (curr.index === prev.index &&
-                Math.abs(curr.now - prev.now) <= (schCfg.sync && schCfg.sync.tolerance_sec || 60)) {
-                consecutiveCount++;
-                adopted = curr;
-            } else {
-                consecutiveCount = 1;
-                adopted = curr;
-            }
-        }
-
-        // 연속 일치 수가 min_consecutive 이상이면 확정
-        if (adopted && consecutiveCount >= minConsecutive) {
-            copyQuery(adopted);
-            return;
+        // 연속성이 깨지면 배열 초기화
+        if (!isIndexMatch || !isTimeValid) {
+            tempQuery.length = 0;
         }
     }
 
-    // 샘플 수 미달이거나 연속성 불일치 시 기존 기록과 대조
+    // 2. 현재 결과물 누적
+    tempQuery.push(rtn);
+
+    const minConsecutive = (schCfg.sync && schCfg.sync.min_consecutive) || 4;
+
+    // 3. 샘플이 minConsecutive개 이상 모였으면 확정 채택
+    if (tempQuery.length >= minConsecutive) {
+        copyQuery(rtn);
+        return;
+    }
+
+    // 4. 샘플 수 미달 시 기존 기록(cmp)과 대조
     const cmp = getEpisodeInfo();
     if (cmp &&
-        tempQuery.length < minConsecutive &&
         rtn.index === cmp.index &&
-        Math.abs(rtn.now - cmp.now) <= (schCfg.sync && schCfg.sync.tolerance_sec || 60)) {
+        Math.abs(rtn.now - cmp.now) <= tolerance) {
         copyQuery(rtn);
         return;
     }

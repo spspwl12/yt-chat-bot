@@ -1046,6 +1046,25 @@ function simBadge(sim) {
     return 'badge-red';
 }
 
+function formatSecWithTime(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '--';
+    const isNegative = sec < 0;
+    const abs = Math.abs(sec);
+    const totalSec = Math.floor(abs);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const sign = isNegative ? '-' : '';
+
+    let timeStr;
+    if (h > 0) {
+        timeStr = `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } else {
+        timeStr = `${sign}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${sec.toFixed(1)}s (${timeStr})`;
+}
+
 function createSearchLogRow(d) {
     const tr = document.createElement('tr');
     const sim = d.similarity != null ? d.similarity.toFixed(1) : '--';
@@ -1058,8 +1077,9 @@ function createSearchLogRow(d) {
                 <td>${d.hammingDistance != null ? d.hammingDistance : '--'}</td>
                 <td>${d.matchCount != null ? d.matchCount : '--'}</td>
                 <td>${d.coverage != null ? d.coverage.toFixed(1) + '%' : '--'}</td>
-                <td>${d.dbTimestamp != null ? d.dbTimestamp.toFixed(1) : '--'}s</td>
-                <td>${d.clipTimestamp != null ? d.clipTimestamp.toFixed(1) : '--'}s</td>
+                <td>${formatSecWithTime(d.dbTimestamp)}</td>
+                <td>${formatSecWithTime(d.clipTimestamp)}</td>
+                <td style="color:#60a5fa; font-weight:500;">${formatSecWithTime(d.now)}</td>
                 <td style="color:var(--info);">${realTs}</td>
             `;
     return tr;
@@ -1090,9 +1110,9 @@ function createViolationLogRow(d) {
     tr.innerHTML = `
             <td>${fmtTime(d.time)}</td>
             <td style="font-weight:600; color:#f87171;">${d.filename || '--'}</td>
-            <td>${d.dbTimestamp != null ? d.dbTimestamp.toFixed(1) : '--'}s</td>
-            <td>${d.cmpNow != null ? d.cmpNow.toFixed(1) : '--'}s</td>
-            <td style="color:var(--danger);">${d.diffNow != null ? d.diffNow.toFixed(1) : '--'}s</td>
+            <td>${formatSecWithTime(d.dbTimestamp)}</td>
+            <td>${formatSecWithTime(d.cmpNow)}</td>
+            <td style="color:var(--danger);">${formatSecWithTime(d.diffNow)}</td>
             <td style="color:var(--text-dim); font-size: 0.85em;">${reasonText}</td>
             <td>${d.matchCount != null ? d.matchCount : '--'}</td>
         `;
