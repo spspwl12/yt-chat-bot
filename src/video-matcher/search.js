@@ -1,10 +1,11 @@
 const { fromHHMMSS } = require('../func.js');
 const path = require('path');
 const fs = require('fs');
-const config = require('../../data/config-youtube.js');
+const configManager = require('../config-manager.js');
+const { cfg, schCfg } = configManager;
 const eventBus = require('../event-bus.js');
 
-const VIDEO_INFO_PATH = path.join(__dirname, '../../data/video-info.json');
+const VIDEO_INFO_PATH = configManager.PATHS.videoInfo;
 
 
 // --- 초기 메타데이터 전처리 및 시간 캐싱 ---
@@ -327,11 +328,11 @@ function processSearchResult(jsonResult, segmentInfo, cmp) {
             }
 
             const diffNow = Math.abs(match.dbTimestamp - cmp.now);
-            if (diffNow >= config.sync.segment_duration_min && diffNow <= config.sync.segment_duration_max) {
+            if (diffNow >= (schCfg.sync && schCfg.sync.segment_duration_min || 4) && diffNow <= (schCfg.sync && schCfg.sync.segment_duration_max || 20)) {
                 adoptedMatch = match;
                 break;
             } else {
-                const reason = diffNow < config.sync.segment_duration_min
+                const reason = diffNow < (schCfg.sync && schCfg.sync.segment_duration_min || 4)
                     ? 'MIN_VIOLATION'
                     : 'MAX_VIOLATION';
 

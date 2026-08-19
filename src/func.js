@@ -4,12 +4,15 @@ const configManager = require('./config-manager.js');
 const profanitySet = configManager.profanitySet;
 
 let lastSetSize = -1;
+let lastProfanityVersion = -1;
 let cachedProfanityRegex = null;
 let cachedProfanityTestRegex = null;
 
 function _ensureProfanityRegex() {
-    if (!cachedProfanityRegex || profanitySet.size !== lastSetSize) {
+    const currentVersion = configManager.getProfanityVersion ? configManager.getProfanityVersion() : 0;
+    if (!cachedProfanityRegex || profanitySet.size !== lastSetSize || currentVersion !== lastProfanityVersion) {
         lastSetSize = profanitySet.size;
+        lastProfanityVersion = currentVersion;
         const sortedList = Array.from(profanitySet)
             .filter(w => typeof w === 'string' && w.trim().length > 0)
             .sort((a, b) => b.length - a.length);

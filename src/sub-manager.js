@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const TextSearchEngine = require('./textsearcher.js');
-const cfg = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfg } = configManager;
 const search_lib = require('./video-matcher/search.js');
 const { fromHHMMSS, roundUpTime, formatDate, getClockEmoji, toUnicodeNumber } = require('./func.js');
 
-const VIDEO_SUB_PATH = path.join(__dirname, '../data/video-sub.json');
+const VIDEO_SUB_PATH = configManager.PATHS.videoSub;
 
 let subtitles = {};
 let searcher = null;

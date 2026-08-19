@@ -3,17 +3,29 @@ const { postCommunityText } = require('./innertube.js');
 const { getEpisodeInfo } = require('./commands.js');
 const fs = require('fs');
 const path = require('path');
-const cfg = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfg } = configManager;
 
-const EPISODE_END = cfg.episode.end;
 const STATE_FILE = path.join(__dirname, '../data', 'schedule_state.json');
 
-// ─── 스케줄러 설정 (config-youtube.js → schedule_poster 섹션에서 로드) ───
-const _sp = cfg.schedule_poster || {};
-const SCHEDULE_CONFIG = {
-    initialDelayMs: (_sp.initial_delay_sec ?? 60) * 1000,
-    cycleTransitionDelayMs: (_sp.cycle_transition_delay_min ?? 5) * 60 * 1000,
-};
+// ─── 스케줄러 설정 동적 헬퍼 (config-youtube.js → schedule_poster 섹션에서 로드) ───
+function getEpisodeEnd() {
+    return (cfg.episode && cfg.episode.end !== undefined) ? cfg.episode.end : 293;
+}
+
+function getScheduleConfig() {
+    const _sp = cfg.schedule_poster || {};
+    return {
+        initialDelayMs: (_sp.initial_delay_sec ?? 60) * 1000,
+        cycleTransitionDelayMs: (_sp.cycle_transition_delay_min ?? 5) * 60 * 1000,
+    };
+}
+
+const SCHEDULE_CONFIG = new Proxy({}, {
+    get(_, prop) {
+        return getScheduleConfig()[prop];
+    }
+});
 
 function loadState() {
     try {
@@ -101,7 +113,7 @@ function checkCycleTransition() {
     if (currentAlias === null) return;
 
     // 293 → 1 전환 감지 (이전 화가 마지막 근처이고, 현재 화가 처음 근처)
-    if (prevAlias !== null && prevAlias >= EPISODE_END - 2 && currentAlias <= 3 && !transitionPending) {
+    if (prevAlias !== null && prevAlias >= getEpisodeEnd() - 2 && currentAlias <= 3 && !transitionPending) {
         transitionPending = true;
         console.log(`📊 [편성표 스케줄러] 사이클 전환 감지! (${prevAlias}화 → ${currentAlias}화)`);
         console.log(`📊 [편성표 스케줄러] ${SCHEDULE_CONFIG.cycleTransitionDelayMs / 1000}초 후 다음 사이클 편성표 게시...`);

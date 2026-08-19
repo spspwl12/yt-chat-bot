@@ -11,6 +11,8 @@ const { EventEmitter } = require('events');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const configManager = require('../config-manager.js');
+const { schCfg } = configManager;
 
 /**
  * 프로세스 및 하위 프로세스 트리 강제 종료 및 스트림 정리
@@ -48,14 +50,8 @@ function killProcessTree(proc) {
 }
 
 class LiveDownloader extends EventEmitter {
-    /**
-     * @param {object} config - config-search.js 전체 객체
-     * @param {object} syncCfg - config-youtube.js의 sync 객체
-     */
-    constructor(config, syncCfg) {
+    constructor() {
         super();
-        this._config = config;
-        this._syncCfg = syncCfg;
         this._running = false;
 
         // 프로세스 핸들
@@ -119,7 +115,7 @@ class LiveDownloader extends EventEmitter {
         const gen = ++this._pipelineGen;
 
         const segmentDir = this._getSegmentDir();
-        const duration = this._syncCfg.segment_duration_max || 20;
+        const duration = (schCfg.sync && schCfg.sync.segment_duration_max) || 20;
         const segmentPattern = path.join(segmentDir, 'live_segment_%06d.mp4');
 
         // seg 폴더 생성 (없으면)
@@ -137,7 +133,7 @@ class LiveDownloader extends EventEmitter {
         console.log('📥 파이프라인 시작: yt-dlp → ffmpeg (segment)');
 
         // ── yt-dlp: 라이브 스트림을 stdout으로 연속 출력 ──
-        const rawCustomArgs = (this._config.ytdlp && (this._config.ytdlp.commandLine || this._config.ytdlp.args || this._config.ytdlp.options)) || [];
+        const rawCustomArgs = (schCfg.ytdlp && (schCfg.ytdlp.commandLine || schCfg.ytdlp.args || schCfg.ytdlp.options)) || [];
         let customArgs = [];
         if (Array.isArray(rawCustomArgs)) {
             customArgs = rawCustomArgs.map(String).filter(Boolean);
@@ -147,14 +143,14 @@ class LiveDownloader extends EventEmitter {
 
         const ytdlpArgs = [
             ...customArgs,
-            this._config.searcher.youtube_url
+            schCfg.searcher.youtube_url
         ];
 
-        this._ytdlp = spawn(this._config.ytdlp.path, ytdlpArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+        this._ytdlp = spawn(schCfg.ytdlp.path, ytdlpArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
 
         // ── ffmpeg: stdin에서 읽어 20초 단위 세그먼트 파일 생성 & 2초마다 썸네일 업데이트 ──
         const tempPreview = path.resolve(__dirname, '../../data/temp_preview.jpg');
-        this._ffmpeg = spawn(this._config.ffmpeg.ffmpegPath, [
+        this._ffmpeg = spawn(schCfg.ffmpeg.ffmpegPath, [
             '-y',
             '-i', 'pipe:0',
             // 첫 번째 출력: 세그먼트 파일 (스트림 복사)
@@ -179,7 +175,7 @@ class LiveDownloader extends EventEmitter {
         this._ytdlp.stdout.on('error', () => { });
 
         // ── yt-dlp stderr 모니터링 (config.ytdlp.logLevel 기준 필터링) ──
-        const logLevel = (this._config.ytdlp && this._config.ytdlp.logLevel) || 'error';
+        const logLevel = (schCfg.ytdlp && schCfg.ytdlp.logLevel) || 'error';
         this._ytdlp.stderr.on('data', (data) => {
             if (gen !== this._pipelineGen) return;
             const msg = data.toString().trim();
@@ -348,8 +344,8 @@ class LiveDownloader extends EventEmitter {
         this._closeWatcher();
 
         this._restartCount++;
-        const maxRestart = this._syncCfg.max_restart_count || 30;
-        const delay = this._syncCfg.restart_delay_ms || 3000;
+        const maxRestart = (schCfg.sync && schCfg.sync.max_restart_count) || 30;
+        const delay = (schCfg.sync && schCfg.sync.restart_delay_ms) || 3000;
 
         if (this._restartCount >= maxRestart) {
             console.error('📥 최대 재시작 횟수 초과. 60초 후 카운터 리셋 후 재시도.');
@@ -370,7 +366,7 @@ class LiveDownloader extends EventEmitter {
      * downloader_timeout_ms 동안 세그먼트가 오지 않으면 파이프라인 강제 재시작.
      */
     _resetWatchdog() {
-        const wdCfg = this._config.watchdog;
+        const wdCfg = schCfg.watchdog;
         if (!wdCfg || !wdCfg.enable) return;
 
         this._clearWatchdog();
@@ -410,7 +406,7 @@ class LiveDownloader extends EventEmitter {
     }
 
     _getSegmentDir() {
-        return path.resolve(this._config.searcher.segmentDir);
+        return path.resolve(schCfg.searcher.segmentDir);
     }
 
     /**

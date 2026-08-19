@@ -11,11 +11,12 @@ const path = require('path');
 const search_lib = require('./video-matcher/search.js');
 const { getEpisodeInfo } = require('./commands.js');
 const { formatDate, roundUpTime } = require('./func.js');
-const cfg = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfg } = configManager;
 
 const videoInfo = search_lib.videoInfo;
-const EPISODE_START = cfg.episode.start;   // 1
-const EPISODE_END = cfg.episode.end;       // 293
+function getEpisodeStart() { return (cfg.episode && cfg.episode.start !== undefined) ? cfg.episode.start : 1; }
+function getEpisodeEnd() { return (cfg.episode && cfg.episode.end !== undefined) ? cfg.episode.end : 293; }
 
 // 이미지 저장 디렉토리
 const OUTPUT_DIR = path.join(__dirname, 'data', 'schedule-images');
@@ -24,7 +25,9 @@ const OUTPUT_DIR = path.join(__dirname, 'data', 'schedule-images');
  * 활성 에피소드만 필터링 (disable 제외, alias 범위 내)
  */
 function getActiveEpisodes() {
-    return videoInfo.filter(e => !e.disable && parseInt(e.alias) >= EPISODE_START && parseInt(e.alias) <= EPISODE_END);
+    const epStart = getEpisodeStart();
+    const epEnd = getEpisodeEnd();
+    return videoInfo.filter(e => !e.disable && parseInt(e.alias) >= epStart && parseInt(e.alias) <= epEnd);
 }
 
 /**
@@ -385,7 +388,7 @@ function renderScheduleImage(scheduleData, title) {
     ctx.fillStyle = COLORS.subtitleText;
     ctx.font = `12px "Malgun Gothic", "맑은 고딕", sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(`총 ${scheduleData.length}화 | ${EPISODE_START}화 ~ ${EPISODE_END}화 | 자동 생성`, LAYOUT.pageWidth / 2, footerY);
+    ctx.fillText(`총 ${scheduleData.length}화 | ${getEpisodeStart()}화 ~ ${getEpisodeEnd()}화 | 자동 생성`, LAYOUT.pageWidth / 2, footerY);
 
     return canvas.toBuffer('image/png');
 }
@@ -423,8 +426,8 @@ function generateScheduleImages() {
         return null;
     }
 
-    const currentImage = renderScheduleImage(thisCycle, `📺 편성표 — 현재 사이클 (${EPISODE_START}화 ~ ${EPISODE_END}화)`);
-    const nextImage = renderScheduleImage(nextCycle, `📺 편성표 — 다음 사이클 (${EPISODE_START}화 ~ ${EPISODE_END}화)`);
+    const currentImage = renderScheduleImage(thisCycle, `📺 편성표 — 현재 사이클 (${getEpisodeStart()}화 ~ ${getEpisodeEnd()}화)`);
+    const nextImage = renderScheduleImage(nextCycle, `📺 편성표 — 다음 사이클 (${getEpisodeStart()}화 ~ ${getEpisodeEnd()}화)`);
 
     // 저장
     if (!fs.existsSync(OUTPUT_DIR)) {

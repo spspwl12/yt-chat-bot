@@ -19,6 +19,7 @@ const cfgYoutube = require(PATHS.youtube);
 const cfgMessages = require(PATHS.messages);
 const cfgSearch = require(PATHS.search);
 const profanitySet = require(PATHS.profanity);
+let profanityVersion = 1;
 
 let musics = {};
 try {
@@ -140,6 +141,7 @@ function reloadProfanityList() {
         for (const word of fresh) {
             profanitySet.add(word);
         }
+        profanityVersion++;
         updateRequireCache(PATHS.profanity, profanitySet);
 
         console.log(`[ConfigManager] profanity-list.js 리로드 완료 (${profanitySet.size}개 단어)`);
@@ -299,6 +301,7 @@ module.exports = {
     videoMetaMap,
     getMusicSearcher: () => musicSearcher,
     getVideoMetaMap: () => videoMetaMap,
+    getProfanityVersion: () => profanityVersion,
 
     // 단축 별칭
     cfg: cfgYoutube,

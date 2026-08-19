@@ -9,23 +9,39 @@ const { cfg, msg } = configManager;
 
 class SpamGuard {
     constructor(opts) {
-        opts = opts || {};
-        this.baseWindowMs = (opts.windowSec || 10) * 1000;
-        this.maxCount = opts.maxCount || 1;
-        this.warnLimit = opts.warnLimit || 5;
-        this.penaltyDurationMs = (opts.penaltyDurationHrs !== undefined ? opts.penaltyDurationHrs : 12) * 60 * 60 * 1000;
-        this.penaltyAddMs = (opts.penaltyAddSec || 0) * 1000;
+        this._opts = opts || {};
         this.tracker = this._loadTracker();
         this.banned = this._loadBanned();
         this._saveTrackerTimer = null;
 
         console.log(
             '🛡️  도배 방지 — 기본 ' +
-            (opts.windowSec || 10) + '초 (누적량 비례 +' + (opts.penaltyAddSec || 0) + '초, ' +
-            (opts.penaltyDurationHrs !== undefined ? opts.penaltyDurationHrs : 12) + '시간 유지) / ' +
+            (this.baseWindowMs / 1000) + '초 (누적량 비례 +' + (this.penaltyAddMs / 1000) + '초, ' +
+            (this.penaltyDurationMs / 3600000) + '시간 유지) / ' +
             this.maxCount + '회, ' +
             this.warnLimit + '회 경고 후 차단'
         );
+    }
+
+    get baseWindowMs() {
+        return (cfg.spam && cfg.spam.spam_window_sec !== undefined ? cfg.spam.spam_window_sec : (this._opts.windowSec || 10)) * 1000;
+    }
+
+    get maxCount() {
+        return (cfg.spam && cfg.spam.spam_max_count !== undefined ? cfg.spam.spam_max_count : (this._opts.maxCount || 1));
+    }
+
+    get warnLimit() {
+        return (cfg.spam && cfg.spam.spam_warn_limit !== undefined ? cfg.spam.spam_warn_limit : (this._opts.warnLimit || 5));
+    }
+
+    get penaltyDurationMs() {
+        const hrs = (cfg.spam && cfg.spam.penalty_duration_hrs !== undefined ? cfg.spam.penalty_duration_hrs : (this._opts.penaltyDurationHrs !== undefined ? this._opts.penaltyDurationHrs : 12));
+        return hrs * 60 * 60 * 1000;
+    }
+
+    get penaltyAddMs() {
+        return (cfg.spam && cfg.spam.penalty_add_sec !== undefined ? cfg.spam.penalty_add_sec : (this._opts.penaltyAddSec || 0)) * 1000;
     }
 
     /**

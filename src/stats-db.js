@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
-const cfg = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfg } = configManager;
 
 class StatsTracker {
     constructor() {

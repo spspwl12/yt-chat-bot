@@ -736,7 +736,7 @@ function onMatchResult(rtn) {
     if (!rtn)
         return;
 
-    const minConsecutive = cfg.sync.min_consecutive || 4;
+    const minConsecutive = (schCfg.sync && schCfg.sync.min_consecutive) || 4;
 
     // 서치 엔진 결과물(rtn) 누적 (동기화 신뢰도를 높이고자 여러 번 샘플링)
     tempQuery.push(rtn);
@@ -752,7 +752,7 @@ function onMatchResult(rtn) {
             const curr = tempQuery[i];
 
             if (curr.index === prev.index &&
-                Math.abs(curr.now - prev.now) <= cfg.sync.tolerance_sec) {
+                Math.abs(curr.now - prev.now) <= (schCfg.sync && schCfg.sync.tolerance_sec || 60)) {
                 consecutiveCount++;
                 adopted = curr;
             } else {
@@ -773,7 +773,7 @@ function onMatchResult(rtn) {
     if (cmp &&
         tempQuery.length < minConsecutive &&
         rtn.index === cmp.index &&
-        Math.abs(rtn.now - cmp.now) <= cfg.sync.tolerance_sec) {
+        Math.abs(rtn.now - cmp.now) <= (schCfg.sync && schCfg.sync.tolerance_sec || 60)) {
         copyQuery(rtn);
         return;
     }
@@ -1134,11 +1134,11 @@ function initCommand() {
     initCommand.__init = true;
 
     // LiveDownloader 초기화 (실시간 20초 세그먼트 연속 다운로드)
-    const downloader = new LiveDownloader(schCfg, cfg.sync);
+    const downloader = new LiveDownloader();
     globalDownloader = downloader;
 
     // LiveSearcher 초기화 (searcher.exe 데몬 상시 구동)
-    const searcher = new LiveSearcher(schCfg, cfg.sync);
+    const searcher = new LiveSearcher();
     globalSearcher = searcher;
 
     // 이벤트 연결: 세그먼트 다운로드 완료 → searcher 큐에 추가
@@ -1168,7 +1168,7 @@ function initCommand() {
                     const { broadcastYtdlpState } = require('./web-server.js');
                     if (broadcastYtdlpState) broadcastYtdlpState();
                 } catch (_) { }
-            }, cfg.sync.init_delay_ms);
+            }, (schCfg.sync && schCfg.sync.init_delay_ms) || 5000);
         } else {
             console.log('📥 [Commands] yt-dlp가 OFF 상태로 저장되어 있어 searcher/downloader 자동 시작하지 않습니다.');
             try {

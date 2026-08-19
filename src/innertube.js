@@ -18,7 +18,8 @@ if (!fs.existsSync(sessionPath)) {
     fs.writeFileSync(sessionPath, JSON.stringify({ cookie: "" }, null, 4), 'utf-8');
 }
 const cookies = require('../data/session.json');
-const cfg = require('../data/config-youtube.js');
+const configManager = require('./config-manager.js');
+const { cfg } = configManager;
 
 const ORIGIN = 'https://www.youtube.com';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';

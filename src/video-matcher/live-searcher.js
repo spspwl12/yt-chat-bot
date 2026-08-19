@@ -12,16 +12,12 @@ const { EventEmitter } = require('events');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const readline = require('readline');
+const configManager = require('../config-manager.js');
+const { schCfg } = configManager;
 
 class LiveSearcher extends EventEmitter {
-    /**
-     * @param {object} config - config-search.js 전체 객체
-     * @param {object} syncCfg - config-youtube.js의 sync 객체
-     */
-    constructor(config, syncCfg) {
+    constructor() {
         super();
-        this._config = config;
-        this._syncCfg = syncCfg;
         this._running = false;
         this._daemon = null;
         this._ready = false;
@@ -157,24 +153,24 @@ class LiveSearcher extends EventEmitter {
         this._jsonBuffer = '';
 
         // config.json 생성 (데몬용)
-        const targetConfigPath = this._config.searcher.commandLine
+        const targetConfigPath = schCfg.searcher.commandLine
             .find(arg => arg.endsWith('.json') && arg.includes('config'));
 
         if (targetConfigPath) {
             try {
-                fs.writeFileSync(targetConfigPath, JSON.stringify(this._config), 'utf8');
+                fs.writeFileSync(targetConfigPath, JSON.stringify(schCfg), 'utf8');
             } catch (_) { }
         }
 
         // searcher.exe --daemon 실행 인자 구성
         const args = [
             '--daemon',
-            ...this._config.searcher.commandLine
+            ...schCfg.searcher.commandLine
         ];
 
-        console.log(`🔍 데몬 시작: ${this._config.searcher.path} ${args.join(' ')}`);
+        console.log(`🔍 데몬 시작: ${schCfg.searcher.path} ${args.join(' ')}`);
 
-        const daemon = spawn(this._config.searcher.path, args, {
+        const daemon = spawn(schCfg.searcher.path, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
             cwd: process.cwd()
         });
@@ -229,8 +225,8 @@ class LiveSearcher extends EventEmitter {
             if (!this._running) return;
 
             this._restartCount++;
-            const maxRestart = this._syncCfg.max_restart_count || 30;
-            const delay = this._syncCfg.restart_delay_ms || 3000;
+            const maxRestart = (schCfg.sync && schCfg.sync.max_restart_count) || 30;
+            const delay = (schCfg.sync && schCfg.sync.restart_delay_ms) || 3000;
 
             console.error(`🔍 데몬 종료 (code=${code}, signal=${signal}), 재시작 ${this._restartCount}/${maxRestart}`);
 
@@ -277,7 +273,7 @@ class LiveSearcher extends EventEmitter {
      * searcher_timeout_ms 동안 결과가 오지 않으면 데슬을 강제 종료하여 재시작 트리거.
      */
     _resetWatchdog() {
-        const wdCfg = this._config.watchdog;
+        const wdCfg = schCfg.watchdog;
         if (!wdCfg || !wdCfg.enable) return;
 
         this._clearWatchdog();
