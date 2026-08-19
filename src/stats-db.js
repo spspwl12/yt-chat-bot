@@ -63,6 +63,29 @@ class StatsTracker {
         `);
 
         this._prepareStatements();
+        this._purgeExcludedUsers();
+    }
+
+    _purgeExcludedUsers() {
+        const excludeList = cfg.stats && cfg.stats.exclude_channel_ids;
+        if (!Array.isArray(excludeList) || excludeList.length === 0) return;
+
+        const placeholders = excludeList.map(() => '?').join(', ');
+        try {
+            // user_daily_stats 먼저 삭제 (외래키 참조)
+            this.db.prepare(
+                `DELETE FROM user_daily_stats WHERE user_id IN (SELECT id FROM users WHERE channel_id IN (${placeholders}))`
+            ).run(...excludeList);
+            // users 삭제
+            const result = this.db.prepare(
+                `DELETE FROM users WHERE channel_id IN (${placeholders})`
+            ).run(...excludeList);
+            if (result.changes > 0) {
+                console.log(`[StatsTracker] exclude_channel_ids 계정 ${result.changes}개 DB에서 삭제됨`);
+            }
+        } catch (err) {
+            console.error('[StatsTracker] 제외 계정 삭제 실패:', err.message);
+        }
     }
 
 
@@ -150,6 +173,10 @@ class StatsTracker {
         if (!this.db || !msg || !msg.channelId) return;
 
         const channelId = msg.channelId;
+
+        // 제외 목록(봇 계정 등)에 포함된 channel_id는 스탯 집계에서 제외
+        const excludeList = cfg.stats && cfg.stats.exclude_channel_ids;
+        if (Array.isArray(excludeList) && excludeList.includes(channelId)) return;
         const displayName = msg.displayName || '';
         const timestamp = typeof msg.timestamp === 'number' && !isNaN(msg.timestamp) ? msg.timestamp : Date.now();
         const currentDate = this.getKSTDateInt(timestamp);

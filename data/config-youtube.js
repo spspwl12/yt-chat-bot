@@ -42,6 +42,7 @@ module.exports = {
         enable: true,                   // 스탯 기능 사용 여부
         db_path: "../data/chat_stats.db", // sqlite3 DB 파일 경로
         watch_threshold_min: 10,        // 라이브 시청시간 판정 기준 (분) - 이 시간 이내 연속 채팅 시 시청시간 누적
+        exclude_channel_ids: ["UCtC1Mlh_p9reIImKeNgbQzg"],        // 스탯 집계에서 제외할 channel_id 목록 (봇 계정 등)
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
