@@ -2,6 +2,7 @@ module.exports = {
     // ─── 유튜브 설정 ────────────────────────────────────────
     yt: {
         video_id: "l1ivJtlM7gE",    // 봇이 입장할 유튜브 라이브 아이디
+        chat_mode: "top",          // 채팅 모드: 'live' = 실시간 채팅 (모든 메시지), 'top' = 주요 채팅 (인기 메시지만)
         send_delay: 3000,           // 메시지 전송 딜레이
         max_retries: 4,             // 메세지 재전송 횟수
         verify_timeout: 10000       // innertube.js의 fetchChat에서 확인 대기 최대 시간
