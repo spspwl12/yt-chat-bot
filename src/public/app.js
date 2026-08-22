@@ -610,6 +610,14 @@ function handleWSMessage(msg) {
             }
             break;
 
+        case 'reloadCommands_result':
+            if (payload.success) {
+                showToast('⚡ ' + (payload.message || '명령어 모듈 핫리로드 완료!'));
+            } else {
+                showToast('❌ 리로드 실패: ' + (payload.error || payload.message), true);
+            }
+            break;
+
         case 'saveConfigMessages_result':
             if (payload.success) {
                 showToast('config-messages.js 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
@@ -1233,10 +1241,10 @@ function updateMuteBtn(muted) {
     const btn = document.getElementById('btn-toggle-mute');
     if (!btn) return;
     if (muted) {
-        btn.innerText = 'Bot Muted: ON (말 못함)';
+        btn.innerText = '🔇 Mute: ON';
         btn.style.backgroundColor = 'var(--error)';
     } else {
-        btn.innerText = 'Bot Muted: OFF (정상 대화)';
+        btn.innerText = '🔊 Mute: OFF';
         btn.style.backgroundColor = 'var(--secondary)';
     }
 }
@@ -1253,10 +1261,10 @@ function updateYtdlpBtn(running) {
     const btn = document.getElementById('btn-toggle-ytdlp');
     if (!btn) return;
     if (running) {
-        btn.innerText = 'yt-dlp: ON (다운로드 중)';
+        btn.innerText = '📥 yt-dlp: ON';
         btn.style.backgroundColor = 'var(--secondary)';
     } else {
-        btn.innerText = 'yt-dlp: OFF (중지됨)';
+        btn.innerText = '⏸️ yt-dlp: OFF';
         btn.style.backgroundColor = 'var(--error)';
     }
 }
@@ -1483,6 +1491,13 @@ window.reloadMetadataFromServer = function () {
             ws.send(JSON.stringify({ action: 'getVideoMetadata' }));
             showToast('video-metadata.json 불러오는 중...');
         }
+    }
+};
+
+window.reloadCommands = function () {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'reloadCommands' }));
+        showToast('명령어 모듈 핫리로드 요청 중...');
     }
 };
 

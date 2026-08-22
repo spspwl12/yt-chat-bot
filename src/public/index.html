@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 
 <body>
@@ -58,6 +58,14 @@
                 <span id="tl-tick-mid">--</span>
                 <span id="tl-tick-now">현재</span>
             </div>
+        </div>
+
+        <!-- ══ Quick Action Buttons (타임라인 슬라이더 오른쪽) ══ -->
+        <div class="timeline-actions-wrap">
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute" style="background-color: var(--secondary);">🔊 Mute: OFF</button>
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp" style="background-color: var(--secondary);">📥 yt-dlp: ON</button>
+            <button class="btn btn-sm tl-action-btn" style="background-color: #ef4444;" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄 Reboot</button>
+            <button class="btn btn-sm tl-action-btn" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 1px 6px rgba(99, 102, 241, 0.3);" onclick="reloadCommands()" title="명령어 모듈 즉시 핫리로드">⚡ 명령어 리로드</button>
         </div>
     </div>
 
@@ -135,13 +143,6 @@
                     style="flex: 1; min-width: 120px;"
                     onkeydown="if(event.key==='Enter') sendSimulatedChat()">
                 <button class="btn" onclick="sendSimulatedChat()" style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
-            </div>
-            <div style="display:flex; gap:12px; margin-top: 20px; flex-wrap: wrap;">
-                <button class="btn" id="btn-toggle-mute" style="background-color: var(--secondary);">Bot Muted:
-                    OFF</button>
-                <button class="btn" id="btn-toggle-ytdlp" style="background-color: var(--secondary);">yt-dlp: ON (다운로드 중)</button>
-                <button class="btn btn-ban" style="background-color: #ef4444;" onclick="rebootBot()">🔄 Reboot
-                    Bot</button>
             </div>
         </div>
 
@@ -812,6 +813,7 @@
                 <div class="config-block-header">
                     <h3>config-youtube.js (Bot Configuration)</h3>
                     <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-sm" onclick="reloadCommands()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);" title="src/commands/modules/ 모듈 전체 즉시 재로드">⚡ 명령어 리로드</button>
                         <button class="btn btn-sm" onclick="reloadConfigFromServer('youtube')" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
                         <button class="btn" onclick="saveConfig('youtube')" style="box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">💾 Save Changes (즉시 적용)</button>
                     </div>
@@ -832,7 +834,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=8"></script>
 
     <div id="increment-context-menu" class="glass"
         style="display: none; position: fixed; z-index: 10000; border-radius: 8px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-direction: column; gap: 2px;">

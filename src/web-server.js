@@ -551,6 +551,15 @@ async function handleAction(client, req) {
         eventBus.emit('simulate_chat', payload);
         sendWSFrame(client, JSON.stringify({ action: 'simulate_chat_result', payload: { success: true } }));
     }
+    // ── 명령어 모듈 핫리로드 ──
+    else if (action === 'reloadCommands') {
+        try {
+            const success = commandsLib.reloadCommands();
+            sendWSFrame(client, JSON.stringify({ action: 'reloadCommands_result', payload: { success, message: success ? '명령어 모듈 리로드 완료' : '리로드 실패 (로그 확인)' } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'reloadCommands_result', payload: { success: false, error: e.message } }));
+        }
+    }
     // ── 새 기능: 검색 로그 ──
     else if (action === 'getSearchLogs') {
         sendWSFrame(client, JSON.stringify({ action: 'search_logs', payload: searchLogs }));

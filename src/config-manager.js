@@ -217,6 +217,19 @@ function reloadVideoMetadata() {
     }
 }
 
+function reloadCommands() {
+    try {
+        const { reloadCommands: reloadCmds } = require('./commands/index.js');
+        if (reloadCmds) {
+            return reloadCmds();
+        }
+        return true;
+    } catch (e) {
+        console.error('[ConfigManager] 명령어 리로드 실패:', e.message);
+        return false;
+    }
+}
+
 /**
  * 모든 설정 및 데이터 파일 일괄 리로드
  */
@@ -229,6 +242,7 @@ function reloadAll() {
     reloadVideoSub();
     reloadVideoMusic();
     reloadVideoMetadata();
+    reloadCommands();
     return true;
 }
 
@@ -318,6 +332,7 @@ module.exports = {
     reloadVideoSub,
     reloadVideoMusic,
     reloadVideoMetadata,
+    reloadCommands,
     reloadAll,
 
     // 검증 및 저장
