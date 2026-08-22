@@ -134,6 +134,18 @@ class StatsTracker {
         this.stmts.getUserDailyHistory = this.db.prepare(
             'SELECT date, message_count, watch_seconds FROM user_daily_stats WHERE user_id = ? ORDER BY date DESC LIMIT 60'
         );
+        this.stmts.getTopTotalWatch = this.db.prepare(
+            'SELECT display_name, total_watch_seconds FROM users WHERE total_watch_seconds > 0 ORDER BY total_watch_seconds DESC LIMIT ?'
+        );
+        this.stmts.getTopTotalMessages = this.db.prepare(
+            'SELECT display_name, total_messages FROM users WHERE total_messages > 0 ORDER BY total_messages DESC LIMIT ?'
+        );
+        this.stmts.getTopTodayMessages = this.db.prepare(
+            'SELECT u.display_name, d.message_count FROM user_daily_stats d JOIN users u ON d.user_id = u.id WHERE d.date = ? AND d.message_count > 0 ORDER BY d.message_count DESC LIMIT ?'
+        );
+        this.stmts.getTopTodayWatch = this.db.prepare(
+            'SELECT u.display_name, d.watch_seconds FROM user_daily_stats d JOIN users u ON d.user_id = u.id WHERE d.date = ? AND d.watch_seconds > 0 ORDER BY d.watch_seconds DESC LIMIT ?'
+        );
     }
 
     getKSTDateInt(timestamp = Date.now()) {
@@ -382,6 +394,28 @@ class StatsTracker {
             lastChatDate:  this.formatDateDisplay(user.last_chat_date),
             dailyHistory
         };
+    }
+
+    getTopTotalWatch(limit = 30) {
+        if (!this.db) return [];
+        return this.stmts.getTopTotalWatch.all(limit);
+    }
+
+    getTopTotalMessages(limit = 30) {
+        if (!this.db) return [];
+        return this.stmts.getTopTotalMessages.all(limit);
+    }
+
+    getTopTodayMessages(limit = 30) {
+        if (!this.db) return [];
+        const currentDate = this.getKSTDateInt();
+        return this.stmts.getTopTodayMessages.all(currentDate, limit);
+    }
+
+    getTopTodayWatch(limit = 30) {
+        if (!this.db) return [];
+        const currentDate = this.getKSTDateInt();
+        return this.stmts.getTopTodayWatch.all(currentDate, limit);
     }
 
     close() {

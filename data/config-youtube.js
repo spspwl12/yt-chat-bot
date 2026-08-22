@@ -44,6 +44,8 @@ module.exports = {
         db_path: "../data/chat_stats.db", // sqlite3 DB 파일 경로
         watch_threshold_min: 10,        // 라이브 시청시간 판정 기준 (분) - 이 시간 이내 연속 채팅 시 시청시간 누적
         exclude_channel_ids: ["UCtC1Mlh_p9reIImKeNgbQzg"],        // 스탯 집계에서 제외할 channel_id 목록 (봇 계정 등)
+        rank_chat_len_limit: 160,       // 랭킹 채팅 출력 최대 글자 수 (기본 160)
+        rank_chat_nick_len_limit: 10,   // 랭킹 닉네임 최대 글자 수 (기본 10, 초과 시 ... 표기)
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {

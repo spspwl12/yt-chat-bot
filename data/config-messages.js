@@ -82,10 +82,23 @@ module.exports = {
             `🎬 "${unicodenum}. ${title}" 방영중 ${timestr}초 남음 ${cooldownMsg}`,
     },
 
+    // ─── 시간표 반복문 출력 ───────────────────────────────────
+    timetable: {
+        first_item: (unicodenum, title) => `${unicodenum}화)${title}`,
+        next_item: (header, title) => `→${header})${title}`,
+    },
+
     // ─── 유저 스탯 조회 결과 ───────────────────────────────────
     stats: {
         user_stats: (name, totalMsgs, totalRank, daysCount, todayMsgs, todayRank, todayWatchStr, todayWatchRank, totalWatchStr, totalWatchRank, cooldownMsg) =>
             `📊 [${name} 님의 스탯] 출석: ${daysCount}일 | 채팅수: ${todayMsgs}개 (${todayRank}위) | 시청시간: ${todayWatchStr} (${todayWatchRank}위) | 총 채팅수: ${totalMsgs}개 (${totalRank}위) | 총 시청시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
+        overview: (todayUsers, todayMsgs, totalUsers, totalMsgs, cooldownMsg) =>
+            `📊 [전체 통계] 오늘 활동 유저: ${todayUsers}명 | 오늘 채팅 수: ${todayMsgs}개 | 총 등록 유저: ${totalUsers}명 | 총 누적 채팅: ${totalMsgs}개 ${cooldownMsg}`,
+        rank_header: (title) => `🏆 [${title}] `,
+        rank_item: (rankStr, name, valueStr) => `${rankStr} ${name}(${valueStr})`,
+        rank_separator: ` `,
+        rank_list: (title, itemsStr, cooldownMsg) => `🏆 [${title}] ${itemsStr} ${cooldownMsg}`.trim(),
+        invalid_arg: `⚠️ !스탯 뒤에 다음 단어만 인식합니다: ▶전체: 전체 통계 요약 ▶총시간: 전체 시청시간 순위 ▶총채팅: 전체 채팅수 순위 ▶채팅: 오늘 채팅수 순위 ▶시간: 오늘 시청시간 순위`,
     },
 
     // ─── 쿨타임 안내 ─────────────────────────────────────────
