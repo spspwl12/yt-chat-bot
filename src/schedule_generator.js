@@ -362,7 +362,6 @@ function renderScheduleImage(scheduleData, title) {
 
         // 제목
         ctx.fillStyle = COLORS.rowText;
-        ctx.font = `14px "Malgun Gothic", "맑은 고딕", sans-serif`;
         ctx.textAlign = 'left';
         const titleText = entry.title.length > 50 ? entry.title.substring(0, 50) + '...' : entry.title;
         ctx.fillText(titleText, colStartX + LAYOUT.colAlias + 15, textY);

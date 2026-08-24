@@ -1,3 +1,6 @@
+const cfg = require('../../../data/config-youtube.js');
+const { maskProfanity } = require('../../func.js');
+
 module.exports = {
     name: 'greeting',
     group: 'greeting',
@@ -5,12 +8,11 @@ module.exports = {
     description: '봇 인사 메시지 출력',
 
     async execute({ cmd, displayName, _input, ctx }) {
-        if (!ctx.cfg.input.enable_greeting) {
+        if (!cfg.input.enable_greeting) {
             return null;
         }
-        // lazy require: 핫리로드 시 최신 greeting.js 코드가 반영되도록 execute 안에서 require
         const greeting_lib = require('../../greeting.js');
         ctx.setCooldown(cmd, 0, _input);
-        return greeting_lib(ctx.maskProfanity(displayName));
+        return greeting_lib(maskProfanity(displayName));
     }
 };

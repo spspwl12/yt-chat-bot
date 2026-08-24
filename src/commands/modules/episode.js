@@ -1,6 +1,16 @@
+const cfg = require('../../../data/config-youtube.js');
+const msg = require('../../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
+const videoSubManager = require('../../sub-manager.js');
+const { searchEpisodeByAI } = require('../../ai.js');
+const { sendChat } = require('../../innertube.js');
+const { filterText, hasProfanity, toUnicodeNumber, toUnicodeNumber2, formatDate, roundUpTime, insertSpaces } = require('../../func.js');
+const { printNowEpisode, printNumEpisode } = require('./future-episode.js');
+
+const retryPattern = ["$1", "$1 ", " $1", "", ""];
+
 function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
-    const limitLength = ctx.cfg.timetable.default_limit;
-    const videoInfo = ctx.videoInfo;
+    const limitLength = cfg.timetable.default_limit;
     const currentInfo = videoInfo[rtn.index];
 
     let totalCycleMs = 0;
@@ -19,7 +29,7 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
         const cycleOffset = seenCount[num];
         seenCount[num]++;
 
-        const baseFutureDate = ctx.roundUpTime(ctx.search_lib.getFutureDate(info, rtn, 0));
+        const baseFutureDate = roundUpTime(getFutureDate(info, rtn, 0));
         const futureDate = new Date(baseFutureDate.getTime() + cycleOffset * totalCycleMs);
 
         entries.push({
@@ -32,14 +42,14 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
     entries.sort((a, b) => a.futureDate.getTime() - b.futureDate.getTime());
 
     const makeMsg = (change) => {
-        const currentAlias = ctx.toUnicodeNumber(currentInfo.alias);
+        const currentAlias = toUnicodeNumber(currentInfo.alias);
         let str = `${currentAlias}화`;
         let pdate = null;
 
         for (const entry of entries) {
-            const hdr = `${ctx.formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
-            const unicodeAlias = ctx.toUnicodeNumber(entry.alias);
-            const candidate = ctx.insertSpaces(`→${hdr}${unicodeAlias}화`, change);
+            const hdr = `${formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
+            const unicodeAlias = toUnicodeNumber(entry.alias);
+            const candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
             if (str.length + candidate.length >= limitLength) break;
             str += candidate;
             pdate = entry.futureDate;
@@ -49,9 +59,9 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
     };
 
     return {
-        msg: makeMsg(ctx.retryPattern[0]),
+        msg: makeMsg(retryPattern[0]),
         proc: function (attempt) {
-            return makeMsg(ctx.retryPattern[attempt]);
+            return makeMsg(retryPattern[attempt]);
         }
     };
 }
@@ -63,12 +73,6 @@ module.exports = {
     description: '현재 회차, 에피소드 예정 시간, 다중 회차 및 대사 검색',
 
     async execute({ cmd, args, rtn, _input, ctx }) {
-        const { printNowEpisode, printNumEpisode } = require('./future-episode.js');
-        const cfg = ctx.cfg;
-        const msg = ctx.msg;
-        const videoInfo = ctx.videoInfo;
-        const subtt = ctx.videoSubManager.getSubtitles();
-
         if (!args || args.length <= 0) {
             ctx.setCooldown(cmd, 0, _input);
             return printNowEpisode(rtn, cmd, ctx);
@@ -109,7 +113,7 @@ module.exports = {
 
         // 24시간 이내 동일 검색어 체크
         if (cfg.input.duplicate_history_hours > 0 && _input.spamGuard) {
-            const normalizedQuery = isChapter ? parseChapter.toString() : ctx.filterText(query);
+            const normalizedQuery = isChapter ? parseChapter.toString() : filterText(query);
 
             const now = Date.now();
             const expiry = now - (cfg.input.duplicate_history_hours * 60 * 60 * 1000);
@@ -169,13 +173,13 @@ module.exports = {
             return ctx.returnWarning(msg.error.search_min_length(cfg.input.search_min_length), cmd, _input);
         }
 
-        const searchText = ctx.filterText(query);
-        if (ctx.hasProfanity(searchText)) {
+        const searchText = filterText(query);
+        if (hasProfanity(searchText)) {
             return ctx.returnWarning(msg.error.search_profanity, cmd, _input);
         }
 
         const baseWarn = cfg.subtitle_score.warn_base || 10;
-        const { validResults, searchInfo } = ctx.videoSubManager.searchAndFormat(query, rtn);
+        const { validResults, searchInfo } = videoSubManager.searchAndFormat(query, rtn);
         if (validResults && validResults.length > 0) {
             _input.warn = baseWarn +
                 parseInt((100 - validResults[0].score) / cfg.subtitle_score.warn_divisor);
@@ -213,19 +217,19 @@ module.exports = {
 
                 return {
                     msg: msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
-                        ctx.insertSpaces(firstResult.subInfo.title, ctx.retryPattern[0]),
+                        insertSpaces(firstResult.subInfo.title, retryPattern[0]),
                         message, firstResult.unicodescore, ctx.getCooldownMsg(cmd)),
                     proc: function (attempt) {
                         return msg.subtitle.found_definitive(prefixEmoji, firstResult.unicodenum,
-                            ctx.insertSpaces(firstResult.subInfo.title, ctx.retryPattern[attempt]),
+                            insertSpaces(firstResult.subInfo.title, retryPattern[attempt]),
                             message, firstResult.unicodescore, ctx.getCooldownMsg(cmd));
                     }
                 };
             } else {
                 const makeMsg = (attempt) => {
                     const mapped = validResults.map((r, i) => {
-                        const rankEmoji = ctx.toUnicodeNumber2((i + 1).toString());
-                        const title = ctx.insertSpaces(r.subInfo.shorten, ctx.retryPattern[attempt]);
+                        const rankEmoji = toUnicodeNumber2((i + 1).toString());
+                        const title = insertSpaces(r.subInfo.shorten, retryPattern[attempt]);
                         const timeMsg = r.outOfbounds ?
                             msg.subtitle.not_in_stream_short :
                             `${r.emoji} ${r.timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
@@ -256,9 +260,9 @@ module.exports = {
 
         // AI 폴백 시도
         if (cfg.ai && cfg.ai.enable) {
-            ctx.sendChat(msg.error.search_ai_pending);
+            sendChat(msg.error.search_ai_pending);
 
-            ctx.searchEpisodeByAI(query, cfg.ai, cfg.episode.start, cfg.episode.end)
+            searchEpisodeByAI(query, cfg.ai, cfg.episode.start, cfg.episode.end)
                 .then(episodeNum2 => {
                     if (episodeNum2 !== null) {
                         console.log(`🤖 AI: "${query}" → ${episodeNum2}화`);
@@ -266,18 +270,18 @@ module.exports = {
                         const result = printNumEpisode(rtn, episodeNum2, cmd, ctx);
                         if (result) {
                             if (typeof result === 'string')
-                                return ctx.sendChat(`🤖 ${result}`);
-                            return ctx.sendChat(`🤖 ${result.msg}`);
+                                return sendChat(`🤖 ${result}`);
+                            return sendChat(`🤖 ${result.msg}`);
                         }
                     }
 
-                    ctx.sendChat(ctx.returnWarning(msg.error.search_failed, cmd, _input));
+                    sendChat(ctx.returnWarning(msg.error.search_failed, cmd, _input));
                 })
                 .catch(err => {
                     console.error('AI 검색 중 오류 발생:', err);
                 });
 
-            _input.warn = baseWarn * 5;
+            if (_input) _input.warn = baseWarn * 5;
             return null;
         }
 

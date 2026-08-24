@@ -42,11 +42,12 @@ async function searchEpisodeByAI(query, aiCfg, startEp, endEp) {
         const client = url.protocol === 'https:' ? https : http;
 
         const req = client.get(requestUrl, { timeout: timeoutMs }, (res) => {
-            let body = '';
-            res.on('data', (chunk) => { body += chunk; });
+            const chunks = [];
+            res.on('data', (chunk) => { chunks.push(chunk); });
             res.on('end', () => {
                 clearTimeout(timer);
                 try {
+                    const body = Buffer.concat(chunks).toString('utf-8');
                     const json = JSON.parse(body);
                     // response_path 설정에 따라 JSON 객체에서 실제 문자열 추출
                     const text = resolveJsonPath(json, aiCfg.response_path);

@@ -312,13 +312,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
                 loadStatsOverview();
                 searchUserStats();
             }
-            if (targetId === 'tab-videoinfo') ws.send(JSON.stringify({ action: 'getVideoInfo' }));
-            if (targetId === 'tab-config') ws.send(JSON.stringify({ action: 'getConfig' }));
             if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
-            if (targetId === 'tab-config-messages') ws.send(JSON.stringify({ action: 'getConfigMessages' }));
-            if (targetId === 'tab-config-profanity') ws.send(JSON.stringify({ action: 'getProfanityList' }));
-            if (targetId === 'tab-config-music') ws.send(JSON.stringify({ action: 'getVideoMusic' }));
-            if (targetId === 'tab-config-metadata') ws.send(JSON.stringify({ action: 'getVideoMetadata' }));
+            if (targetId === 'tab-editor') switchEditorFile(currentEditorFile);
         }
     });
 });
@@ -470,11 +465,11 @@ function handleWSMessage(msg) {
             break;
 
         case 'config_data':
-            if (document.getElementById('val-youtube')) {
-                document.getElementById('val-youtube').value = payload.youtube;
-            }
-            if (document.getElementById('val-search')) {
-                document.getElementById('val-search').value = payload.search;
+            window._currentSearchConfigText = payload.search || '';
+            if (currentEditorFile === 'youtube' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.youtube ? payload.youtube.replace(/^\uFEFF/, '').trim() : '';
+            } else if (currentEditorFile === 'search' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.search ? payload.search.replace(/^\uFEFF/, '').trim() : '';
             }
             try {
                 const searchConfigStr = payload.search.replace(/module\.exports\s*=\s*/, '').trim().replace(/;$/, '');
@@ -596,7 +591,12 @@ function handleWSMessage(msg) {
 
         // ── 새 기능 ──
         case 'videoInfo_data':
-            document.getElementById('val-videoinfo').value = payload.replace(/^\uFEFF/, '').trim();
+            if (document.getElementById('val-videoinfo')) {
+                document.getElementById('val-videoinfo').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            if (currentEditorFile === 'videoInfo' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
+            }
             break;
 
         case 'saveVideoInfo_result':
@@ -607,6 +607,9 @@ function handleWSMessage(msg) {
         case 'configMessages_data':
             if (document.getElementById('val-messages')) {
                 document.getElementById('val-messages').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            if (currentEditorFile === 'messages' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
             }
             break;
 
@@ -630,6 +633,9 @@ function handleWSMessage(msg) {
             if (document.getElementById('val-profanity')) {
                 document.getElementById('val-profanity').value = payload.replace(/^\uFEFF/, '').trim();
             }
+            if (currentEditorFile === 'profanity' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
+            }
             break;
 
         case 'saveProfanityList_result':
@@ -643,6 +649,9 @@ function handleWSMessage(msg) {
         case 'videoMusic_data':
             if (document.getElementById('val-music')) {
                 document.getElementById('val-music').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            if (currentEditorFile === 'videoMusic' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
             }
             break;
 
@@ -658,6 +667,9 @@ function handleWSMessage(msg) {
             if (document.getElementById('val-metadata')) {
                 document.getElementById('val-metadata').value = payload.replace(/^\uFEFF/, '').trim();
             }
+            if (currentEditorFile === 'videoMetadata' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
+            }
             break;
 
         case 'saveVideoMetadata_result':
@@ -665,6 +677,20 @@ function handleWSMessage(msg) {
                 showToast('video-metadata.json 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
             } else {
                 showToast('메타데이터 저장 실패: ' + payload.error, true);
+            }
+            break;
+
+        case 'videoSub_data':
+            if (currentEditorFile === 'videoSub' && document.getElementById('unified-code-editor')) {
+                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
+            }
+            break;
+
+        case 'saveVideoSub_result':
+            if (payload.success) {
+                showToast('video-sub.json 저장 완료! 즉시 적용되었습니다.');
+            } else {
+                showToast('자막 데이터 저장 실패: ' + payload.error, true);
             }
             break;
 
@@ -1508,6 +1534,131 @@ window.rebootBot = function () {
     }
 };
 
+// ══════════════════════════════════════════════
+//  Unified JS / JSON Config & Data Editor
+// ══════════════════════════════════════════════
+let currentEditorFile = 'youtube';
+
+window.switchEditorFile = function (fileKey) {
+    currentEditorFile = fileKey || 'youtube';
+    const select = document.getElementById('unified-file-select');
+    if (select && select.value !== currentEditorFile) {
+        select.value = currentEditorFile;
+    }
+
+    const formatBtn = document.getElementById('editor-format-btn');
+    const isJson = ['videoMusic', 'videoMetadata', 'videoInfo', 'videoSub'].includes(currentEditorFile);
+    if (formatBtn) {
+        formatBtn.style.display = isJson ? 'inline-block' : 'none';
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+
+    switch (currentEditorFile) {
+        case 'youtube':
+        case 'search':
+            ws.send(JSON.stringify({ action: 'getConfig' }));
+            break;
+        case 'messages':
+            ws.send(JSON.stringify({ action: 'getConfigMessages' }));
+            break;
+        case 'profanity':
+            ws.send(JSON.stringify({ action: 'getProfanityList' }));
+            break;
+        case 'videoMusic':
+            ws.send(JSON.stringify({ action: 'getVideoMusic' }));
+            break;
+        case 'videoMetadata':
+            ws.send(JSON.stringify({ action: 'getVideoMetadata' }));
+            break;
+        case 'videoInfo':
+            ws.send(JSON.stringify({ action: 'getVideoInfo' }));
+            break;
+        case 'videoSub':
+            ws.send(JSON.stringify({ action: 'getVideoSub' }));
+            break;
+    }
+};
+
+window.reloadCurrentEditorFile = function () {
+    const fileLabels = {
+        youtube: 'config-youtube.js',
+        messages: 'config-messages.js',
+        search: 'config-search.js',
+        profanity: 'profanity-list.js',
+        videoMusic: 'video-music.json',
+        videoMetadata: 'video-metadata.json',
+        videoInfo: 'video-info.json',
+        videoSub: 'video-sub.json',
+    };
+    const fname = fileLabels[currentEditorFile] || currentEditorFile;
+    if (confirm(`서버의 ${fname} 파일을 다시 읽어옵니다.\n편집 중인 내용이 덮어씌워질 수 있습니다. 진행하시겠습니까?`)) {
+        switchEditorFile(currentEditorFile);
+        showToast(`${fname} 새로고침 요청 중...`);
+    }
+};
+
+window.saveCurrentEditorFile = function () {
+    const editor = document.getElementById('unified-code-editor');
+    if (!editor) return;
+    const content = editor.value.replace(/^\uFEFF/, '').trim();
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return showToast('WebSocket 연결이 끊겨있습니다.', true);
+    }
+
+    const isJson = ['videoMusic', 'videoMetadata', 'videoInfo', 'videoSub'].includes(currentEditorFile);
+    if (isJson) {
+        try {
+            JSON.parse(content);
+        } catch (e) {
+            return showToast('JSON 유효성 검사 실패: ' + e.message, true);
+        }
+    }
+
+    switch (currentEditorFile) {
+        case 'youtube':
+            ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'youtube', content } }));
+            break;
+        case 'messages':
+            ws.send(JSON.stringify({ action: 'saveConfigMessages', payload: { content } }));
+            break;
+        case 'search':
+            ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content } }));
+            break;
+        case 'profanity':
+            ws.send(JSON.stringify({ action: 'saveProfanityList', payload: { content } }));
+            break;
+        case 'videoMusic':
+            ws.send(JSON.stringify({ action: 'saveVideoMusic', payload: { content } }));
+            break;
+        case 'videoMetadata':
+            ws.send(JSON.stringify({ action: 'saveVideoMetadata', payload: { content } }));
+            break;
+        case 'videoInfo':
+            ws.send(JSON.stringify({ action: 'saveVideoInfo', payload: { content } }));
+            break;
+        case 'videoSub':
+            ws.send(JSON.stringify({ action: 'saveVideoSub', payload: { content } }));
+            break;
+    }
+};
+
+window.formatCurrentEditorJson = function () {
+    const editor = document.getElementById('unified-code-editor');
+    if (!editor) return;
+    try {
+        const raw = editor.value.replace(/^\uFEFF/, '').trim();
+        const obj = JSON.parse(raw);
+        editor.value = JSON.stringify(obj, null, 2);
+        showToast('✨ JSON 포맷 정렬 완료');
+    } catch (e) {
+        showToast('JSON 파싱 에러: ' + e.message, true);
+    }
+};
+
 // ── Code Editor Enhancements (Tab indent & Ctrl+S) ──
 document.querySelectorAll('textarea.code-editor').forEach(ta => {
     ta.addEventListener('keydown', function (e) {
@@ -1519,7 +1670,8 @@ document.querySelectorAll('textarea.code-editor').forEach(ta => {
             this.selectionStart = this.selectionEnd = start + 4;
         } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
-            if (this.id === 'val-messages') saveConfigMessages();
+            if (this.id === 'unified-code-editor') saveCurrentEditorFile();
+            else if (this.id === 'val-messages') saveConfigMessages();
             else if (this.id === 'val-profanity') saveProfanityList();
             else if (this.id === 'val-music') saveMusicData();
             else if (this.id === 'val-metadata') saveMetadata();
@@ -1636,12 +1788,16 @@ function refreshLiveFrame() {
 }
 
 function saveVideoMatchingConfig() {
-    if (!window._currentSearchConfig) return;
-    let text = document.getElementById('val-search').value;
+    let text = window._currentSearchConfigText || '';
+    if (!text && document.getElementById('unified-code-editor') && currentEditorFile === 'search') {
+        text = document.getElementById('unified-code-editor').value;
+    }
+    if (!text) {
+        showToast('설정 데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.', true);
+        return;
+    }
 
     function updateKey(key, value, isString = false) {
-        // (?<![A-Za-z0-9_]) 로 앞 word boundary, (?![A-Za-z0-9_]) 로 뒤 word boundary
-        // 값은 문자열("...") 또는 숫자/불리언 단일값만 교체 (배열 [ 로 시작하면 절대 건드리지 않음)
         const regex = new RegExp(
             '(?<![A-Za-z0-9_])(' + key + '\\s*:\\s*)("[^"]*"|true|false|-?[0-9]+(?:\\.[0-9]+)?)',
             'g'
@@ -1675,28 +1831,31 @@ function saveVideoMatchingConfig() {
     updateKey('topN', parseInt(document.getElementById('vm-match-topn').value) || 5);
     updateKey('earlyExit', document.getElementById('vm-match-early').checked);
 
-    // 메모리 내 객체도 업데이트
-    const cfg = window._currentSearchConfig;
-    cfg.extraction.crop.x = parseInt(document.getElementById('vm-crop-x').value) || 0;
-    cfg.extraction.crop.y = parseInt(document.getElementById('vm-crop-y').value) || 0;
-    cfg.extraction.crop.w = parseInt(document.getElementById('vm-crop-w').value) || 0;
-    cfg.extraction.crop.h = parseInt(document.getElementById('vm-crop-h').value) || 0;
-    cfg.extraction.crop.enabled = document.getElementById('vm-crop-enabled').checked;
-    cfg.extraction.fps = parseInt(document.getElementById('vm-ext-fps').value) || 2;
-    cfg.extraction.width = parseInt(document.getElementById('vm-ext-w').value) || 64;
-    cfg.extraction.height = parseInt(document.getElementById('vm-ext-h').value) || 64;
-    if (!cfg.phash) cfg.phash = {};
-    cfg.phash.resizeWidth = parseInt(document.getElementById('vm-ph-rw').value) || 64;
-    cfg.phash.resizeHeight = parseInt(document.getElementById('vm-ph-rh').value) || 64;
-    cfg.phash.dctSize = parseInt(document.getElementById('vm-ph-dct').value) || 64;
-    cfg.phash.lowFreqSize = lowFreqSize;
-    cfg.phash.hashBits = hashBits;
-    if (!cfg.matching) cfg.matching = {};
-    cfg.matching.hammingThreshold = parseInt(document.getElementById('vm-match-th').value) || 30;
-    cfg.matching.topN = parseInt(document.getElementById('vm-match-topn').value) || 5;
-    cfg.matching.earlyExit = document.getElementById('vm-match-early').checked;
-    if (!cfg.searcher) cfg.searcher = {};
-    cfg.searcher.youtube_url = document.getElementById('vm-search-url').value.trim();
+    if (window._currentSearchConfig) {
+        const cfg = window._currentSearchConfig;
+        if (!cfg.extraction) cfg.extraction = {};
+        if (!cfg.extraction.crop) cfg.extraction.crop = {};
+        cfg.extraction.crop.x = parseInt(document.getElementById('vm-crop-x').value) || 0;
+        cfg.extraction.crop.y = parseInt(document.getElementById('vm-crop-y').value) || 0;
+        cfg.extraction.crop.w = parseInt(document.getElementById('vm-crop-w').value) || 0;
+        cfg.extraction.crop.h = parseInt(document.getElementById('vm-crop-h').value) || 0;
+        cfg.extraction.crop.enabled = document.getElementById('vm-crop-enabled').checked;
+        cfg.extraction.fps = parseInt(document.getElementById('vm-ext-fps').value) || 2;
+        cfg.extraction.width = parseInt(document.getElementById('vm-ext-w').value) || 64;
+        cfg.extraction.height = parseInt(document.getElementById('vm-ext-h').value) || 64;
+        if (!cfg.phash) cfg.phash = {};
+        cfg.phash.resizeWidth = parseInt(document.getElementById('vm-ph-rw').value) || 64;
+        cfg.phash.resizeHeight = parseInt(document.getElementById('vm-ph-rh').value) || 64;
+        cfg.phash.dctSize = parseInt(document.getElementById('vm-ph-dct').value) || 64;
+        cfg.phash.lowFreqSize = lowFreqSize;
+        cfg.phash.hashBits = hashBits;
+        if (!cfg.matching) cfg.matching = {};
+        cfg.matching.hammingThreshold = parseInt(document.getElementById('vm-match-th').value) || 30;
+        cfg.matching.topN = parseInt(document.getElementById('vm-match-topn').value) || 5;
+        cfg.matching.earlyExit = document.getElementById('vm-match-early').checked;
+        if (!cfg.searcher) cfg.searcher = {};
+        cfg.searcher.youtube_url = document.getElementById('vm-search-url').value.trim();
+    }
 
     const ytdlpCmdEl = document.getElementById('vm-ytdlp-cmdline');
     if (ytdlpCmdEl) {
@@ -1715,12 +1874,17 @@ function saveVideoMatchingConfig() {
             text = text.replace(/(ytdlp\s*:\s*\{)/, `$1\n        commandLine: ${cmdLineJson},`);
         }
 
-        if (!cfg.ytdlp) cfg.ytdlp = {};
-        cfg.ytdlp.commandLine = parsedArr;
+        if (window._currentSearchConfig && window._currentSearchConfig.ytdlp) {
+            window._currentSearchConfig.ytdlp.commandLine = parsedArr;
+        }
+    }
+
+    window._currentSearchConfigText = text;
+    if (currentEditorFile === 'search' && document.getElementById('unified-code-editor')) {
+        document.getElementById('unified-code-editor').value = text;
     }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
-        document.getElementById('val-search').value = text;
         ws.send(JSON.stringify({ action: 'saveConfig', payload: { target: 'search', content: text } }));
     }
 }

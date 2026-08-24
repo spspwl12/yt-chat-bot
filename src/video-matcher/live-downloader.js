@@ -491,4 +491,23 @@ async function extractLatestSegmentFrame() {
     return { success: false, error: '준비된 썸네일이 없습니다. (방송 다운로드 대기 중)' };
 }
 
+// ─── yt-dlp ON/OFF 활성화 상태 영속화 ─────────────────────────────────────────
+const YTDLP_STATE_FILE = path.join(__dirname, '../../data', 'ytdlp-state.json');
+
+function getYtdlpEnabled() {
+    try {
+        return JSON.parse(fs.readFileSync(YTDLP_STATE_FILE, 'utf8')).enabled !== false;
+    } catch {
+        return true;
+    }
+}
+
+function saveYtdlpState(enabled) {
+    try {
+        fs.writeFileSync(YTDLP_STATE_FILE, JSON.stringify({ enabled }), 'utf8');
+    } catch { }
+}
+
 module.exports.extractLatestSegmentFrame = extractLatestSegmentFrame;
+module.exports.getYtdlpEnabled = getYtdlpEnabled;
+module.exports.saveYtdlpState = saveYtdlpState;

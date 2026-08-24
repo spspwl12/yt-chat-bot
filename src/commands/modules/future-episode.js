@@ -1,5 +1,11 @@
+const cfg = require('../../../data/config-youtube.js');
+const msg = require('../../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
+const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces } = require('../../func.js');
+
+const retryPattern = ["$1", "$1 ", " $1", "", ""];
+
 function printFutureEpisode(rtn, cmd, skipCount, label, _input, ctx) {
-    const videoInfo = ctx.videoInfo;
     const n = videoInfo.length;
     let currentIdx = (rtn.index + 1) % n;
     let info = null;
@@ -19,26 +25,25 @@ function printFutureEpisode(rtn, cmd, skipCount, label, _input, ctx) {
     }
 
     if (info === null) {
-        return ctx.returnWarning(ctx.msg.error.next_episode_not_found(label), cmd, _input);
+        return ctx.returnWarning(msg.error.next_episode_not_found(label), cmd, _input);
     }
 
     // 찾은 에피소드가 방영될 미래의 예정 시각 계산
-    const futureDate = ctx.roundUpTime(ctx.search_lib.getFutureDate(info, rtn, 0));
-    const unicodenum = ctx.toUnicodeNumber(info.alias);
-    const timestr = ctx.formatDate(futureDate);
-    const emoji = ctx.getClockEmoji(timestr);
+    const futureDate = roundUpTime(getFutureDate(info, rtn, 0));
+    const unicodenum = toUnicodeNumber(info.alias);
+    const timestr = formatDate(futureDate);
+    const emoji = getClockEmoji(timestr);
 
     ctx.setCooldown(cmd, 0, _input);
     return {
-        msg: ctx.msg.episode.future(label, unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[0]), emoji, timestr, ctx.getCooldownMsg(cmd)),
+        msg: msg.episode.future(label, unicodenum, insertSpaces(info.title, retryPattern[0]), emoji, timestr, ctx.getCooldownMsg(cmd)),
         proc: function (attempt) {
-            return ctx.msg.episode.future(label, unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[attempt]), emoji, timestr, ctx.getCooldownMsg(cmd));
+            return msg.episode.future(label, unicodenum, insertSpaces(info.title, retryPattern[attempt]), emoji, timestr, ctx.getCooldownMsg(cmd));
         }
     };
 }
 
 function printNumEpisode(rtn, num, cmd, ctx) {
-    const videoInfo = ctx.videoInfo;
     const info = videoInfo.find(e => e.alias == num);
 
     if (!info)
@@ -48,33 +53,32 @@ function printNumEpisode(rtn, num, cmd, ctx) {
         return printNowEpisode(rtn, cmd, ctx);
     }
 
-    const futureDate = ctx.roundUpTime(ctx.search_lib.getFutureDate(info, rtn, 0));
-    const unicodenum = ctx.toUnicodeNumber(info.alias);
-    const timestr = ctx.formatDate(futureDate);
-    const emoji = ctx.getClockEmoji(timestr);
+    const futureDate = roundUpTime(getFutureDate(info, rtn, 0));
+    const unicodenum = toUnicodeNumber(info.alias);
+    const timestr = formatDate(futureDate);
+    const emoji = getClockEmoji(timestr);
 
     let timeMsg = info.disable
-        ? ctx.msg.episode.scheduled_no_stream
-        : ctx.msg.episode.scheduled_time(emoji, timestr);
+        ? msg.episode.scheduled_no_stream
+        : msg.episode.scheduled_time(emoji, timestr);
 
     return {
-        msg: ctx.msg.episode.scheduled(unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[0]), timeMsg, ctx.getCooldownMsg(cmd)),
+        msg: msg.episode.scheduled(unicodenum, insertSpaces(info.title, retryPattern[0]), timeMsg, ctx.getCooldownMsg(cmd)),
         proc: function (attempt) {
-            return ctx.msg.episode.scheduled(unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[attempt]), timeMsg, ctx.getCooldownMsg(cmd));
+            return msg.episode.scheduled(unicodenum, insertSpaces(info.title, retryPattern[attempt]), timeMsg, ctx.getCooldownMsg(cmd));
         }
     };
 }
 
 function printNowEpisode(rtn, cmd, ctx) {
-    const videoInfo = ctx.videoInfo;
     const info = videoInfo[rtn.index];
-    const unicodenum = ctx.toUnicodeNumber(info.alias);
-    const timestr = ctx.toHHMMSS(rtn.end - rtn.now);
+    const unicodenum = toUnicodeNumber(info.alias);
+    const timestr = toHHMMSS(rtn.end - rtn.now);
 
     return {
-        msg: ctx.msg.episode.now_playing(unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[0]), timestr, ctx.getCooldownMsg(cmd)),
+        msg: msg.episode.now_playing(unicodenum, insertSpaces(info.title, retryPattern[0]), timestr, ctx.getCooldownMsg(cmd)),
         proc: function (attempt) {
-            return ctx.msg.episode.now_playing(unicodenum, ctx.insertSpaces(info.title, ctx.retryPattern[attempt]), timestr, ctx.getCooldownMsg(cmd));
+            return msg.episode.now_playing(unicodenum, insertSpaces(info.title, retryPattern[attempt]), timestr, ctx.getCooldownMsg(cmd));
         }
     };
 }
@@ -104,11 +108,11 @@ module.exports = {
         }
         if (group === 'first') {
             ctx.setCooldown(cmd, 0, _input);
-            return printNumEpisode(rtn, ctx.cfg.episode.start, cmd, ctx);
+            return printNumEpisode(rtn, cfg.episode.start, cmd, ctx);
         }
         if (group === 'last') {
             ctx.setCooldown(cmd, 0, _input);
-            return printNumEpisode(rtn, ctx.cfg.episode.end, cmd, ctx);
+            return printNumEpisode(rtn, cfg.episode.end, cmd, ctx);
         }
         return null;
     },

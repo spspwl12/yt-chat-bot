@@ -1,3 +1,10 @@
+const cfg = require('../../../data/config-youtube.js');
+const msg = require('../../../data/config-messages.js');
+const { videoInfo, getEpAtDate } = require('../../video-matcher/search.js');
+const { parseKoreanDate, toUnicodeNumber, toHHMMSS, insertSpaces } = require('../../func.js');
+
+const retryPattern = ["$1", "$1 ", " $1", "", ""];
+
 module.exports = {
     name: 'date',
     group: 'date',
@@ -6,24 +13,24 @@ module.exports = {
 
     async execute({ cmd, args, rtn, _input, ctx }) {
         if (!args || args.length === 0) {
-            return ctx.returnWarning(ctx.msg.error.date_missing, cmd, _input);
+            return ctx.returnWarning(msg.error.date_missing, cmd, _input);
         }
 
         const dtStr = args.join(' ');
-        const dtParsed = ctx.parseKoreanDate(dtStr);
+        const dtParsed = parseKoreanDate(dtStr);
         if (!dtParsed) {
-            return ctx.returnWarning(ctx.msg.error.date_invalid_format, cmd, _input);
+            return ctx.returnWarning(msg.error.date_invalid_format, cmd, _input);
         }
 
         const nowTime = Date.now();
         const limitFutureTime = nowTime + (1000 * 60 * 60 * 24 * 90); // 약 3개월(90일)
 
         if (dtParsed.endDate.getTime() < nowTime) {
-            return ctx.returnWarning(ctx.msg.error.date_past, cmd, _input);
+            return ctx.returnWarning(msg.error.date_past, cmd, _input);
         }
 
         if (dtParsed.startDate.getTime() > limitFutureTime) {
-            return ctx.returnWarning(ctx.msg.error.date_too_far, cmd, _input);
+            return ctx.returnWarning(msg.error.date_too_far, cmd, _input);
         }
 
         const makeDateMsg = (attempt) => {
@@ -38,48 +45,48 @@ module.exports = {
                 `${yyyy}-${mm}-${dd}`;
 
             if (dtParsed.hasDate && !dtParsed.hasTime) {
-                const stEp = ctx.search_lib.getEpAtDate(dtParsed.startDate, rtn);
-                const edEp = ctx.search_lib.getEpAtDate(dtParsed.endDate, rtn);
+                const stEp = getEpAtDate(dtParsed.startDate, rtn);
+                const edEp = getEpAtDate(dtParsed.endDate, rtn);
 
-                const numSt = ctx.toUnicodeNumber(stEp.info.alias);
-                const numEd = ctx.toUnicodeNumber(edEp.info.alias);
+                const numSt = toUnicodeNumber(stEp.info.alias);
+                const numEd = toUnicodeNumber(edEp.info.alias);
 
                 if (stEp.idx === edEp.idx) {
-                    return ctx.msg.date.full_repeat(reqDateStr, ctx.getCooldownMsg(cmd));
+                    return msg.date.full_repeat(reqDateStr, ctx.getCooldownMsg(cmd));
                 } else {
-                    return ctx.msg.date.range_episodes(reqDateStr, numSt, numEd, ctx.getCooldownMsg(cmd));
+                    return msg.date.range_episodes(reqDateStr, numSt, numEd, ctx.getCooldownMsg(cmd));
                 }
             } else {
-                const tEp = ctx.search_lib.getEpAtDate(dtParsed.startDate, rtn);
+                const tEp = getEpAtDate(dtParsed.startDate, rtn);
                 const info = tEp.info;
-                const threshold = ctx.cfg.input.boundary_sec;
+                const threshold = cfg.input.boundary_sec;
 
-                const numStr = ctx.toUnicodeNumber(info.alias);
+                const numStr = toUnicodeNumber(info.alias);
                 let overlaps = [];
-                let mainTxt = `"${numStr}. ${ctx.insertSpaces(info.title, ctx.retryPattern[attempt])}"`;
+                let mainTxt = `"${numStr}. ${insertSpaces(info.title, retryPattern[attempt])}"`;
 
                 const epRemainSec = info._streamDurationSec - tEp.streamPos;
-                const timestr = ctx.toHHMMSS(epRemainSec);
+                const timestr = toHHMMSS(epRemainSec);
 
                 if (tEp.streamPos < threshold) {
-                    let pIdx = (tEp.idx - 1 + ctx.videoInfo.length) % ctx.videoInfo.length;
-                    while (ctx.videoInfo[pIdx].disable) pIdx = (pIdx - 1 + ctx.videoInfo.length) % ctx.videoInfo.length;
-                    const pInfo = ctx.videoInfo[pIdx];
-                    overlaps.push(`"${ctx.toUnicodeNumber(pInfo.alias)}. ${ctx.insertSpaces(pInfo.title, ctx.retryPattern[attempt])}"`);
+                    let pIdx = (tEp.idx - 1 + videoInfo.length) % videoInfo.length;
+                    while (videoInfo[pIdx].disable) pIdx = (pIdx - 1 + videoInfo.length) % videoInfo.length;
+                    const pInfo = videoInfo[pIdx];
+                    overlaps.push(`"${toUnicodeNumber(pInfo.alias)}. ${insertSpaces(pInfo.title, retryPattern[attempt])}"`);
                     overlaps.push(mainTxt);
                 } else if (info._streamDurationSec - tEp.streamPos < threshold) {
                     overlaps.push(mainTxt);
-                    let nIdx = (tEp.idx + 1) % ctx.videoInfo.length;
-                    while (ctx.videoInfo[nIdx].disable) nIdx = (nIdx + 1) % ctx.videoInfo.length;
-                    const nInfo = ctx.videoInfo[nIdx];
-                    overlaps.push(`"${ctx.toUnicodeNumber(nInfo.alias)}. ${ctx.insertSpaces(nInfo.title, ctx.retryPattern[attempt])}"`);
+                    let nIdx = (tEp.idx + 1) % videoInfo.length;
+                    while (videoInfo[nIdx].disable) nIdx = (nIdx + 1) % videoInfo.length;
+                    const nInfo = videoInfo[nIdx];
+                    overlaps.push(`"${toUnicodeNumber(nInfo.alias)}. ${insertSpaces(nInfo.title, retryPattern[attempt])}"`);
                 } else {
                     overlaps.push(mainTxt);
                 }
 
                 const overlapStr = overlaps.join(" 및 ");
                 ctx.setCooldown(cmd, 0, _input);
-                return ctx.msg.date.exact_episode(reqDateStr, overlapStr, timestr, ctx.getCooldownMsg(cmd));
+                return msg.date.exact_episode(reqDateStr, overlapStr, timestr, ctx.getCooldownMsg(cmd));
             }
         };
 

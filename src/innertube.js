@@ -17,7 +17,7 @@ if (!fs.existsSync(sessionPath)) {
     console.log('📝 data/session.json 파일이 없어 새로 생성합니다.');
     fs.writeFileSync(sessionPath, JSON.stringify({ cookie: "" }, null, 4), 'utf-8');
 }
-const cookies = require('../data/session.json');
+const cookies = require(sessionPath);
 const configManager = require('./config-manager.js');
 const { cfg } = configManager;
 
@@ -182,14 +182,15 @@ function h2Post(urlPath, extraHeaders, bodyObj) {
         req.write(payload);
         req.end();
 
-        var body = '';
+        var chunks = [];
         var respHeaders = {};
         req.on('response', function (h) { respHeaders = h; });
-        req.on('data', function (c) { body += c; });
+        req.on('data', function (c) { chunks.push(c); });
         req.on('end', function () {
             // ★ Set-Cookie 반영
             updateCookiesFromHeaders(respHeaders);
             client.close();
+            var body = Buffer.concat(chunks).toString('utf-8');
             try { resolve(JSON.parse(body)); }
             catch (e) { reject(new Error('응답 파싱 실패: ' + body.slice(0, 300))); }
         });
@@ -217,13 +218,14 @@ function h2Get(urlPath, extraHeaders) {
         var req = client.request(headers);
         req.end();
 
-        var body = '';
+        var chunks = [];
         var respHeaders = {};
         req.on('response', function (h) { respHeaders = h; });
-        req.on('data', function (c) { body += c; });
+        req.on('data', function (c) { chunks.push(c); });
         req.on('end', function () {
             updateCookiesFromHeaders(respHeaders);
             client.close();
+            var body = Buffer.concat(chunks).toString('utf-8');
             resolve(body);
         });
         req.on('error', function (e) { client.close(); reject(e); });
@@ -256,12 +258,13 @@ function h2PostAnon(urlPath, bodyObj) {
         req.write(payload);
         req.end();
 
-        var body = '';
+        var chunks = [];
         req.on('data', function (c) {
-            body += c;
+            chunks.push(c);
         });
         req.on('end', function () {
             client.close();
+            var body = Buffer.concat(chunks).toString('utf-8');
             try {
                 resolve(JSON.parse(body));
             }
@@ -978,15 +981,16 @@ async function postCommunityText(text) {
             req.write(payload);
             req.end();
 
-            var body = '';
+            var chunks = [];
             var status = 0;
             req.on('response', function (h) {
                 status = h[':status'];
                 updateCookiesFromHeaders(h);
             });
-            req.on('data', function (c) { body += c; });
+            req.on('data', function (c) { chunks.push(c); });
             req.on('end', function () {
                 client.close();
+                var body = Buffer.concat(chunks).toString('utf-8');
                 console.log('📡 [Community] 게시물 생성 응답 status:', status, 'body length:', body.length);
                 if (!body) {
                     reject(new Error('게시물 생성 응답이 비어있음 (HTTP ' + status + ')'));

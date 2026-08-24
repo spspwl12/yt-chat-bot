@@ -21,24 +21,6 @@ const cfgSearch = require(PATHS.search);
 const profanitySet = require(PATHS.profanity);
 let profanityVersion = 1;
 
-let musics = {};
-try {
-    musics = require(PATHS.videoMusic);
-} catch {
-    console.warn('⚠️ [ConfigManager] video-music.json 파일이 없습니다.');
-}
-
-let videoMetadata = [];
-try {
-    videoMetadata = require(PATHS.videoMetadata);
-} catch {
-    console.warn('⚠️ [ConfigManager] video-metadata.json 파일이 없습니다.');
-}
-
-const TextSearchEngine = require('./textsearcher.js');
-let musicSearcher = new TextSearchEngine(musics);
-const videoMetaMap = new Map(videoMetadata.map(m => [m.name, m]));
-
 /**
  * JS 코드 문법 및 module.exports 유효성 검증
  */
@@ -174,49 +156,6 @@ function reloadVideoSub() {
     }
 }
 
-function reloadVideoMusic() {
-    try {
-        const resolved = require.resolve(PATHS.videoMusic);
-        delete require.cache[resolved];
-        const fresh = require(PATHS.videoMusic);
-
-        for (const k of Object.keys(musics)) {
-            delete musics[k];
-        }
-        Object.assign(musics, fresh);
-        updateRequireCache(PATHS.videoMusic, musics);
-
-        musicSearcher = new TextSearchEngine(musics);
-
-        console.log(`[ConfigManager] video-music.json 리로드 완료`);
-        return true;
-    } catch (e) {
-        console.error('[ConfigManager] video-music.json 리로드 실패:', e.message);
-        throw e;
-    }
-}
-
-function reloadVideoMetadata() {
-    try {
-        const resolved = require.resolve(PATHS.videoMetadata);
-        delete require.cache[resolved];
-        const fresh = require(PATHS.videoMetadata);
-
-        videoMetadata.length = 0;
-        videoMetadata.push(...fresh);
-        updateRequireCache(PATHS.videoMetadata, videoMetadata);
-
-        videoMetaMap.clear();
-        videoMetadata.forEach(m => videoMetaMap.set(m.name, m));
-
-        console.log(`[ConfigManager] video-metadata.json 리로드 완료`);
-        return true;
-    } catch (e) {
-        console.error('[ConfigManager] video-metadata.json 리로드 실패:', e.message);
-        throw e;
-    }
-}
-
 function reloadCommands() {
     try {
         const { reloadCommands: reloadCmds } = require('./commands/index.js');
@@ -240,8 +179,6 @@ function reloadAll() {
     reloadProfanityList();
     reloadVideoInfo();
     reloadVideoSub();
-    reloadVideoMusic();
-    reloadVideoMetadata();
     reloadCommands();
     return true;
 }
@@ -276,24 +213,27 @@ function validateAndSaveConfig(target, content) {
             break;
         case 'messages':
             reloadMessagesConfig();
+            reloadCommands();
             break;
         case 'search':
             reloadSearchConfig();
             break;
         case 'profanity':
             reloadProfanityList();
+            reloadCommands();
             break;
         case 'videoInfo':
             reloadVideoInfo();
+            reloadCommands();
             break;
         case 'videoSub':
             reloadVideoSub();
+            reloadCommands();
             break;
         case 'videoMusic':
-            reloadVideoMusic();
-            break;
         case 'videoMetadata':
-            reloadVideoMetadata();
+            // 명령어 모듈들이 직접 require 하므로 명령어 리로드로 즉시 재적용
+            reloadCommands();
             break;
     }
 
@@ -309,12 +249,6 @@ module.exports = {
     cfgMessages,
     cfgSearch,
     profanitySet,
-    musics,
-    videoMetadata,
-    musicSearcher,
-    videoMetaMap,
-    getMusicSearcher: () => musicSearcher,
-    getVideoMetaMap: () => videoMetaMap,
     getProfanityVersion: () => profanityVersion,
 
     // 단축 별칭
@@ -330,8 +264,6 @@ module.exports = {
     reloadProfanityList,
     reloadVideoInfo,
     reloadVideoSub,
-    reloadVideoMusic,
-    reloadVideoMetadata,
     reloadCommands,
     reloadAll,
 
@@ -339,3 +271,4 @@ module.exports = {
     validateJS,
     validateAndSaveConfig
 };
+

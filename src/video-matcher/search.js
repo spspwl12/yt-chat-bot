@@ -44,11 +44,17 @@ function preprocessVideoInfo(data) {
             e._editParsed = null;
             e._effectiveEndSec = e._endSec;
             if (e.edit_time) {
-                const editArr = JSON.parse(e.edit_time);
-                e._editParsed = editArr.map(et => ({
-                    s: fromHHMMSS(et.s),
-                    e: fromHHMMSS(et.e)
-                }));
+                try {
+                    const editArr = typeof e.edit_time === 'string' ? JSON.parse(e.edit_time) : e.edit_time;
+                    if (Array.isArray(editArr)) {
+                        e._editParsed = editArr.map(et => ({
+                            s: fromHHMMSS(et.s),
+                            e: fromHHMMSS(et.e)
+                        }));
+                    }
+                } catch {
+                    e._editParsed = null;
+                }
                 for (const et of e._editParsed) {
                     e._editSec += (et.e - et.s);
                 }
@@ -434,5 +440,97 @@ function getAdjustedVideoTime(requestTime, phashTime, nowIdx) {
     return rtn;
 }
 
-module.exports = { videoInfo, processSearchResult, getLiveVideoTime, getAdjustedVideoTime, getRemainingTime, getFutureDate, getEffectiveIndex, getEditOffset, getEpAtDate, reloadVideoInfo };
+// ─── 라이브 싱크 상태 관리 (동기화 쿼리 및 현재 에피소드 계산) ─────────────
+const lastQueryRelPath = (schCfg.searcher && schCfg.searcher.lastquery_path) || 'data/lastquery.json';
+const LASTQUERY_PATH = path.resolve(__dirname, '../', lastQueryRelPath);
+let lastQuery = { index: 0, now: 0, requestTime: 0, retry: 0 };
+try {
+    if (fs.existsSync(LASTQUERY_PATH)) {
+        lastQuery = require(LASTQUERY_PATH);
+    } else {
+        fs.writeFileSync(LASTQUERY_PATH, JSON.stringify(lastQuery, null, 4), 'utf-8');
+    }
+} catch (e) {
+    console.warn('⚠️ [search] lastquery.json 로드 실패, 기본값 사용:', e.message);
+}
+const tempQuery = [];
+
+/**
+ * C++ 서치 엔진에서 검색된 현재 라이브 영상 싱크 데이터를
+ * 파일과 메모리(lastQuery)에 저장하여 상태를 동기화합니다.
+ */
+function copyQuery(obj) {
+    if (!obj) return;
+    ['index', 'now', 'requestTime'].forEach(key => {
+        if (obj[key] !== undefined) lastQuery[key] = obj[key];
+    });
+    tempQuery.length = 0;
+    try {
+        const json = JSON.stringify(lastQuery, null, 4);
+        fs.writeFileSync(LASTQUERY_PATH, json, 'utf-8');
+    } catch (e) {
+        console.warn('⚠️ [search] lastquery.json 저장 실패:', e.message);
+    }
+    eventBus.emit('lastquery_update', {
+        index: lastQuery.index,
+        now: lastQuery.now,
+        requestTime: lastQuery.requestTime,
+        retry: lastQuery.retry
+    });
+}
+
+/**
+ * 최신 동기화된 데이터를 바탕으로 현재 방송 중인 회차와 시점(초)을 계산해 반환
+ * @returns {object|null}
+ */
+function getEpisodeInfo() {
+    if (!lastQuery.requestTime) return null;
+    return getAdjustedVideoTime(lastQuery.requestTime, lastQuery.now, lastQuery.index);
+}
+
+/**
+ * LiveSearcher 'match' 이벤트 핸들러: 연속성 검증 후 확정 시 싱크 저장
+ */
+function onMatchResult(rtn) {
+    if (!rtn) return;
+
+    const tolerance = (schCfg.sync && schCfg.sync.tolerance_sec) || 60;
+
+    if (tempQuery.length > 0) {
+        const last = tempQuery[tempQuery.length - 1];
+        if (rtn.index !== last.index || Math.abs(rtn.now - last.now) > tolerance) {
+            tempQuery.length = 0;
+        }
+    }
+
+    tempQuery.push(rtn);
+    const minConsecutive = (schCfg.sync && schCfg.sync.min_consecutive) || 4;
+
+    if (tempQuery.length >= minConsecutive) {
+        copyQuery(rtn);
+        return;
+    }
+
+    const cmp = getEpisodeInfo();
+    if (cmp && rtn.index === cmp.index && Math.abs(rtn.now - cmp.now) <= tolerance) {
+        copyQuery(rtn);
+    }
+}
+
+module.exports = {
+    videoInfo,
+    processSearchResult,
+    getLiveVideoTime,
+    getAdjustedVideoTime,
+    getRemainingTime,
+    getFutureDate,
+    getEffectiveIndex,
+    getEditOffset,
+    getEpAtDate,
+    reloadVideoInfo,
+    lastQuery,
+    copyQuery,
+    getEpisodeInfo,
+    onMatchResult
+};
 

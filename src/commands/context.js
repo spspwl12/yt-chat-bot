@@ -1,19 +1,6 @@
-const configManager = require('../config-manager.js');
-const { cfg, msg, schCfg, musics, videoMetadata, videoMetaMap } = configManager;
-const videoSubManager = require('../sub-manager.js');
-const search_lib = require('../video-matcher/search.js');
-const { searchEpisodeByAI } = require('../ai.js');
-const TextSearchEngine = require('../textsearcher.js');
-const statsTracker = require('../stats-db.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
 const eventBus = require('../event-bus.js');
-const { sendChat } = require('../innertube.js');
-const {
-    insertSpaces, filterText, toUnicodeNumber, toUnicodeNumber2,
-    toHHMMSS, fromHHMMSS, formatDate, roundUpTime, getClockEmoji, parseKoreanDate, hasProfanity, maskProfanity
-} = require('../func.js');
-
-const videoInfo = search_lib.videoInfo;
-const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
 // ─── 쿨타임 상태 관리 ─────────────────────────────────────────
 let delayChatTime = 0;                 // global 모드용
@@ -141,8 +128,8 @@ function getCooldownState() {
             const cooldownMs = 1000 * 60 * config.time;
             const lastTime = delayChatTimeMap.get(config.key) || 0;
             state.groups[group] = {
-                cooldownMs: cooldownMs,
-                lastTime: lastTime,
+                cooldownMs,
+                lastTime,
                 remainingMs: Math.max(0, cooldownMs - (now - lastTime))
             };
         }
@@ -151,33 +138,7 @@ function getCooldownState() {
 }
 
 module.exports = {
-    cfg,
-    msg,
-    schCfg,
-    musics,
-    videoMetadata,
-    videoMetaMap,
-    videoSubManager,
-    search_lib,
-    searchEpisodeByAI,
-    TextSearchEngine,
-    statsTracker,
     eventBus,
-    sendChat,
-    videoInfo,
-    retryPattern,
-    insertSpaces,
-    filterText,
-    toUnicodeNumber,
-    toUnicodeNumber2,
-    toHHMMSS,
-    fromHHMMSS,
-    formatDate,
-    roundUpTime,
-    getClockEmoji,
-    parseKoreanDate,
-    hasProfanity,
-    maskProfanity,
     setCommandGroupResolver,
     getCommandGroup,
     getCooldownConfig,

@@ -1,3 +1,9 @@
+const msg = require('../../../data/config-messages.js');
+const { videoInfo } = require('../../video-matcher/search.js');
+const { toUnicodeNumber, toHHMMSS, insertSpaces } = require('../../func.js');
+
+const retryPattern = ["$1", "$1 ", " $1", "", ""];
+
 module.exports = {
     name: 'time',
     group: 'time',
@@ -6,14 +12,14 @@ module.exports = {
 
     async execute({ cmd, rtn, _input, ctx }) {
         ctx.setCooldown(cmd, 0, _input);
-        const info = ctx.videoInfo[rtn.index];
-        const unicodenum = ctx.toUnicodeNumber(info.alias);
-        const timestr = ctx.toHHMMSS(rtn.end - rtn.now);
+        const info = videoInfo[rtn.index];
+        const unicodenum = toUnicodeNumber(info.alias);
+        const timestr = toHHMMSS(rtn.end - rtn.now);
 
         return {
-            msg: ctx.msg.time.remaining(unicodenum, ctx.insertSpaces(info.shorten, ctx.retryPattern[0]), timestr, ctx.getCooldownMsg(cmd)),
+            msg: msg.time.remaining(unicodenum, insertSpaces(info.shorten, retryPattern[0]), timestr, ctx.getCooldownMsg(cmd)),
             proc: function (attempt) {
-                return ctx.msg.time.remaining(unicodenum, ctx.insertSpaces(info.shorten, ctx.retryPattern[attempt]), timestr, ctx.getCooldownMsg(cmd));
+                return msg.time.remaining(unicodenum, insertSpaces(info.shorten, retryPattern[attempt]), timestr, ctx.getCooldownMsg(cmd));
             }
         };
     }

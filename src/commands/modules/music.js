@@ -1,3 +1,19 @@
+const path = require('path');
+const cfg = require('../../../data/config-youtube.js');
+const msg = require('../../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
+const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji } = require('../../func.js');
+const TextSearchEngine = require('../../textsearcher.js');
+
+let musics = {};
+try {
+    musics = require(path.join(__dirname, '../../../data/video-music.json'));
+} catch (e) {
+    console.warn('⚠️ [music module] video-music.json 로드 실패:', e.message);
+}
+
+const musicSearcher = new TextSearchEngine(musics);
+
 let musicFreq = null;
 
 function getMusicFreq(musics) {
@@ -22,11 +38,6 @@ module.exports = {
     description: '현재/과거 재생 음악 및 음악 등장 회차 검색',
 
     async execute({ cmd, args, rtn, _input, ctx }) {
-        const cfg = ctx.cfg;
-        const msg = ctx.msg;
-        const musics = ctx.musics;
-        const videoInfo = ctx.videoInfo;
-
         if (cfg.music && !cfg.music.enable) {
             return ctx.returnWarning(msg.error.music_disabled, cmd, _input);
         }
@@ -47,8 +58,8 @@ module.exports = {
             // 현재 에피소드의 음악 스캔
             for (let i = epMusics.length - 1; i >= 0; i--) {
                 const m = epMusics[i];
-                const startSec = ctx.fromHHMMSS(m.start);
-                const endSec = ctx.fromHHMMSS(m.end);
+                const startSec = fromHHMMSS(m.start);
+                const endSec = fromHHMMSS(m.end);
 
                 if (rtn.now >= startSec && rtn.now <= endSec) {
                     foundList.push({ diff: 0, text: m.text });
@@ -74,8 +85,8 @@ module.exports = {
 
                         for (let i = prevMusics.length - 1; i >= 0; i--) {
                             const m = prevMusics[i];
-                            const startSec = ctx.fromHHMMSS(m.start);
-                            const endSec = ctx.fromHHMMSS(m.end);
+                            const startSec = fromHHMMSS(m.start);
+                            const endSec = fromHHMMSS(m.end);
 
                             if (endSec > prevEnd) continue;
 
@@ -144,8 +155,7 @@ module.exports = {
         }
 
         const query = args.join(' ');
-        const configManager = require('../../config-manager.js');
-        const searchInfo = configManager.getMusicSearcher().search(query);
+        const searchInfo = musicSearcher.search(query);
         if (searchInfo && searchInfo.length > 0) {
             searchInfo.sort((a, b) => b.score - a.score);
 
@@ -170,7 +180,7 @@ module.exports = {
                     for (const idx of matched) {
                         const candidate = musics[key][idx - 1];
                         if (!candidate) continue;
-                        const t = ctx.fromHHMMSS(candidate.start);
+                        const t = fromHHMMSS(candidate.start);
                         let oob = !!subInfo.disable;
                         if (!oob && subInfo._editParsed) {
                             for (const et of subInfo._editParsed) {
@@ -191,13 +201,13 @@ module.exports = {
                     }
 
                     if (bestMObj && subInfo) {
-                        const subTime = ctx.fromHHMMSS(bestMObj.start);
-                        const unicodenum = ctx.toUnicodeNumber(subInfo.alias);
+                        const subTime = fromHHMMSS(bestMObj.start);
+                        const unicodenum = toUnicodeNumber(subInfo.alias);
                         const rawHwa = `${unicodenum}화`;
 
-                        const futureDate = ctx.roundUpTime(ctx.search_lib.getFutureDate(subInfo, rtn, subTime));
-                        const timestr = ctx.formatDate(futureDate);
-                        const emoji = ctx.getClockEmoji(timestr);
+                        const futureDate = roundUpTime(getFutureDate(subInfo, rtn, subTime));
+                        const timestr = formatDate(futureDate);
+                        const emoji = getClockEmoji(timestr);
 
                         const timeMsg = bestOutOfbounds ?
                             msg.subtitle.not_in_stream_short :

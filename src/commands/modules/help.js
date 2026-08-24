@@ -1,3 +1,5 @@
+const msg = require('../../../data/config-messages.js');
+
 module.exports = {
     name: 'help',
     group: 'help',
@@ -6,6 +8,6 @@ module.exports = {
 
     async execute({ cmd, _input, ctx }) {
         ctx.setCooldown(cmd, 0, _input);
-        return ctx.msg.help.main;
+        return msg.help.main;
     }
 };

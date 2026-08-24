@@ -20,6 +20,20 @@ const chatHistory = require('./chat-history.js');
 const { startSchedulePoster } = require('./schedule_poster.js');
 const statsTracker = require('./stats-db.js');
 
+// ═══════════════════════════════════════
+//  전역 예외 핸들러 (프로세스 다운 방지)
+// ═══════════════════════════════════════
+process.on('uncaughtException', function (err) {
+    console.error('\n⚠️ [uncaughtException] 잡히지 않은 예외 — 프로세스 유지:', err && err.message ? err.message : String(err));
+    if (err && err.stack) console.error(err.stack);
+});
+
+process.on('unhandledRejection', function (reason) {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    console.error('\n⚠️ [unhandledRejection] 처리되지 않은 Promise 거부 — 프로세스 유지:', msg);
+    if (reason instanceof Error && reason.stack) console.error(reason.stack);
+});
+
 const spamGuard = new SpamGuard({
     windowSec: cfg.spam.spam_window_sec || 10,
     maxCount: cfg.spam.spam_max_count || 5,

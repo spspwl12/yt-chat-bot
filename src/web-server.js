@@ -231,13 +231,16 @@ function broadcastSpam() {
 function processClientMessage(client, message) {
     try {
         const parsed = JSON.parse(message);
-        handleAction(client, parsed);
+        handleAction(client, parsed).catch(e => {
+            console.warn('⚠️ [ws] handleAction 비동기 오류:', e && e.message ? e.message : String(e));
+        });
     } catch (e) {
-        console.error("WS Parse error", e);
+        console.error('⚠️ [ws] 메시지 파싱 오류:', e && e.message ? e.message : String(e));
     }
 }
 
 async function handleAction(client, req) {
+    try {
     const { action, payload } = req;
 
     if (action === 'getState') {
@@ -529,6 +532,25 @@ async function handleAction(client, req) {
             sendWSFrame(client, JSON.stringify({ action: 'saveVideoMetadata_result', payload: { success: false, error: e.message } }));
         }
     }
+    // ── video-sub.json 조회 및 편집 ──
+    else if (action === 'getVideoSub') {
+        try {
+            const subText = fs.readFileSync(configManager.PATHS.videoSub, 'utf8')
+                .replace(/^\uFEFF/, '').trim();
+            sendWSFrame(client, JSON.stringify({ action: 'videoSub_data', payload: subText }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'videoSub_data', payload: '[]' }));
+        }
+    }
+    else if (action === 'saveVideoSub') {
+        const { content } = payload;
+        try {
+            configManager.validateAndSaveConfig('videoSub', content);
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoSub_result', payload: { success: true } }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({ action: 'saveVideoSub_result', payload: { success: false, error: e.message } }));
+        }
+    }
     // ── video-sub.json 리로드 ──
     else if (action === 'reloadVideoSub') {
         try {
@@ -666,6 +688,9 @@ async function handleAction(client, req) {
         const { channelId } = payload || {};
         const detail = statsTracker ? statsTracker.getUserDetail(channelId) : null;
         sendWSFrame(client, JSON.stringify({ action: 'userStatsDetail_data', payload: detail }));
+    }
+    } catch (e) {
+        console.warn('⚠️ [ws] handleAction 처리 중 오류 (action=' + (req && req.action) + '):', e && e.message ? e.message : String(e));
     }
 }
 
