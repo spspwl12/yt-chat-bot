@@ -1,6 +1,6 @@
-const msg = require('../../../data/config-messages.js');
-const { videoInfo } = require('../../video-matcher/search.js');
-const { toUnicodeNumber, toHHMMSS, insertSpaces } = require('../../func.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo } = require('../video-matcher/search.js');
+const { toUnicodeNumber, toHHMMSS, insertSpaces } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 

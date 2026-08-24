@@ -286,37 +286,60 @@ function sendSimulatedChat() {
     }
 }
 
-// ── UI Interactions ──
+// ── UI Interactions & State Persistence ──
+function switchTab(targetId, saveState = true) {
+    if (!targetId) return;
+    const targetBtn = document.querySelector(`.nav-btn[data-target="${targetId}"]`);
+    const targetPanel = document.getElementById(targetId);
+    if (!targetBtn || !targetPanel) return;
+
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+    targetPanel.classList.add('active');
+    targetBtn.classList.add('active');
+
+    if (saveState) {
+        try { localStorage.setItem('bot_admin_last_tab', targetId); } catch {}
+    }
+
+    // Close sidebar on mobile after nav click
+    closeSidebar();
+
+    // Fetch relevant data on tab switch
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        if (targetId === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
+        if (targetId === 'tab-chat') ws.send(JSON.stringify({ action: 'getChat' }));
+        if (targetId === 'tab-spam') ws.send(JSON.stringify({ action: 'getSpam' }));
+        if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
+        if (targetId === 'tab-commands') ws.send(JSON.stringify({ action: 'getCommandLogs' }));
+        if (targetId === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
+        if (targetId === 'tab-modules') {
+            loadWebModules();
+            refreshCurrentModule();
+        }
+        if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
+        if (targetId === 'tab-editor') switchEditorFile(currentEditorFile);
+    }
+}
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
         const target = e.currentTarget;
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
         const targetId = target.getAttribute('data-target');
-        document.getElementById(targetId).classList.add('active');
-        target.classList.add('active');
-
-        // Close sidebar on mobile after nav click
-        closeSidebar();
-
-        // Fetch relevant data on tab switch
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            if (targetId === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
-            if (targetId === 'tab-chat') ws.send(JSON.stringify({ action: 'getChat' }));
-            if (targetId === 'tab-spam') ws.send(JSON.stringify({ action: 'getSpam' }));
-            if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
-            if (targetId === 'tab-commands') ws.send(JSON.stringify({ action: 'getCommandLogs' }));
-            if (targetId === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
-            if (targetId === 'tab-stats') {
-                loadStatsOverview();
-                searchUserStats();
-            }
-            if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
-            if (targetId === 'tab-editor') switchEditorFile(currentEditorFile);
-        }
+        switchTab(targetId, true);
     });
 });
+
+// 초기 진입 시 마지막으로 선택했던 탭 복원
+function restoreSavedTab() {
+    try {
+        const savedTab = localStorage.getItem('bot_admin_last_tab');
+        if (savedTab && document.getElementById(savedTab)) {
+            switchTab(savedTab, false);
+        }
+    } catch {}
+}
 
 function showToast(message, isError = false) {
     const container = document.getElementById('toast-container');
@@ -379,6 +402,8 @@ function connectWS() {
         document.getElementById('status-text').innerText = 'Connected';
         ws.send(JSON.stringify({ action: 'getState' }));
         tlLoadHistory(); // 타임라인 이력 로드
+        loadWebModules(); // 웹 독립 모듈 목록 로드
+        restoreSavedTab(); // 마지막으로 선택했던 탭 복원
 
         pinger = setInterval(() => {
             const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
@@ -613,14 +638,6 @@ function handleWSMessage(msg) {
             }
             break;
 
-        case 'reloadCommands_result':
-            if (payload.success) {
-                showToast('⚡ ' + (payload.message || '명령어 모듈 핫리로드 완료!'));
-            } else {
-                showToast('❌ 리로드 실패: ' + (payload.error || payload.message), true);
-            }
-            break;
-
         case 'saveConfigMessages_result':
             if (payload.success) {
                 showToast('config-messages.js 저장 완료! 재부팅 없이 즉시 적용되었습니다.');
@@ -746,17 +763,43 @@ function handleWSMessage(msg) {
             tlHandleStateAtHistory(payload);
             break;
 
-        // ── 유저 통계 뷰어 ──
+        // ── 독립 모듈 매니저 & 뷰어 ──
+        case 'webModules_data':
+            renderWebModulesList(payload);
+            break;
+
+        case 'reloadModules_result':
+        case 'reloadCommands_result':
+            showToast(payload.success ? '⚡ 모든 모듈이 핫리로드되었습니다.' : `❌ 모듈 리로드 실패: ${payload.error || payload.message}`, !payload.success);
+            if (payload.modules) renderWebModulesList(payload.modules);
+            refreshCurrentModule();
+            break;
+
+        // ── 모듈 WS 액션 응답 → 현재 활성 모듈 핸들러로 디스패치 ──
+        case 'getPosterStatus_data':
+        case 'posterStatus_data':
+            if (window.posterModule) posterModule.renderStatus(payload);
+            break;
+
+        case 'manualPostSchedule_data':
+        case 'manualPostSchedule_result':
+            showToast(payload && payload.success
+                ? (payload.skipped ? 'ℹ️ 이미 게시된 사이클입니다 (생략됨).' : '✅ 커뮤니티에 편성표가 게시되었습니다.')
+                : '⚠️ 편성표 게시 실패: ' + (payload && payload.reason ? payload.reason : '오류'),
+                !(payload && payload.success));
+            if (window.posterModule) posterModule.onManualPostResult(payload);
+            break;
+
         case 'userStatsOverview_data':
-            renderStatsOverview(payload);
+            if (window.statsModule) statsModule.renderOverview(payload);
             break;
 
         case 'userStatsSearch_data':
-            renderStatsSearchResults(payload);
+            if (window.statsModule) statsModule.renderSearchResults(payload);
             break;
 
         case 'userStatsDetail_data':
-            renderStatsUserDetail(payload);
+            if (window.statsModule) statsModule.renderDetail(payload);
             break;
     }
 }
@@ -808,6 +851,7 @@ function createChatElement(c) {
     div.className = 'chat-item';
 
     const textDiv = document.createElement('div');
+    textDiv.className = 'chat-content-wrap';
     const authorSpan = document.createElement('span');
     authorSpan.className = 'chat-author';
     authorSpan.textContent = c.displayName;
@@ -818,10 +862,10 @@ function createChatElement(c) {
     textDiv.appendChild(textSpan);
 
     const btnDiv = document.createElement('div');
-    btnDiv.style.cssText = 'display:flex; gap:8px;';
+    btnDiv.className = 'chat-btn-group';
 
     const banBtn = document.createElement('button');
-    banBtn.className = 'btn btn-ban';
+    banBtn.className = 'btn btn-chat-action btn-ban';
     banBtn.textContent = '유저 숨기기';
     if (!c.contextMenu) {
         banBtn.disabled = true;
@@ -831,14 +875,12 @@ function createChatElement(c) {
     }
 
     const spamBtn = document.createElement('button');
-    spamBtn.className = 'btn btn-ban';
-    spamBtn.style.backgroundColor = 'var(--warning)';
+    spamBtn.className = 'btn btn-chat-action btn-spam';
     spamBtn.textContent = '스팸 추가';
     spamBtn.addEventListener('click', () => execSpamOnly(c.displayName, c.channelId));
 
     const searchBanBtn = document.createElement('button');
-    searchBanBtn.className = 'btn btn-ban';
-    searchBanBtn.style.backgroundColor = '#8b5cf6';
+    searchBanBtn.className = 'btn btn-chat-action btn-searchban';
     searchBanBtn.textContent = '검색 차단';
     searchBanBtn.addEventListener('click', () => execBanSearch(c.displayName, c.channelId));
 
@@ -1521,10 +1563,7 @@ window.reloadMetadataFromServer = function () {
 };
 
 window.reloadCommands = function () {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: 'reloadCommands' }));
-        showToast('명령어 모듈 핫리로드 요청 중...');
-    }
+    reloadModules();
 };
 
 window.rebootBot = function () {
@@ -1538,9 +1577,15 @@ window.rebootBot = function () {
 //  Unified JS / JSON Config & Data Editor
 // ══════════════════════════════════════════════
 let currentEditorFile = 'youtube';
+try {
+    const savedEditorFile = localStorage.getItem('bot_admin_last_editor_file');
+    if (savedEditorFile) currentEditorFile = savedEditorFile;
+} catch {}
 
 window.switchEditorFile = function (fileKey) {
     currentEditorFile = fileKey || 'youtube';
+    try { localStorage.setItem('bot_admin_last_editor_file', currentEditorFile); } catch {}
+
     const select = document.getElementById('unified-file-select');
     if (select && select.value !== currentEditorFile) {
         select.value = currentEditorFile;
@@ -1551,6 +1596,9 @@ window.switchEditorFile = function (fileKey) {
     if (formatBtn) {
         formatBtn.style.display = isJson ? 'inline-block' : 'none';
     }
+
+    const editor = document.getElementById('unified-code-editor');
+    if (editor) editor.value = '불러오는 중...';
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         return showToast('WebSocket 연결이 끊겨있습니다.', true);
@@ -1656,6 +1704,13 @@ window.formatCurrentEditorJson = function () {
         showToast('✨ JSON 포맷 정렬 완료');
     } catch (e) {
         showToast('JSON 파싱 에러: ' + e.message, true);
+    }
+};
+
+window.reloadVideoSub = function () {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        showToast('📜 video-sub.json 대사 파일 리로드 요청 중...');
+        ws.send(JSON.stringify({ action: 'reloadVideoSub' }));
     }
 };
 
@@ -2132,242 +2187,154 @@ if (vmPreviewArea && vmConfigArea) {
 }
 
 // ══════════════════════════════════════════════
-//  User Statistics Viewer Logic
+//  Independent Module Management - Dynamic Injection Engine
 // ══════════════════════════════════════════════
-let statsSearchDebounceTimer = null;
-let currentSelectedChannelId = null;
+let webModulesList = [];
+let currentActiveModuleId = null;
 
-function loadStatsOverview() {
+function loadWebModules() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: 'getUserStatsOverview' }));
+        ws.send(JSON.stringify({ action: 'getWebModules' }));
     }
 }
 
-let statsCurrentPage = 1;
-let statsPageLimit = 100;
-let statsTotalCount = 0;
-
-function changeStatsPage(delta) {
-    const maxPage = Math.max(1, Math.ceil(statsTotalCount / statsPageLimit));
-    const targetPage = Math.max(1, Math.min(maxPage, statsCurrentPage + delta));
-    if (targetPage !== statsCurrentPage) {
-        searchUserStats(targetPage);
-    }
-}
-
-function onChangeStatsPageLimit() {
-    const sel = document.getElementById('stats-page-limit');
-    if (sel) {
-        statsPageLimit = parseInt(sel.value, 10) || 100;
-        searchUserStats(1);
-    }
-}
-
-function onStatsSearchInput() {
-    clearTimeout(statsSearchDebounceTimer);
-    statsSearchDebounceTimer = setTimeout(() => {
-        searchUserStats(1);
-    }, 250);
-}
-
-function searchUserStats(page = 1) {
-    statsCurrentPage = page;
-    const input = document.getElementById('stats-search-input');
-    const sortSelect = document.getElementById('stats-sort-by');
-    const query = input ? input.value.trim() : '';
-    const sortBy = sortSelect ? sortSelect.value : 'total_messages';
-
-    const statusEl = document.getElementById('stats-search-status');
-    if (statusEl) statusEl.textContent = '검색 중...';
-
-    const offset = (statsCurrentPage - 1) * statsPageLimit;
-
+function reloadModules() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            action: 'searchUserStats',
-            payload: { query, sortBy, sortOrder: 'DESC', limit: statsPageLimit, offset }
-        }));
+        showToast('🔄 모든 모듈 및 명령어를 핫리로드하는 중...');
+        ws.send(JSON.stringify({ action: 'reloadModules' }));
     }
 }
+const reloadCommands = reloadModules;
+window.reloadModules = reloadModules;
+window.reloadCommands = reloadModules;
 
-function renderStatsOverview(data) {
-    if (!data) return;
-    const setTxt = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = val;
-    };
+/**
+ * 서버에서 받은 모듈 목록으로 콤보박스 갱신 및 초기/저장된 모듈 주입
+ */
+function renderWebModulesList(modules) {
+    if (!Array.isArray(modules) || modules.length === 0) return;
+    webModulesList = modules;
+    const sel = document.getElementById('unified-module-select');
+    if (!sel) return;
 
-    setTxt('stats-ov-users', `${(data.totalUsers || 0).toLocaleString()}명`);
-    setTxt('stats-ov-msgs', `${(data.totalMessages || 0).toLocaleString()}개`);
-    setTxt('stats-ov-watch', data.totalWatchStr || '0분');
-    setTxt('stats-ov-today-users', `${(data.todayUsers || 0).toLocaleString()}명`);
-    setTxt('stats-ov-today-msgs', `${(data.todayMessages || 0).toLocaleString()}개`);
-}
-
-function renderStatsSearchResults(data) {
-    const statusEl = document.getElementById('stats-search-status');
-    const countEl = document.getElementById('stats-user-count');
-    const tbody = document.getElementById('stats-users-tbody');
-
-    if (!tbody) return;
-    if (statusEl) statusEl.textContent = '';
-    statsTotalCount = data.total || 0;
-    if (countEl) countEl.textContent = statsTotalCount.toLocaleString();
-
-    // Update pagination indicators
-    const maxPage = Math.max(1, Math.ceil(statsTotalCount / statsPageLimit));
-    const pageInfoEl = document.getElementById('stats-page-info');
-    if (pageInfoEl) pageInfoEl.textContent = `${statsCurrentPage} / ${maxPage} (총 ${statsTotalCount.toLocaleString()}명)`;
-    const prevBtn = document.getElementById('btn-stats-prev');
-    const nextBtn = document.getElementById('btn-stats-next');
-    if (prevBtn) prevBtn.disabled = statsCurrentPage <= 1;
-    if (nextBtn) nextBtn.disabled = statsCurrentPage >= maxPage;
-
-    const users = data.users || [];
-    if (users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 40px;">${data.query ? '검색 결과가 없습니다.' : '기록된 유저가 없습니다.'}</td></tr>`;
-        return;
-    }
-
-    const sortBy = data.sortBy || 'total_messages';
-
-    tbody.innerHTML = users.map((u, idx) => {
-        let displayRank = (statsCurrentPage - 1) * statsPageLimit + idx + 1;
-        if (sortBy === 'total_messages') displayRank = u.totalMessagesRank;
-        else if (sortBy === 'total_watch_seconds') displayRank = u.totalWatchRank;
-        else if (sortBy === 'today_messages') displayRank = u.todayMessagesRank;
-        else if (sortBy === 'today_watch_seconds') displayRank = u.todayWatchRank;
-
-        let rankBadgeClass = 'stats-rank-badge';
-        if (displayRank === 1) rankBadgeClass += ' stats-rank-1';
-        else if (displayRank === 2) rankBadgeClass += ' stats-rank-2';
-        else if (displayRank === 3) rankBadgeClass += ' stats-rank-3';
-
-        const rankIcon = displayRank === 1 ? '🥇' : (displayRank === 2 ? '🥈' : (displayRank === 3 ? '🥉' : displayRank));
-        const isSelected = u.channelId === currentSelectedChannelId ? 'selected' : '';
-        const lastDate = u.lastChatDate ? u.lastChatDate : (u.lastChatTime ? tlFmtShort(u.lastChatTime) : '--');
-
-        return `
-            <tr class="stats-user-row ${isSelected}" onclick="showStatsDetail('${escapeHtml(u.channelId)}')">
-                <td style="text-align: center;">
-                    <span class="${rankBadgeClass}">${rankIcon}</span>
-                </td>
-                <td>
-                    <div style="font-weight: 600; color: #fcd34d; font-size: 0.9rem;">${escapeHtml(u.displayName)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">${escapeHtml(u.channelId)}</div>
-                </td>
-                <td style="text-align: right; font-weight: 600; color: #f472b6;">
-                    ${(u.totalMessages || 0).toLocaleString()}개
-                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.totalMessagesRank || 1).toLocaleString()}위</div>
-                </td>
-                <td style="text-align: right; font-weight: 600; color: #34d399;">
-                    ${u.totalWatchStr || '0분'}
-                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.totalWatchRank || 1).toLocaleString()}위</div>
-                </td>
-                <td style="text-align: right; font-weight: 500; color: #a78bfa;">
-                    ${(u.todayMessages || 0).toLocaleString()}개
-                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.todayMessagesRank || 1).toLocaleString()}위</div>
-                </td>
-                <td style="text-align: right; font-weight: 500; color: #fbbf24;">
-                    ${u.todayWatchStr || '0분'}
-                    <div style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">${(u.todayWatchRank || 1).toLocaleString()}위</div>
-                </td>
-                <td style="text-align: center; color: #60a5fa; font-weight: 600;">
-                    ${(u.activeDays || 0).toLocaleString()}일
-                </td>
-                <td style="text-align: center; font-size: 0.75rem; color: var(--text-dim);">
-                    ${lastDate}
-                </td>
-                <td style="text-align: center;">
-                    <button class="btn btn-sm" onclick="event.stopPropagation(); showStatsDetail('${escapeHtml(u.channelId)}')" style="padding: 3px 8px; font-size: 0.72rem; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.3); color: #c084fc;">조회</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function showStatsDetail(channelId) {
-    if (!channelId) return;
-    currentSelectedChannelId = channelId;
-
-    document.querySelectorAll('.stats-user-row').forEach(tr => tr.classList.remove('selected'));
-    const rows = document.querySelectorAll('.stats-user-row');
-    rows.forEach(tr => {
-        if (tr.innerHTML.includes(channelId)) tr.classList.add('selected');
-    });
-
-    const card = document.getElementById('stats-detail-card');
-    const layout = document.querySelector('.stats-layout-wrap');
-    if (card) card.style.display = 'block';
-    if (layout) layout.classList.add('has-detail');
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            action: 'getUserStatsDetail',
-            payload: { channelId }
-        }));
-    }
-}
-
-function closeStatsDetail() {
-    currentSelectedChannelId = null;
-    document.querySelectorAll('.stats-user-row').forEach(tr => tr.classList.remove('selected'));
-    const card = document.getElementById('stats-detail-card');
-    const layout = document.querySelector('.stats-layout-wrap');
-    if (card) card.style.display = 'none';
-    if (layout) layout.classList.remove('has-detail');
-}
-
-function renderStatsUserDetail(data) {
-    if (!data) return;
-
-    const setTxt = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = val;
-    };
-
-    setTxt('stats-detail-name', data.displayName || '시청자');
-    setTxt('stats-detail-channel', data.channelId || '--');
-
-    setTxt('stats-detail-total-msgs', `${(data.totalMessages || 0).toLocaleString()}개`);
-    setTxt('stats-detail-total-msgs-rank', `전체 ${(data.totalMessagesRank || 1).toLocaleString()}위`);
-
-    setTxt('stats-detail-total-watch', data.totalWatchStr || '0분');
-    setTxt('stats-detail-total-watch-rank', `전체 ${(data.totalWatchRank || 1).toLocaleString()}위`);
-
-    setTxt('stats-detail-today-msgs', `${(data.todayMessages || 0).toLocaleString()}개`);
-    setTxt('stats-detail-today-msgs-rank', `오늘 ${(data.todayMessagesRank || 1).toLocaleString()}위`);
-
-    setTxt('stats-detail-today-watch', data.todayWatchStr || '0분');
-    setTxt('stats-detail-today-watch-rank', `오늘 ${(data.todayWatchRank || 1).toLocaleString()}위`);
-
-    setTxt('stats-detail-active-days', `${(data.daysCount || 0).toLocaleString()}일`);
-
-    if (data.lastChatTime) {
-        const d = new Date(data.lastChatTime);
-        setTxt('stats-detail-last-active', `${d.toLocaleTimeString('ko-KR')}`);
-        setTxt('stats-detail-last-date', data.lastChatDate || `${d.toLocaleDateString('ko-KR')}`);
-    } else {
-        setTxt('stats-detail-last-active', '--');
-        setTxt('stats-detail-last-date', '--');
-    }
-
-    const historyTbody = document.getElementById('stats-detail-daily-tbody');
-    if (historyTbody) {
-        const list = data.dailyHistory || [];
-        if (list.length === 0) {
-            historyTbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-dim); padding: 15px;">활동 이력이 없습니다.</td></tr>`;
-        } else {
-            historyTbody.innerHTML = list.map(item => `
-                <tr>
-                    <td style="font-weight: 500; color: var(--text-main); font-family: monospace;">${item.date}</td>
-                    <td style="text-align: right; color: #a78bfa; font-weight: 600;">${(item.messageCount || 0).toLocaleString()}개</td>
-                    <td style="text-align: right; color: #34d399; font-weight: 600;">${item.watchStr || '0분'}</td>
-                </tr>
-            `).join('');
+    let targetModId = currentActiveModuleId;
+    try {
+        const savedMod = localStorage.getItem('bot_admin_last_module');
+        if (savedMod && modules.some(m => m.id === savedMod)) {
+            targetModId = savedMod;
         }
+    } catch {}
+
+    if (!targetModId || !modules.some(m => m.id === targetModId)) {
+        targetModId = (modules[0] && modules[0].id) || 'stats';
+    }
+
+    sel.innerHTML = modules.map(m =>
+        `<option value="${m.id}" ${m.id === targetModId ? 'selected' : ''}>${m.icon || '📦'} ${m.name} (${m.title || m.name})</option>`
+    ).join('');
+
+    switchModule(targetModId, true);
+}
+
+/**
+ * 콤보박스에서 모듈 선택 시 호출 - 해당 모듈의 styles/panel/scripts를 DOM에 주입
+ */
+function switchModule(moduleId, triggerFetch = true) {
+    if (!moduleId) return;
+    currentActiveModuleId = moduleId;
+    try { localStorage.setItem('bot_admin_last_module', moduleId); } catch {}
+
+    const sel = document.getElementById('unified-module-select');
+    if (sel && sel.value !== moduleId) sel.value = moduleId;
+
+    const mod = webModulesList.find(m => m.id === moduleId);
+
+    // 배지 / 설명 업데이트
+    const badgeEl = document.getElementById('module-status-badge');
+    const descEl = document.getElementById('active-module-desc-inline');
+    if (badgeEl) {
+        badgeEl.textContent = mod ? (mod.badge || 'Module') : 'Module';
+        badgeEl.className = 'badge ' + (
+            mod && mod.badge === 'DB' ? 'badge-purple' :
+            mod && mod.badge === 'Service' ? 'badge-green' : 'badge-blue'
+        );
+    }
+    if (descEl) descEl.textContent = mod ? (mod.description || '') : '';
+
+    // 1. 스타일 주입
+    const styleSlot = document.getElementById('module-injected-styles');
+    if (styleSlot) styleSlot.textContent = (mod && mod.styles) ? mod.styles : '';
+
+    // 2. 패널 HTML 주입
+    const mountEl = document.getElementById('module-panel-mount');
+    if (mountEl) {
+        if (mod && mod.panel) {
+            mountEl.innerHTML = mod.panel;
+        } else if (mod) {
+            // panel이 없는 모듈은 기본 정보 카드 표시
+            mountEl.innerHTML = `
+                <div class="section-card glass" style="padding: 30px; text-align: center;">
+                    <div style="font-size: 2.5rem; margin-bottom: 12px;">${mod.icon || '📦'}</div>
+                    <h3 style="margin-bottom: 8px;">${mod.title || mod.name}</h3>
+                    <p style="color: var(--text-dim); max-width: 600px; margin: 0 auto 16px auto;">${mod.description || ''}</p>
+                    ${mod.aliases && mod.aliases.length > 0 ? `<div style="font-size:0.85rem; color:var(--text-dim);"><strong>등록 명령어:</strong> ${mod.aliases.join(', ')}</div>` : ''}
+                    ${mod.category ? `<div style="font-size:0.8rem; color:var(--text-dim); margin-top:4px;"><strong>카테고리:</strong> ${mod.category}</div>` : ''}
+                </div>`;
+        } else {
+            mountEl.innerHTML = '';
+        }
+    }
+
+    // 3. 스크립트 실행 (Function 생성자로 안전하게 실행)
+    if (mod && mod.scripts) {
+        try {
+            // eslint-disable-next-line no-new-func
+            new Function(mod.scripts)();
+        } catch (e) {
+            console.error('[ModuleEngine] 모듈 스크립트 실행 오류 (' + moduleId + '):', e);
+        }
+    }
+
+    if (triggerFetch) {
+        setTimeout(() => {
+            refreshCurrentModule();
+        }, 50);
+    }
+}
+
+/**
+ * 현재 활성 모듈의 window 객체 참조 반환
+ */
+function getActiveModuleObject() {
+    if (!currentActiveModuleId) return null;
+    const key = currentActiveModuleId + 'Module';
+    return window[key] || null;
+}
+
+/**
+ * 현재 모듈 새로고침 - 모듈 자체의 refresh() 호출
+ */
+function refreshCurrentModule() {
+    const modObj = getActiveModuleObject();
+    if (modObj) {
+        if (typeof modObj.setWs === 'function') modObj.setWs(ws);
+        if (typeof modObj.refresh === 'function') {
+            modObj.refresh();
+        }
+    } else {
+        setTimeout(() => {
+            const retryObj = getActiveModuleObject();
+            if (retryObj) {
+                if (typeof retryObj.setWs === 'function') retryObj.setWs(ws);
+                if (typeof retryObj.refresh === 'function') retryObj.refresh();
+            }
+        }, 100);
     }
 }
 
 // Bootstrap
 connectWS();
+
+
+
+

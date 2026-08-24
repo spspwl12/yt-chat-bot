@@ -1,7 +1,7 @@
-const cfg = require('../../../data/config-youtube.js');
-const msg = require('../../../data/config-messages.js');
-const { videoInfo, getEpAtDate } = require('../../video-matcher/search.js');
-const { parseKoreanDate, toUnicodeNumber, toHHMMSS, insertSpaces } = require('../../func.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo, getEpAtDate } = require('../video-matcher/search.js');
+const { parseKoreanDate, toUnicodeNumber, toHHMMSS, insertSpaces } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 

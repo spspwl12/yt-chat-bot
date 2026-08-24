@@ -1,7 +1,7 @@
-const cfg = require('../../../data/config-youtube.js');
-const msg = require('../../../data/config-messages.js');
-const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
-const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces } = require('../../func.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
+const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -84,7 +84,7 @@ function printNowEpisode(rtn, cmd, ctx) {
 }
 
 module.exports = {
-    name: 'future-episode',
+    name: 'future',
     groups: {
         'next': ['!다음', '!다음화', '!다음회', '!다음편', '!다음회차'],
         'nextnext': ['!다다음', '!다다음화', '!다다음회', '!다다음편', '!다다음회차'],

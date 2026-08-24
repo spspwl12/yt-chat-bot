@@ -3,8 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
-const vm = require('vm');
 
+// Helmet 보안 미들웨어 (node_modules에 없으면 안전하게 통과하는 폴백)
+let helmetSecurity = null;
+try {
+    const helmet = require('helmet');
+    helmetSecurity = helmet();
+} catch (e) {
+    helmetSecurity = null;
+}
 
 const chatHistory = require('./chat-history.js');
 const { banUser, blockUser } = require('./innertube.js');
@@ -14,7 +21,6 @@ const configManager = require('./config-manager.js');
 const { cfgYoutube } = configManager;
 const eventBus = require('./event-bus.js');
 const commandsLib = require('./commands.js');
-const statsTracker = require('./stats-db.js');
 
 let spamGuardRef = null;
 let getEpisodeInfoRef = null;
@@ -573,13 +579,21 @@ async function handleAction(client, req) {
         eventBus.emit('simulate_chat', payload);
         sendWSFrame(client, JSON.stringify({ action: 'simulate_chat_result', payload: { success: true } }));
     }
-    // ── 명령어 모듈 핫리로드 ──
-    else if (action === 'reloadCommands') {
+    // ── 명령어 / 독립 모듈 핫리로드 통합 ──
+    else if (action === 'reloadCommands' || action === 'reloadModules') {
         try {
-            const success = commandsLib.reloadCommands();
-            sendWSFrame(client, JSON.stringify({ action: 'reloadCommands_result', payload: { success, message: success ? '명령어 모듈 리로드 완료' : '리로드 실패 (로그 확인)' } }));
+            const success = commandsLib.reloadModules ? commandsLib.reloadModules() : commandsLib.reloadCommands();
+            const modules = commandsLib.getWebModules ? commandsLib.getWebModules() : [];
+            const resultMsg = {
+                action: action === 'reloadCommands' ? 'reloadCommands_result' : 'reloadModules_result',
+                payload: { success, message: success ? '모든 모듈 리로드 완료' : '리로드 실패 (로그 확인)', modules }
+            };
+            sendWSFrame(client, JSON.stringify(resultMsg));
+            if (action === 'reloadCommands') {
+                sendWSFrame(client, JSON.stringify({ action: 'reloadModules_result', payload: { success, message: success ? '모든 모듈 리로드 완료' : '리로드 실패 (로그 확인)', modules } }));
+            }
         } catch (e) {
-            sendWSFrame(client, JSON.stringify({ action: 'reloadCommands_result', payload: { success: false, error: e.message } }));
+            sendWSFrame(client, JSON.stringify({ action: action === 'reloadCommands' ? 'reloadCommands_result' : 'reloadModules_result', payload: { success: false, error: e.message } }));
         }
     }
     // ── 새 기능: 검색 로그 ──
@@ -672,22 +686,33 @@ async function handleAction(client, req) {
             }
         }));
     }
-    // ── 새 기능: 유저 통계 개요 조회 ──
-    else if (action === 'getUserStatsOverview') {
-        const overview = statsTracker ? statsTracker.getGlobalOverview() : null;
-        sendWSFrame(client, JSON.stringify({ action: 'userStatsOverview_data', payload: overview }));
+    // ── 독립 모듈 목록 조회 ──
+    else if (action === 'getWebModules') {
+        const modules = commandsLib.getWebModules ? commandsLib.getWebModules() : [];
+        sendWSFrame(client, JSON.stringify({ action: 'webModules_data', payload: modules }));
     }
-    // ── 새 기능: 유저 통계 검색 및 랭킹 정렬 ──
-    else if (action === 'searchUserStats') {
-        const { query, sortBy, sortOrder, limit, offset } = payload || {};
-        const result = statsTracker ? statsTracker.searchUsers({ query, sortBy, sortOrder, limit: limit || 50, offset: offset || 0 }) : { users: [], total: 0 };
-        sendWSFrame(client, JSON.stringify({ action: 'userStatsSearch_data', payload: result }));
-    }
-    // ── 새 기능: 유저 통계 상세 및 일자별 히스토리 ──
-    else if (action === 'getUserStatsDetail') {
-        const { channelId } = payload || {};
-        const detail = statsTracker ? statsTracker.getUserDetail(channelId) : null;
-        sendWSFrame(client, JSON.stringify({ action: 'userStatsDetail_data', payload: detail }));
+
+    // ── 독립 모듈 웹 액션 동적 디스패치 및 폴백 ──
+    else {
+        if (commandsLib.handleWebAction) {
+            const webResult = await commandsLib.handleWebAction(action, payload);
+            if (webResult && webResult.handled) {
+                // 기존 프론트 호환 action명 매핑 (getUserStatsOverview → userStatsOverview_data 등)
+                const actionNameMap = {
+                    getUserStatsOverview: 'userStatsOverview_data',
+                    searchUserStats: 'userStatsSearch_data',
+                    getUserStatsDetail: 'userStatsDetail_data',
+                };
+                const responseAction = actionNameMap[action] || `${action}_data`;
+                sendWSFrame(client, JSON.stringify({
+                    action: responseAction,
+                    payload: webResult.result,
+                    error: webResult.error || null,
+                    moduleName: webResult.moduleName
+                }));
+                return;
+            }
+        }
     }
     } catch (e) {
         console.warn('⚠️ [ws] handleAction 처리 중 오류 (action=' + (req && req.action) + '):', e && e.message ? e.message : String(e));
@@ -699,39 +724,64 @@ function startServer(port, spamGuard, getEpisodeInfo) {
     getEpisodeInfoRef = getEpisodeInfo;
 
     const server = http.createServer((req, res) => {
-        // 대시보드 정적 호스팅
-        if (req.method === 'GET') {
-            const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-            let pathname = parsedUrl.pathname;
-            if (pathname === '/') pathname = '/index.html';
+        // 1. Helmet 보안 헤더 적용 (helmet 미설치 시 안전하게 패스스루)
+        const runSecurity = helmetSecurity || ((_req, _res, next) => next());
+        runSecurity(req, res, () => {
+            // 2. 대시보드 정적 호스팅 (Brotli / Gzip / Deflate 자동 압축)
+            if (req.method === 'GET') {
+                const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+                let pathname = parsedUrl.pathname;
+                if (pathname === '/') pathname = '/index.html';
 
-            let filePath = path.join(__dirname, 'public', pathname);
-            const ext = path.extname(filePath).toLowerCase();
-            const mimeTypes = {
-                '.html': 'text/html; charset=utf-8',
-                '.js': 'application/javascript; charset=utf-8',
-                '.css': 'text/css; charset=utf-8'
-            };
+                let filePath = path.join(__dirname, 'public', pathname);
+                const ext = path.extname(filePath).toLowerCase();
+                const mimeTypes = {
+                    '.html': 'text/html; charset=utf-8',
+                    '.js': 'application/javascript; charset=utf-8',
+                    '.css': 'text/css; charset=utf-8'
+                };
 
-            if (mimeTypes[ext]) {
-                fs.readFile(filePath, 'utf8', (err, data) => {
-                    if (err) {
-                        res.writeHead(404, { 'Content-Type': 'text/plain' });
-                        res.end('Not Found');
-                    } else {
-                        res.writeHead(200, {
-                            'Content-Type': mimeTypes[ext],
-                            'Cache-Control': 'no-cache, no-store, must-revalidate'
-                        });
-                        res.end(data);
-                    }
-                });
-                return;
+                if (mimeTypes[ext]) {
+                    fs.readFile(filePath, 'utf8', (err, data) => {
+                        if (err) {
+                            res.writeHead(404, { 'Content-Type': 'text/plain' });
+                            res.end('Not Found');
+                        } else {
+                            const acceptEncoding = (req.headers['accept-encoding'] || '').toLowerCase();
+                            let compressedData = Buffer.from(data, 'utf8');
+                            let encodingHeader = null;
+
+                            if (acceptEncoding.includes('br') && typeof zlib.brotliCompressSync === 'function') {
+                                compressedData = zlib.brotliCompressSync(compressedData);
+                                encodingHeader = 'br';
+                            } else if (acceptEncoding.includes('gzip')) {
+                                compressedData = zlib.gzipSync(compressedData);
+                                encodingHeader = 'gzip';
+                            } else if (acceptEncoding.includes('deflate')) {
+                                compressedData = zlib.deflateSync(compressedData);
+                                encodingHeader = 'deflate';
+                            }
+
+                            const headers = {
+                                'Content-Type': mimeTypes[ext],
+                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                'Vary': 'Accept-Encoding'
+                            };
+                            if (encodingHeader) {
+                                headers['Content-Encoding'] = encodingHeader;
+                            }
+
+                            res.writeHead(200, headers);
+                            res.end(compressedData);
+                        }
+                    });
+                    return;
+                }
             }
-        }
 
-        res.writeHead(404);
-        res.end('Not Found');
+            res.writeHead(404);
+            res.end('Not Found');
+        });
     });
 
     // WebSocket 핸드쉐이크 직접 처리 (의존성 최소화)

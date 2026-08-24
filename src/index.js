@@ -11,14 +11,13 @@ console.log = function (...args) {
 };
 
 const { initSession, fetchChat, sendChat, getSendParams, hasPendingVerify } = require('./innertube.js');
-const { initCommand, handleCommand } = require('./commands.js');
+const { initCommand, handleCommand, shutdown } = require('./commands.js');
 const { SpamGuard } = require('./spam-guard.js');
 const configManager = require('./config-manager.js');
 const { cfg } = configManager;
 const { startServer, broadcastChat, broadcastSpam } = require('./web-server.js');
 const chatHistory = require('./chat-history.js');
-const { startSchedulePoster } = require('./schedule_poster.js');
-const statsTracker = require('./stats-db.js');
+const eventBus = require('./event-bus.js');
 
 // ═══════════════════════════════════════
 //  전역 예외 핸들러 (프로세스 다운 방지)
@@ -65,17 +64,12 @@ async function main() {
     }
 
     initCommand();
-    if (cfg.schedule_poster && cfg.schedule_poster.enable_poster) {
-        startSchedulePoster();
-    }
     let isFirstFetch = true;
 
     // 대시보드 웹 서버 백그라운드 시작 (getEpisodeInfo 전달)
     const { getEpisodeInfo } = require('./commands.js');
-    const { startServer, broadcastSpam, isBotMuted } = require('./web-server.js');
     startServer(12345, spamGuard, getEpisodeInfo);
 
-    const eventBus = require('./event-bus.js');
     eventBus.on('simulate_chat', async (text) => {
         console.log(`[디버그 채팅] 입력: ${text}`);
         const msg = {
@@ -86,7 +80,7 @@ async function main() {
             isModerator: false,
             timestamp: Date.now()
         };
-        statsTracker.recordChatMessage(msg);
+        eventBus.emit('chat', msg);
         const checkBan = spamGuard.confirm(msg.channelId);
         const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
         const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);
@@ -155,8 +149,8 @@ async function main() {
                 if (!msg.text || !msg.channelId)
                     continue;
 
-                // 유저 채팅 스탯 실시간 기록
-                statsTracker.recordChatMessage(msg);
+                // 독립 모듈들에 실시간 채팅 이벤트 전달
+                eventBus.emit('chat', msg);
 
                 if (msg.isChatOwner || msg.isModerator)
                     continue;
@@ -230,13 +224,13 @@ function sleep(ms) {
 process.on('SIGINT', function () {
     originalLog('\n⏹️  종료...');
     running = false;
-    statsTracker.close();
+    try { shutdown(); } catch {}
     process.exit();
 });
 
 process.on('SIGTERM', function () {
     running = false;
-    statsTracker.close();
+    try { shutdown(); } catch {}
 });
 
 main().catch(function (err) {

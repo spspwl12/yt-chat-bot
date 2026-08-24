@@ -158,7 +158,10 @@ function reloadVideoSub() {
 
 function reloadCommands() {
     try {
-        const { reloadCommands: reloadCmds } = require('./commands/index.js');
+        const { reloadModules, reloadCommands: reloadCmds } = require('./module-manager.js');
+        if (reloadModules) {
+            return reloadModules();
+        }
         if (reloadCmds) {
             return reloadCmds();
         }

@@ -1,11 +1,11 @@
-const cfg = require('../../../data/config-youtube.js');
-const msg = require('../../../data/config-messages.js');
-const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
-const videoSubManager = require('../../sub-manager.js');
-const { searchEpisodeByAI } = require('../../ai.js');
-const { sendChat } = require('../../innertube.js');
-const { filterText, hasProfanity, toUnicodeNumber, toUnicodeNumber2, formatDate, roundUpTime, insertSpaces } = require('../../func.js');
-const { printNowEpisode, printNumEpisode } = require('./future-episode.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
+const videoSubManager = require('../sub-manager.js');
+const { searchEpisodeByAI } = require('../ai.js');
+const { sendChat } = require('../innertube.js');
+const { filterText, hasProfanity, toUnicodeNumber, toUnicodeNumber2, formatDate, roundUpTime, insertSpaces } = require('../func.js');
+const { printNowEpisode, printNumEpisode } = require('./future.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 

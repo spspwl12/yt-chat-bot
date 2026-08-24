@@ -1,15 +1,20 @@
 /**
- * yt-chat-bot 명령어 및 실시간 방송 트래커 브릿지 모듈
- * 모듈화된 명령어 시스템(commands/index.js)과 방송 매처 엔진(tracker.js)을 연결하여
+ * yt-chat-bot 통합 모듈 및 실시간 방송 트래커 브릿지
+ * 통합 모듈 시스템(module-manager.js -> modules/*)과 방송 매처 엔진(tracker.js)을 연결하여
  * 기존 참조와의 100% 하위 호환성을 보장합니다.
  */
 
 const {
     commandManager,
+    moduleManager,
     handleCommand,
     reloadCommands,
-    getCooldownState
-} = require('./commands/index.js');
+    reloadModules,
+    shutdown,
+    getCooldownState,
+    getWebModules,
+    handleWebAction
+} = require('./module-manager.js');
 
 const {
     initCommand,
@@ -30,7 +35,12 @@ module.exports = {
     isYtdlpRunning,
     setYtdlpRunning,
     reloadCommands,
+    reloadModules,
+    shutdown,
     commandManager,
+    moduleManager,
+    getWebModules,
+    handleWebAction,
     onMatchResult,
     copyQuery,
     reloadMessages: configManager.reloadMessages

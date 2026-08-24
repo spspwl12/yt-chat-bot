@@ -1,6 +1,6 @@
-const cfg = require('../../data/config-youtube.js');
-const msg = require('../../data/config-messages.js');
-const eventBus = require('../event-bus.js');
+const cfg = require('../data/config-youtube.js');
+const msg = require('../data/config-messages.js');
+const eventBus = require('./event-bus.js');
 
 // ─── 쿨타임 상태 관리 ─────────────────────────────────────────
 let delayChatTime = 0;                 // global 모드용

@@ -190,46 +190,39 @@ const data = {
     // 계절/날씨 인사
     seasonalGreetings: ["", "맑은 날", "화창한 날", "상쾌한 날", "청명한 날", "눈부신 날", "아름다운 날"]
 };
+
 // 랜덤 선택 함수
 function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
+
 // 문장 생성 함수
 function generateGreeting(nick) {
     const patterns = [
-        // 패턴 1: 기본형
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
-        // 패턴 2: 수식어 + 기본형
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.modifiers)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
-        // 패턴 3: 감정 + 인사
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.emotions)} ${pick(data.greetingStarters)}${pick(data.endings)}`,
-        // 패턴 4: 인사 + 추가멘트
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)} ${pick(data.additions)}${pick(data.endings)}`,
-        // 패턴 5: 감탄사 + 인사
-        () =>
-            `${pick(data.exclamations)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
-        // 패턴 6: 풀 콤보
-        () =>
-            `${pick(data.exclamations)} ${nick} ${pick(data.honorifics)} ${pick(data.modifiers)} ${pick(data.timeGreetings)} ${pick(data.additions)}${pick(data.emojis)}${pick(data.endings)}`,
-        // 패턴 7: 계절 인사
-        () =>
-            `${pick(data.seasonalGreetings)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
-        // 패턴 8: 환영 + 인사
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.greetingStarters)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
-        // 패턴 9: 이모지 포함
-        () =>
-            `${pick(data.emojis)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)} ${pick(data.emojis)}`,
-        // 패턴 10: 감정 + 수식어 + 인사
-        () =>
-            `${nick} ${pick(data.honorifics)} ${pick(data.emotions)} ${pick(data.modifiers)} ${pick(data.greetingStarters)}${pick(data.endings)}`
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.modifiers)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.emotions)} ${pick(data.greetingStarters)}${pick(data.endings)}`,
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)} ${pick(data.additions)}${pick(data.endings)}`,
+        () => `${pick(data.exclamations)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
+        () => `${pick(data.exclamations)} ${nick} ${pick(data.honorifics)} ${pick(data.modifiers)} ${pick(data.timeGreetings)} ${pick(data.additions)}${pick(data.emojis)}${pick(data.endings)}`,
+        () => `${pick(data.seasonalGreetings)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.greetingStarters)} ${pick(data.timeGreetings)}${pick(data.endings)}`,
+        () => `${pick(data.emojis)} ${nick} ${pick(data.honorifics)} ${pick(data.timeGreetings)} ${pick(data.emojis)}`,
+        () => `${nick} ${pick(data.honorifics)} ${pick(data.emotions)} ${pick(data.modifiers)} ${pick(data.greetingStarters)}${pick(data.endings)}`
     ];
     const sentence = pick(patterns)();
-    // 중복 공백 제거 및 정리
     return sentence.replace(/\s+/g, ' ').trim();
 }
-module.exports = generateGreeting;
+
+module.exports = {
+    name: 'greeting',
+    group: 'greeting',
+    aliases: ['!인사'],
+    description: '랜덤하고 다채로운 맞춤형 인사 멘트 생성',
+    generateGreeting,
+
+    async execute({ args, displayName }) {
+        const targetUser = (args && args.length > 0) ? args[0] : displayName;
+        return generateGreeting(targetUser);
+    }
+};

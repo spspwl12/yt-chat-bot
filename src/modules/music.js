@@ -1,13 +1,13 @@
 const path = require('path');
-const cfg = require('../../../data/config-youtube.js');
-const msg = require('../../../data/config-messages.js');
-const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
-const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji } = require('../../func.js');
-const TextSearchEngine = require('../../textsearcher.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
+const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji } = require('../func.js');
+const TextSearchEngine = require('../textsearcher.js');
 
 let musics = {};
 try {
-    musics = require(path.join(__dirname, '../../../data/video-music.json'));
+    musics = require(path.join(__dirname, '../../data/video-music.json'));
 } catch (e) {
     console.warn('⚠️ [music module] video-music.json 로드 실패:', e.message);
 }

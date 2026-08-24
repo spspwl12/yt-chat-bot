@@ -1,7 +1,7 @@
-const cfg = require('../../../data/config-youtube.js');
-const msg = require('../../../data/config-messages.js');
-const { videoInfo, getFutureDate } = require('../../video-matcher/search.js');
-const { toUnicodeNumber, formatDate, roundUpTime, insertSpaces } = require('../../func.js');
+const cfg = require('../../data/config-youtube.js');
+const msg = require('../../data/config-messages.js');
+const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
+const { toUnicodeNumber, formatDate, roundUpTime, insertSpaces } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -68,6 +68,5 @@ module.exports = {
         };
     },
 
-    // 헬퍼 노출 (다른 모듈 또는 외부 참조용)
     printTimeTable
 };

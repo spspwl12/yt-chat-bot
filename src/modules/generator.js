@@ -1,17 +1,16 @@
 /**
- * 편성표 이미지 생성 모듈
+ * 편성표 이미지 및 텍스트 생성 모듈
  *
- * 1~293화 편성표를 canvas로 이미지화.
- * 현재 사이클(1~293화)과 다음 사이클(1~293화) 2장의 이미지를 생성.
- * 293화가 지나면 다음 표로 갱신.
+ * 1~293화 편성표를 canvas로 이미지화 및 텍스트 생성.
+ * 현재 사이클(1~293화)과 다음 사이클(1~293화)의 시간표 계산.
  */
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
-const search_lib = require('./video-matcher/search.js');
-const { getEpisodeInfo } = require('./commands.js');
-const { formatDate, roundUpTime } = require('./func.js');
-const configManager = require('./config-manager.js');
+const search_lib = require('../video-matcher/search.js');
+const { getEpisodeInfo } = require('../tracker.js');
+const { formatDate, roundUpTime } = require('../func.js');
+const configManager = require('../config-manager.js');
 const { cfg } = configManager;
 
 const videoInfo = search_lib.videoInfo;
@@ -19,7 +18,7 @@ function getEpisodeStart() { return (cfg.episode && cfg.episode.start !== undefi
 function getEpisodeEnd() { return (cfg.episode && cfg.episode.end !== undefined) ? cfg.episode.end : 293; }
 
 // 이미지 저장 디렉토리
-const OUTPUT_DIR = path.join(__dirname, 'data', 'schedule-images');
+const OUTPUT_DIR = path.join(__dirname, '../../data', 'schedule-images');
 
 /**
  * 활성 에피소드만 필터링 (disable 제외, alias 범위 내)
@@ -54,10 +53,6 @@ function getTotalCycleDurationMs() {
 
 /**
  * 현재 사이클 편성표 데이터 생성
- *
- * 모든 1~293화에 대해 "이번 사이클"의 방영 시각을 계산.
- * - 현재 화보다 뒤(alias > current): getFutureDate 그대로 (이번 사이클 미래)
- * - 현재 화와 같거나 앞(alias <= current): getFutureDate - 총사이클시간 (이번 사이클 과거)
  */
 function buildCurrentCycleData(rtn) {
     if (!rtn) return [];
@@ -72,16 +67,12 @@ function buildCurrentCycleData(rtn) {
         const alias = parseInt(ep.alias);
         if (isNaN(alias)) continue;
 
-        // getFutureDate는 항상 "다음에 해당 에피소드가 나올 미래 시각"을 반환
         const futureDate = roundUpTime(search_lib.getFutureDate(ep, rtn, 0));
 
         let cycleDate;
         if (alias >= currentAlias) {
-            // 아직 안 나온 에피소드거나 현재 방영 중인 에피소드 → 이번 사이클 미래 시각 그대로
             cycleDate = futureDate;
         } else {
-            // 이미 지나간 에피소드 → getFutureDate는 다음 사이클 시각을 반환하므로
-            // 총 사이클 시간을 빼서 이번 사이클의 (과거) 시각으로 복원
             cycleDate = new Date(futureDate.getTime() - totalCycleMs);
         }
 
@@ -93,17 +84,12 @@ function buildCurrentCycleData(rtn) {
         });
     }
 
-    // alias 순 정렬
     entries.sort((a, b) => parseInt(a.alias) - parseInt(b.alias));
     return entries;
 }
 
 /**
  * 다음 사이클 편성표 데이터 생성
- *
- * 현재 사이클이 끝난 후 반복되는 1~293화의 방영 시각.
- * - 현재 화보다 뒤(alias > current): getFutureDate + 총사이클시간 (다음 사이클)
- * - 현재 화와 같거나 앞(alias <= current): getFutureDate 그대로 (다음 사이클)
  */
 function buildNextCycleData(rtn) {
     if (!rtn) return [];
@@ -122,10 +108,8 @@ function buildNextCycleData(rtn) {
 
         let cycleDate;
         if (alias >= currentAlias) {
-            // 현재 방영 중이거나 아직 안 나온 에피소드 → 이번 사이클 시각 + 총사이클 = 다음 사이클
             cycleDate = new Date(futureDate.getTime() + totalCycleMs);
         } else {
-            // 이미 지나간 에피소드 → getFutureDate가 이미 다음 사이클 시각
             cycleDate = futureDate;
         }
 
@@ -225,7 +209,6 @@ function generateScheduleText(cycleOffset = 0) {
         if (alias === endAlias || i === data.length - 1) {
             const chunkEndDate = new Date(ep.date.getTime() + ep.durationSec * 1000);
 
-            // 묶음 전체 시작/끝 시간은 현재 날짜와 무관하게 무조건 '월 일 시:분' 포맷으로 고정
             const sM = chunkStartDate.getMonth() + 1;
             const sD = chunkStartDate.getDate();
             const sH = String(chunkStartDate.getHours()).padStart(2, '0');
@@ -242,7 +225,7 @@ function generateScheduleText(cycleOffset = 0) {
             text += currentChunk.join('→') + '\n\n';
             currentChunk = [];
             startAlias = alias + 1;
-            endAlias = startAlias + 19; // 다음 20화
+            endAlias = startAlias + 19;
         }
     }
 
@@ -278,12 +261,6 @@ const LAYOUT = {
     subHeaderFontSize: 16,
 };
 
-/**
- * 편성표 이미지를 canvas로 생성
- * @param {Array} scheduleData - 편성표 데이터 배열
- * @param {string} title - 이미지 제목
- * @returns {Buffer} PNG 이미지 버퍼
- */
 function renderScheduleImage(scheduleData, title) {
     if (!scheduleData || scheduleData.length === 0) return null;
 
@@ -294,11 +271,9 @@ function renderScheduleImage(scheduleData, title) {
     const canvas = createCanvas(LAYOUT.pageWidth, totalHeight);
     const ctx = canvas.getContext('2d');
 
-    // ─── 배경 ───
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, LAYOUT.pageWidth, totalHeight);
 
-    // ─── 헤더 ───
     const gradient = ctx.createLinearGradient(0, 0, LAYOUT.pageWidth, LAYOUT.headerHeight);
     gradient.addColorStop(0, '#0f3460');
     gradient.addColorStop(1, '#16213e');
@@ -320,7 +295,6 @@ function renderScheduleImage(scheduleData, title) {
     ctx.font = `${LAYOUT.subHeaderFontSize}px "Malgun Gothic", "맑은 고딕", sans-serif`;
     ctx.fillText(genTime, LAYOUT.pageWidth / 2, 75);
 
-    // ─── 테이블 헤더 ───
     const tableStartY = LAYOUT.headerHeight + LAYOUT.padding;
     const colStartX = LAYOUT.padding;
 
@@ -341,37 +315,31 @@ function renderScheduleImage(scheduleData, title) {
     ctx.lineTo(LAYOUT.pageWidth, tableStartY + tableHeaderHeight);
     ctx.stroke();
 
-    // ─── 데이터 행 ───
     const dataStartY = tableStartY + tableHeaderHeight;
 
     for (let i = 0; i < scheduleData.length; i++) {
         const entry = scheduleData[i];
         const y = dataStartY + (i * LAYOUT.rowHeight);
 
-        // 행 배경
         ctx.fillStyle = i % 2 === 0 ? COLORS.rowEven : COLORS.rowOdd;
         ctx.fillRect(0, y, LAYOUT.pageWidth, LAYOUT.rowHeight);
 
         const textY = y + LAYOUT.rowHeight - 9;
 
-        // 화 번호
         ctx.fillStyle = '#e2e2e2';
         ctx.font = `bold 14px "Malgun Gothic", "맑은 고딕", sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText(entry.alias, colStartX + LAYOUT.colAlias - 5, textY);
 
-        // 제목
         ctx.fillStyle = COLORS.rowText;
         ctx.textAlign = 'left';
         const titleText = entry.title.length > 50 ? entry.title.substring(0, 50) + '...' : entry.title;
         ctx.fillText(titleText, colStartX + LAYOUT.colAlias + 15, textY);
 
-        // 날짜
         ctx.fillStyle = COLORS.dateText;
         ctx.font = `13px "Malgun Gothic", "맑은 고딕", sans-serif`;
         ctx.fillText(formatScheduleDate(entry.date), colStartX + LAYOUT.colAlias + LAYOUT.colTitle + 15, textY);
 
-        // 행 구분선
         if (i < scheduleData.length - 1) {
             ctx.strokeStyle = '#1e2d4d';
             ctx.lineWidth = 0.5;
@@ -382,7 +350,6 @@ function renderScheduleImage(scheduleData, title) {
         }
     }
 
-    // ─── 하단 ───
     const footerY = dataStartY + (scheduleData.length * LAYOUT.rowHeight) + 15;
     ctx.fillStyle = COLORS.subtitleText;
     ctx.font = `12px "Malgun Gothic", "맑은 고딕", sans-serif`;
@@ -392,9 +359,6 @@ function renderScheduleImage(scheduleData, title) {
     return canvas.toBuffer('image/png');
 }
 
-/**
- * 편성 날짜 포맷
- */
 function formatScheduleDate(date) {
     if (!date) return '-';
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -407,9 +371,6 @@ function formatScheduleDate(date) {
     return `${y}-${m}-${d} (${w}) ${hh}:${mm}`;
 }
 
-/**
- * 편성표 이미지 2장 생성 (현재 사이클 + 다음 사이클)
- */
 function generateScheduleImages() {
     const rtn = getEpisodeInfo();
     if (!rtn) {
@@ -428,7 +389,6 @@ function generateScheduleImages() {
     const currentImage = renderScheduleImage(thisCycle, `📺 편성표 — 현재 사이클 (${getEpisodeStart()}화 ~ ${getEpisodeEnd()}화)`);
     const nextImage = renderScheduleImage(nextCycle, `📺 편성표 — 다음 사이클 (${getEpisodeStart()}화 ~ ${getEpisodeEnd()}화)`);
 
-    // 저장
     if (!fs.existsSync(OUTPUT_DIR)) {
         fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     }
@@ -446,9 +406,6 @@ function generateScheduleImages() {
     return { currentImage, nextImage, currentPath, nextPath };
 }
 
-/**
- * 이전 이미지 파일들 정리
- */
 function cleanupOldImages(keepCount = 4) {
     if (!fs.existsSync(OUTPUT_DIR)) return;
 
@@ -469,6 +426,8 @@ function cleanupOldImages(keepCount = 4) {
 }
 
 module.exports = {
+    name: 'generator',
+    description: '1~293화 편성표 텍스트 및 Canvas 이미지 생성기',
     generateScheduleImages,
     generateScheduleText,
     buildCycleData,

@@ -1,4 +1,4 @@
-const msg = require('../../../data/config-messages.js');
+const msg = require('../../data/config-messages.js');
 
 module.exports = {
     name: 'help',
