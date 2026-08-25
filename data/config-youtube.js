@@ -1,4 +1,8 @@
 module.exports = {
+    // ─── 웹 대시보드 서버 설정 ──────────────────────────────
+    web: {
+        port: 12345, // 웹 관리자 대시보드 포트 번호
+    },
     // ─── 유튜브 설정 ────────────────────────────────────────
     yt: {
         video_id: "l1ivJtlM7gE",    // 봇이 입장할 유튜브 라이브 아이디
@@ -21,7 +25,9 @@ module.exports = {
             "next, nextnext, first, last": 0,
             "timetable": 10,
             "music": 2,
-            "stats": 1
+            "stats": 1,
+            "coolcheck": 1,
+            "weather, dice, menu": 1,
         }
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
@@ -35,7 +41,9 @@ module.exports = {
             "next, nextnext, first, last": 1,
             "timetable": 2,
             "music": 2,
-            "stats": 1
+            "stats": 1,
+            "coolcheck": 1,
+            "weather, dice, menu": 1,
         }
     },
     // ─── 유저 스탯 설정 ──────────────────────────────────────────

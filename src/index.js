@@ -68,7 +68,8 @@ async function main() {
 
     // 대시보드 웹 서버 백그라운드 시작 (getEpisodeInfo 전달)
     const { getEpisodeInfo } = require('./commands.js');
-    startServer(12345, spamGuard, getEpisodeInfo);
+    const webPort = (cfg && cfg.web && cfg.web.port) ? cfg.web.port : 12345;
+    startServer(webPort, spamGuard, getEpisodeInfo);
 
     eventBus.on('simulate_chat', async (text) => {
         console.log(`[디버그 채팅] 입력: ${text}`);
@@ -80,7 +81,6 @@ async function main() {
             isModerator: false,
             timestamp: Date.now()
         };
-        eventBus.emit('chat', msg);
         const checkBan = spamGuard.confirm(msg.channelId);
         const chkInput = { warn: 0, ban: checkBan, channelId: msg.channelId, spamGuard };
         const resp = await handleCommand(1, msg.text, msg.displayName, chkInput);

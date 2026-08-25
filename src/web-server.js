@@ -720,6 +720,7 @@ async function handleAction(client, req) {
 }
 
 function startServer(port, spamGuard, getEpisodeInfo) {
+    const finalPort = port || (cfgYoutube && cfgYoutube.web && cfgYoutube.web.port) || 12345;
     spamGuardRef = spamGuard;
     getEpisodeInfoRef = getEpisodeInfo;
 
@@ -842,8 +843,8 @@ function startServer(port, spamGuard, getEpisodeInfo) {
         clients.delete(socket);
     }
 
-    server.listen(port, () => {
-        console.log(`\n🌐 웹 관리자 대시보드 열림: http://localhost:${port}`);
+    server.listen(finalPort, () => {
+        console.log(`\n🌐 웹 관리자 대시보드 열림: http://localhost:${finalPort}`);
     });
 }
 

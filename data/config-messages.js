@@ -19,6 +19,9 @@ module.exports = {
         date_invalid_format: `⚠️ 날짜 형식을 인식하지 못했습니다.`,
         date_past: `⚠️ 과거 날짜나 시간은 조회할 수 없습니다.`,
         date_too_far: `⚠️ 너무 먼 미래의 날짜는 조회할 수 없습니다. (최대 3개월 이내)`,
+        coolcheck_missing_name: (cmd) => `⚠️ 닉네임을 입력해 주세요. (예: ${cmd} 닉네임)`,
+        coolcheck_not_found: (name) => `⚠️ "${name}" 닉네임을 가진 유저를 찾을 수 없습니다.`,
+        coolcheck_failed: `⚠️ 쿨타임 정보를 불러올 수 없습니다.`,
     },
 
     // ─── 도움말 ────────────────────────────────────────────────
@@ -105,5 +108,42 @@ module.exports = {
     cooldown: {
         suffix: (minutes) => `(쿨타임 ${minutes}분)`,
         user_warning: (name, minutes) => `${name} 님은 ${minutes}분 뒤에 명령어 사용 가능합니다.`,
+    },
+
+    // ─── 쿨타임 조회 (!쿨타임) ───────────────────────────────
+    coolcheck: {
+        item_active: (name, timeStr) => `[${name}] 🕐 ${timeStr}`,
+        item_clean: (name) => `[${name}] ✅ 쿨타임 없음`,
+        item_banned: (name) => `[${name}] 🚫 차단됨`,
+    },
+
+    // ─── 날씨 조회 (!날씨) ───────────────────────────────────
+    weather: {
+        national_summary: (weatherList, cooldownMsg) => `🌤️ [전국 날씨] ${weatherList} ${cooldownMsg}`,
+        city_weather: (city, temp, desc, emoji, cooldownMsg) =>
+            `${emoji} [${city} 날씨] 현재 기온: ${temp}°C (${desc}) ${cooldownMsg}`,
+        fetch_error: (cooldownMsg) => `⚠️ 날씨 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`,
+        invalid_city: (query, cooldownMsg) =>
+            `⚠️ "${query}" 지역의 날씨 정보를 찾을 수 없습니다. (예: 서울, 부산, 대구 등) ${cooldownMsg}`,
+    },
+
+    // ─── 주사위 (!주사위) ────────────────────────────────────
+    dice: {
+        roll_standard: (name, emoji, number, min, max, cooldownMsg) =>
+            `🎲 [${name}]님의 주사위 결과: ${emoji} ${number} (${min}~${max}) ${cooldownMsg}`,
+        roll_custom: (name, number, min, max, cooldownMsg) =>
+            `🎲 [${name}]님의 주사위(${min}~${max}): ${number} ${cooldownMsg}`,
+        choose_option: (name, chosen, cooldownMsg) => `🎲 [${name}]님의 선택: "${chosen}" ${cooldownMsg}`,
+        invalid_range: `⚠️ 주사위 범위를 올바르게 입력해 주세요. (예: !주사위 100, !주사위 1 100)`,
+    },
+
+    // ─── 메뉴 추천 (!점심, !저녁) ───────────────────────────
+    menu: {
+        lunch: (name, menu, desc, cooldownMsg) =>
+            `🍴 [점심 추천] ${name}님, 오늘의 점심 메뉴는 "${menu}" 어떠세요? (${desc}) ${cooldownMsg}`,
+        dinner: (name, menu, desc, cooldownMsg) =>
+            `🍴 [저녁 추천] ${name}님, 오늘의 저녁 메뉴는 "${menu}" 어떠세요? (${desc}) ${cooldownMsg}`,
+        general: (label, name, menu, desc, cooldownMsg) =>
+            `🍴 [${label} 추천] ${name}님, 오늘은 "${menu}" 어떠세요? (${desc}) ${cooldownMsg}`,
     },
 };
