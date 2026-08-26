@@ -1,4 +1,5 @@
 const msg = require('../../data/config-messages.js');
+const { sendChat } = require('../innertube.js');
 
 module.exports = {
     name: 'help',
@@ -8,6 +9,11 @@ module.exports = {
 
     async execute({ cmd, _input, ctx }) {
         ctx.setCooldown(cmd, 0, _input);
-        return msg.help.main;
+
+        if (!msg.help.main2)
+            return msg.help.main;
+
+        sendChat(msg.help.main);
+        return msg.help.main2;
     }
 };

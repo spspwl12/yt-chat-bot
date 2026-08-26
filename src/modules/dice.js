@@ -1,4 +1,4 @@
-﻿// ─── dice.js ────────────────────────────────────────────────────────────────
+// ─── dice.js ────────────────────────────────────────────────────────────────
 // 주사위 굴리기 및 랜덤 선택 모듈
 // 사용법:
 //   - !주사위                 → 1~6 기본 주사위 (이모지 포함)
@@ -7,20 +7,22 @@
 //   - !주사위 짜장 짬뽕 볶음밥 → 선택지 중 하나 랜덤 선택
 // ─────────────────────────────────────────────────────────────────────────────
 
-const msg = require("../../data/config-messages.js");
-const { maskProfanity } = require("../func.js");
+const msg = require('../../data/config-messages.js');
+const { maskProfanity } = require('../func.js');
 
-const DICE_EMOJIS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const DICE_EMOJIS = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
 module.exports = {
-    name: "dice",
-    group: "dice",
-    aliases: ["!주사위", "!dice", "!굴리기"],
-    description: "랜덤 주사위 굴리기 및 선택지 추첨",
+    name: 'dice',
+    group: 'dice',
+    aliases: ['!주사위', '!dice', '!굴리기'],
+    description: '랜덤 주사위 굴리기 및 선택지 추첨',
 
     async execute({ cmd, args, displayName, _input, ctx }) {
-        const rawArg = args && args.length > 0 && typeof args[0] === "string" ? args.join(" ").trim() : "";
-        const name = maskProfanity(displayName || "시청자");
+        const rawArg = (args && args.length > 0 && typeof args[0] === 'string')
+            ? args.join(' ').trim()
+            : '';
+        const name = maskProfanity(displayName || '시청자');
         const cooldownMsg = ctx.getCooldownMsg(cmd);
 
         ctx.setCooldown(cmd, 0, _input);
@@ -28,7 +30,7 @@ module.exports = {
         // 1. 인자가 없는 경우: 1~6 기본 주사위
         if (!rawArg) {
             const roll = Math.floor(Math.random() * 6) + 1;
-            const emoji = DICE_EMOJIS[roll] || "🎲";
+            const emoji = DICE_EMOJIS[roll] || '🎲';
             if (msg.dice && msg.dice.roll_standard) {
                 return msg.dice.roll_standard(name, emoji, roll, 1, 6, cooldownMsg);
             }
@@ -43,19 +45,18 @@ module.exports = {
             const maxVal = parseInt(tokens[0], 10);
             if (isNaN(maxVal) || maxVal < 1 || maxVal > 1000000) {
                 return ctx.returnWarning(
-                    (msg.dice && msg.dice.invalid_range) || "⚠️ 1 이상 1,000,000 이하의 숫자를 입력해 주세요.",
-                    cmd,
-                    _input,
+                    (msg.dice && msg.dice.invalid_range) || '⚠️ 1 이상 1,000,000 이하의 숫자를 입력해 주세요.',
+                    cmd, _input
                 );
             }
             const roll = Math.floor(Math.random() * maxVal) + 1;
             if (maxVal <= 6) {
-                const emoji = DICE_EMOJIS[roll] || "🎲";
-                return msg.dice && msg.dice.roll_standard
+                const emoji = DICE_EMOJIS[roll] || '🎲';
+                return (msg.dice && msg.dice.roll_standard)
                     ? msg.dice.roll_standard(name, emoji, roll, 1, maxVal, cooldownMsg)
                     : `🎲 [${name}]님의 주사위 결과: ${emoji} ${roll} (1~${maxVal}) ${cooldownMsg}`;
             }
-            return msg.dice && msg.dice.roll_custom
+            return (msg.dice && msg.dice.roll_custom)
                 ? msg.dice.roll_custom(name, roll, 1, maxVal, cooldownMsg)
                 : `🎲 [${name}]님의 주사위(1~${maxVal}): ${roll} ${cooldownMsg}`;
         }
@@ -65,15 +66,14 @@ module.exports = {
             let minVal = parseInt(tokens[0], 10);
             let maxVal = parseInt(tokens[1], 10);
             if (minVal > maxVal) [minVal, maxVal] = [maxVal, minVal];
-            if (isNaN(minVal) || isNaN(maxVal) || maxVal - minVal > 1000000 || maxVal - minVal < 1) {
+            if (isNaN(minVal) || isNaN(maxVal) || (maxVal - minVal) > 1000000 || (maxVal - minVal) < 0) {
                 return ctx.returnWarning(
-                    (msg.dice && msg.dice.invalid_range) || "⚠️ 올바른 숫자 범위를 입력해 주세요.",
-                    cmd,
-                    _input,
+                    (msg.dice && msg.dice.invalid_range) || '⚠️ 올바른 숫자 범위를 입력해 주세요.',
+                    cmd, _input
                 );
             }
             const roll = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
-            return msg.dice && msg.dice.roll_custom
+            return (msg.dice && msg.dice.roll_custom)
                 ? msg.dice.roll_custom(name, roll, minVal, maxVal, cooldownMsg)
                 : `🎲 [${name}]님의 주사위(${minVal}~${maxVal}): ${roll} ${cooldownMsg}`;
         }
@@ -86,5 +86,5 @@ module.exports = {
             return msg.dice.choose_option(name, chosen, cooldownMsg);
         }
         return `🎲 [${name}]님의 선택: "${chosen}" ${cooldownMsg}`;
-    },
+    }
 };

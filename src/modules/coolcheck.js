@@ -85,7 +85,7 @@ module.exports = {
                 }
             }
         } catch (e) {
-            // DB 검색 실패 시에도 트래커 결과로 진행
+            console.warn('[coolcheck] DB 검색 실패, 트래커 결과로 진행:', e.message);
         }
 
         // 일치하는 유저가 없는 경우
@@ -106,15 +106,20 @@ module.exports = {
             let totalMessages = data.dbUser ? (data.dbUser.totalMessages || 0) : 0;
             let lastActiveTime = data.dbUser ? (data.dbUser.lastChatTime || 0) : 0;
 
-            // stats-db 상세 조회 보완
-            if (!data.dbUser && statsTracker && statsTracker.stmts && statsTracker.stmts.getUserByChannelId) {
+            // stats-db 상세 조회 보완 (공개 stmt 경유 - stmts 객체와 메서드 모두 존재할 때만 접근)
+            if (!data.dbUser) {
                 try {
-                    const dbRow = statsTracker.stmts.getUserByChannelId.get(chId);
-                    if (dbRow) {
-                        totalMessages = dbRow.total_messages || 0;
-                        lastActiveTime = dbRow.last_chat_time || 0;
+                    const stmt = statsTracker && statsTracker.stmts && statsTracker.stmts.getUserByChannelId;
+                    if (stmt && typeof stmt.get === 'function') {
+                        const dbRow = stmt.get(chId);
+                        if (dbRow) {
+                            totalMessages = dbRow.total_messages || 0;
+                            lastActiveTime = dbRow.last_chat_time || 0;
+                        }
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('[coolcheck] getUserByChannelId 조회 실패 (chId=' + chId + '):', e.message);
+                }
             }
 
             const isExact = (lower === searchTerm);
