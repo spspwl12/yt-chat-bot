@@ -8,7 +8,12 @@ const zlib = require('zlib');
 let helmetSecurity = null;
 try {
     const helmet = require('helmet');
-    helmetSecurity = helmet();
+    helmetSecurity = helmet({
+        contentSecurityPolicy: false,
+        strictTransportSecurity: false,
+        crossOriginOpenerPolicy: false,
+        originAgentCluster: false,
+    });
 } catch (e) {
     helmetSecurity = null;
 }
