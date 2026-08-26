@@ -21,12 +21,47 @@ const cfgSearch = require(PATHS.search);
 const profanitySet = require(PATHS.profanity);
 let profanityVersion = 1;
 
+// vm 샌드박스 내에서 차단할 위험 패턴 (정규식)
+const DANGEROUS_PATTERNS = [
+    /\brequire\s*\(/,          // require() 호출
+    /\bprocess\s*\./,          // process.* 접근
+    /\b__dirname\b/,           // 경로 노출
+    /\b__filename\b/,          // 경로 노출
+    /globalThis\s*\./,         // globalThis 접근
+    /\beval\s*\(/,             // eval()
+    /\bFunction\s*\(/,         // new Function()
+];
+
 /**
  * JS 코드 문법 및 module.exports 유효성 검증
  */
 function validateJS(code, filename = 'config.js') {
+    // 1. 위험 패턴 텍스트 검사
+    for (const pattern of DANGEROUS_PATTERNS) {
+        if (pattern.test(code)) {
+            throw new Error(`허용되지 않는 코드 패턴이 포함되어 있습니다: ${pattern.source}`);
+        }
+    }
+
+    // 2. vm 샌드박스 실행 (위험 글로벌 명시 차단)
     const script = new vm.Script(code, { filename });
-    const sandbox = { module: { exports: {} }, exports: {}, Set };
+    const sandbox = {
+        module: { exports: {} },
+        exports: {},
+        Set,
+        // 위험 전역 변수 명시적 차단
+        require: undefined,
+        process: undefined,
+        __dirname: undefined,
+        __filename: undefined,
+        global: undefined,
+        globalThis: undefined,
+        Buffer: undefined,
+        setTimeout: undefined,
+        setInterval: undefined,
+        clearTimeout: undefined,
+        clearInterval: undefined,
+    };
     vm.createContext(sandbox);
     script.runInContext(sandbox);
     if (!sandbox.module.exports) {

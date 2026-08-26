@@ -7,6 +7,8 @@ const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
 function printFutureEpisode(rtn, cmd, skipCount, label, _input, ctx) {
     const n = videoInfo.length;
+    if (n === 0) return ctx.returnWarning(msg.error.next_episode_not_found(label), cmd, _input);
+
     let currentIdx = (rtn.index + 1) % n;
     let info = null;
     let foundCount = 0;
@@ -72,6 +74,7 @@ function printNumEpisode(rtn, num, cmd, ctx) {
 
 function printNowEpisode(rtn, cmd, ctx) {
     const info = videoInfo[rtn.index];
+    if (!info) return null; // videoInfo 비어 있거나 index 범위 벗어날 경우 방어
     const unicodenum = toUnicodeNumber(info.alias);
     const timestr = toHHMMSS(rtn.end - rtn.now);
 

@@ -124,7 +124,13 @@ function broadcastMsg(data) {
     const msg = JSON.stringify(data);
     for (const client of clients) {
         if (!client.destroyed) {
-            sendWSFrame(client, msg);
+            try {
+                sendWSFrame(client, msg);
+            } catch (e) {
+                // 개별 클라이언트 송신 실패 — 전체 broadcast 중단 방지
+                console.warn('⚠️ [ws] broadcast 개별 송신 실패:', e.message);
+                clientDisconnected(client);
+            }
         }
     }
 }
@@ -570,6 +576,10 @@ async function handleAction(client, req) {
     else if (action === 'reboot_bot') {
         console.log("🔄 관리자 웹에서 재부팅 요청을 받았습니다. 프로세스를 종료합니다...");
         sendWSFrame(client, JSON.stringify({ action: 'notification', payload: 'Rebooting...' }));
+        // 종료 전 SpamGuard 데이터 즉시 저장 (데이터 유실 방지)
+        if (spamGuardRef && typeof spamGuardRef.shutdown === 'function') {
+            try { spamGuardRef.shutdown(); } catch (_) {}
+        }
         setTimeout(() => {
             process.exit(0);
         }, 1000);
@@ -743,6 +753,15 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                 };
 
                 if (mimeTypes[ext]) {
+                    // Path Traversal 방지: filePath가 public/ 하위인지 명시적으로 검증
+                    const publicRoot = path.resolve(path.join(__dirname, 'public'));
+                    const resolvedFile = path.resolve(filePath);
+                    if (!resolvedFile.startsWith(publicRoot + path.sep) && resolvedFile !== publicRoot) {
+                        res.writeHead(403, { 'Content-Type': 'text/plain' });
+                        res.end('Forbidden');
+                        return;
+                    }
+
                     fs.readFile(filePath, 'utf8', (err, data) => {
                         if (err) {
                             res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -802,8 +821,14 @@ function startServer(port, spamGuard, getEpisodeInfo) {
             clientConnected(socket);
 
             let buffer = Buffer.alloc(0);
+            const MAX_BUFFER = 5 * 1024 * 1024; // 5MB 단일 뺄퍼 상한 (OOM 방지)
             socket.on('data', chunk => {
                 buffer = Buffer.concat([buffer, chunk]);
+                if (buffer.length > MAX_BUFFER) {
+                    console.warn('⚠️ [ws] 클라이언트 뺄퍼 한도 초과 단연 (5MB):', socket.remoteAddress);
+                    socket.destroy();
+                    return;
+                }
                 // 프레임들을 처리
                 while (true) {
                     const parsed = parseWSFrame(buffer);

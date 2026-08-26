@@ -114,6 +114,30 @@
             font-variant-numeric: tabular-nums;
         }
 
+        /* 회차/시간 값: 글자 수 변화로 인한 chip 출렁임 방지 */
+        #tl-ep-index {
+            display: inline-block;
+            min-width: 3ch;
+            text-align: right;
+        }
+
+        #tl-ep-time {
+            display: inline-block;
+            min-width: 5ch;
+            text-align: right;
+        }
+
+        #tl-diff-value {
+            display: inline-block;
+            min-width: 4ch;
+            text-align: right;
+        }
+
+        .tl-card-diff {
+            border-color: rgba(56, 189, 248, 0.3);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
         .timeline-total-count {
             font-size: 0.72rem;
             color: var(--text-dim);
@@ -174,19 +198,7 @@
             font-weight: 600;
         }
 
-        /* ── 반응형 타임라인 바 단계별 최적화 (절대 아래로 떨어지지 않음) ── */
-        @media (max-width: 1300px) {
-            #tl-diff-card {
-                display: none !important;
-            }
-        }
-
-        @media (max-width: 1100px) {
-            #tl-raw-card {
-                display: none !important;
-            }
-        }
-
+        /* ── 반응형 타임라인 바 단계별 최적화 ── */
         @media (max-width: 950px) {
             .timeline-bar-label span:not(.tl-icon) {
                 display: none !important;

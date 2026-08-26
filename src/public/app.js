@@ -11,7 +11,8 @@ const TL = {
     total: 0,           // 전체 이력 건수
     isLive: true,       // 현재 LIVE 상태 여부
     currentHistIdx: -1, // -1 = 현재(LIVE)
-    debounceTimer: null
+    debounceTimer: null,
+    lastRequestedIdx: -1
 };
 
 const tlSlider = document.getElementById('timeline-slider');
@@ -20,8 +21,6 @@ const tlEpTime = document.getElementById('tl-ep-time');
 const tlDiffCard = document.getElementById('tl-diff-card');
 const tlDiffValue = document.getElementById('tl-diff-value');
 const tlTotalCount = document.getElementById('tl-total-count');
-const tlRawCard = document.getElementById('tl-raw-card');
-const tlRawValue = document.getElementById('tl-raw-value');
 const tlTickOldest = document.getElementById('tl-tick-oldest');
 const tlTickMid = document.getElementById('tl-tick-mid');
 
@@ -81,12 +80,11 @@ function tlUpdateTickLabels() {
 function tlSetLiveMode() {
     TL.isLive = true;
     TL.currentHistIdx = -1;
+    TL.lastRequestedIdx = -1;
     tlSlider.value = tlSlider.max;
     tlUpdateSliderBackground();
     tlDiffCard.style.display = '';
     tlDiffValue.textContent = '--';
-    tlRawCard.style.display = '';
-    tlRawValue.textContent = '--';
 }
 
 function tlClearHistory() {
@@ -135,27 +133,17 @@ function tlHandleHistoryData(data) {
     }
 }
 
-function tlUpdateFromQuery(query, diffSec, epInfo) {
+function tlUpdateFromQuery(query, diffSec) {
     if (!query) return;
-    // 회차 번호 표시
-    if (epInfo && epInfo.index !== undefined) {
-        tlEpIndex.textContent = `${epInfo.index + 1}화`;
-    } else if (query.index !== undefined) {
+    // 회차/시간 chip에 기록 시점 raw 데이터 표시 (조정 없음)
+    if (query.index !== undefined) {
         tlEpIndex.textContent = `${query.index + 1}화`;
     }
-
-    // 시간 표시: 현재 보정된 video time 기준
-    if (epInfo && epInfo.now !== undefined) {
-        tlEpTime.textContent = secToHHMMSS(epInfo.now);
-    } else if (query.now !== undefined) {
-        let approxNow = query.now;
-        if (query.requestTime) {
-            approxNow += (Date.now() - query.requestTime) / 1000;
-        }
-        tlEpTime.textContent = secToHHMMSS(approxNow);
+    if (query.now !== undefined) {
+        tlEpTime.textContent = secToHHMMSS(query.now);
     }
 
-    // 현재 lastquery.now 와 과거 lastquery.now 의 차이(초) 표시 - 항상 표시
+    // 현재와 차이
     tlDiffCard.style.display = '';
     if (!TL.isLive && diffSec !== null && diffSec !== undefined) {
         tlDiffValue.textContent = tlFmtDuration(diffSec);
@@ -166,14 +154,12 @@ function tlUpdateFromQuery(query, diffSec, epInfo) {
 
 function tlHandleStateAtHistory(payload) {
     if (!payload) return;
-    tlUpdateFromQuery(payload.query, payload.diffSec, payload.episodeInfo);
+    // 오래된(stale) 서버 응답 무시 - flash 방지
+    if (payload.historyIndex !== undefined && payload.historyIndex !== TL.lastRequestedIdx) return;
 
-    // 기록 시점 카드: 과거 lastquery의 원본(raw) 화수와 시간 표시
+    // 회차/시간에 raw query 데이터 표시, diff만 서버 계산값 사용
     if (payload.query) {
-        tlRawCard.style.display = '';
-        const rawEp = payload.query.index !== undefined ? `${payload.query.index + 1}화` : '--화';
-        const rawTime = secToHHMMSS(payload.query.now);
-        tlRawValue.textContent = `${rawEp} · ${rawTime}`;
+        tlUpdateFromQuery(payload.query, payload.diffSec);
     }
 
     // 대시보드 전체 상태 업데이트 (에피소드 정보 반영)
@@ -206,31 +192,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 과거 모드
         TL.isLive = false;
-        TL.currentHistIdx = val; // val이 곧 history 배열 인덱스
+        TL.currentHistIdx = val;
 
-        // 해당 인덱스의 이력 데이터 즉시 UI 반영 (로컬) - 회차/시간만
+        // 해당 인덱스의 이력 데이터 즉시 UI 반영 (raw 데이터, 보정 없음)
         if (TL.history.length > 0 && val < TL.history.length) {
             const entry = TL.history[val];
             if (entry) {
-                tlEpIndex.textContent = `${(entry.index !== undefined ? entry.index + 1 : '--')}화`;
-                let approxNow = entry.now || 0;
-                if (entry.requestTime) {
-                    approxNow += (Date.now() - entry.requestTime) / 1000;
-                }
-                tlEpTime.textContent = secToHHMMSS(approxNow);
-                // diff는 서버 응답 전까지 '...' 로 표시 (깜빡거림 방지)
+                tlEpIndex.textContent = `${entry.index !== undefined ? entry.index + 1 : '--'}화`;
+                tlEpTime.textContent = secToHHMMSS(entry.now || 0);
                 tlDiffCard.style.display = '';
                 tlDiffValue.textContent = '...';
-                // 기록 시점: 과거 lastquery의 원본 화수/시간 즉시 표시
-                tlRawCard.style.display = '';
-                const rawEp = entry.index !== undefined ? `${entry.index + 1}화` : '--화';
-                const rawTime = secToHHMMSS(entry.now);
-                tlRawValue.textContent = `${rawEp} · ${rawTime}`;
             }
         }
 
-        // 서버에 상태 조회 (디바운스)
+        // 서버에 현재와의 차이만 조회 (디바운스)
         clearTimeout(TL.debounceTimer);
+        TL.lastRequestedIdx = val;
         TL.debounceTimer = setTimeout(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
@@ -238,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: { historyIndex: val }
                 }));
             }
-        }, 50);
+        }, 80);
     });
 
     // 슬라이더 드래그 종료 시 최종 조회
@@ -247,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const max = parseInt(tlSlider.max) || 1;
         const val = parseInt(tlSlider.value);
         if (val < max && ws && ws.readyState === WebSocket.OPEN) {
+            TL.lastRequestedIdx = val;
             ws.send(JSON.stringify({
                 action: 'getStateAtHistory',
                 payload: { historyIndex: val }

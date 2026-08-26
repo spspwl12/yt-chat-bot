@@ -412,6 +412,17 @@ class SpamGuard {
         const result = this.check(channelId, 0, displayName);
         return result === 'warn';
     }
+    /**
+     * 프로세스 종료 시 트래커 데이터 즉시 동기 저장 (데이터 유실 방지)
+     */
+    shutdown() {
+        if (this._saveTrackerTimer) {
+            clearTimeout(this._saveTrackerTimer);
+            this._saveTrackerTimer = null;
+        }
+        this._saveTracker(); // debounce 대기 없이 즉시 저장
+        console.log('💾 [SpamGuard] 트래커 데이터 저장 완료 (shutdown)');
+    }
 }
 
 module.exports = { SpamGuard };

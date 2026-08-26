@@ -10,7 +10,7 @@ const { printNowEpisode, printNumEpisode } = require('./future.js');
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
 function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
-    const limitLength = cfg.timetable.default_limit;
+    const limitLength = (cfg.timetable && cfg.timetable.default_limit) || 150;
     const currentInfo = videoInfo[rtn.index];
 
     let totalCycleMs = 0;

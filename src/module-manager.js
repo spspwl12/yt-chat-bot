@@ -24,6 +24,7 @@ class ModuleManager {
      */
     loadModules() {
         // 기존 모듈 정리 (stop/destroy 훅 실행)
+        const prevModules = this.modules ? new Map(this.modules) : new Map();
         if (this.modules && this.modules.size > 0) {
             for (const [name, mod] of this.modules) {
                 try {
@@ -73,6 +74,20 @@ class ModuleManager {
         const files = fs.readdirSync(this.modulesDir).filter(f => f.endsWith('.js'));
         for (const file of files) {
             const filePath = path.join(this.modulesDir, file);
+
+            // 심볼릭 링크(symlink)를 통한 모듈 디렉터리 외부 파일 접근 방지
+            try {
+                const realPath = fs.realpathSync(filePath);
+                const realDir  = fs.realpathSync(this.modulesDir);
+                if (!realPath.startsWith(realDir + path.sep) && realPath !== realDir) {
+                    console.warn(`⚠️ [ModuleManager] 심볼릭 링크 외부 경로 스킵: ${file} → ${realPath}`);
+                    continue;
+                }
+            } catch (pathErr) {
+                console.warn(`⚠️ [ModuleManager] 경로 검증 실패 스킵 (${file}):`, pathErr.message);
+                continue;
+            }
+
             try {
                 const resolved = require.resolve(filePath);
                 delete require.cache[resolved];
@@ -145,15 +160,25 @@ class ModuleManager {
     }
 
     /**
-     * 봇 재부팅 없이 모든 모듈 실시간 핫리로드
+     * 봇 재부팅 없이 모든 모듈 실시간 핫리로드 (실패 시 스냅샷 롤백)
      */
     reload() {
         console.log('🔄 [ModuleManager] 모든 모듈 핫리로드 시작...');
+        // 롤백용 스냅샷 저장
+        const snapshot = {
+            modules: new Map(this.modules),
+            aliasToModule: new Map(this.aliasToModule),
+            commandGroups: { ...this.commandGroups },
+        };
         try {
             this.loadModules();
             return true;
         } catch (err) {
-            console.error('❌ [ModuleManager] 핫리로드 실패:', err.message);
+            console.error('❌ [ModuleManager] 핫리로드 실패 — 이전 상태로 롤백:', err.message);
+            // 롤백 복원
+            this.modules = snapshot.modules;
+            this.aliasToModule = snapshot.aliasToModule;
+            this.commandGroups = snapshot.commandGroups;
             return false;
         }
     }
@@ -282,7 +307,7 @@ class ModuleManager {
         const rtn = getEpisodeInfo();
         if (!rtn) return null;
 
-        if (Math.abs(rtn.end - rtn.now) <= cfg.input.boundary_sec || rtn.now <= cfg.input.boundary_sec) {
+        if (Math.abs((rtn.end ?? NaN) - (rtn.now ?? NaN)) <= cfg.input.boundary_sec || (rtn.now ?? NaN) <= cfg.input.boundary_sec) {
             if (_input) _input.warn = 0;
             return null;
         }

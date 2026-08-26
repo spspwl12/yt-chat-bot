@@ -294,9 +294,75 @@ function makeContext() {
     return ctx;
 }
 
-// ═══════════════════════════════════════
-//  Public API
-// ═══════════════════════════════════════
+async function fetchFreshContinuation(videoId, chatMode) {
+    videoId = videoId || currentVideoId;
+    chatMode = chatMode || (cfg.yt && cfg.yt.chat_mode) || 'live';
+    var chatModeLabel = chatMode === 'live' ? '실시간 채팅' : '주요 채팅';
+
+    try {
+        var publicHtml = await h2Get('/live_chat?v=' + videoId, {});
+        var publicCont = null;
+
+        var initDataMatch = publicHtml.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
+            || publicHtml.match(/window\["ytInitialData"\]\s*=\s*({.+?});\s*<\/script>/s);
+
+        if (initDataMatch) {
+            try {
+                var initData = JSON.parse(initDataMatch[1]);
+                var header = initData.contents
+                    && initData.contents.liveChatRenderer
+                    && initData.contents.liveChatRenderer.header
+                    && initData.contents.liveChatRenderer.header.liveChatHeaderRenderer;
+                var subItems = header
+                    && header.viewSelector
+                    && header.viewSelector.sortFilterSubMenuRenderer
+                    && header.viewSelector.sortFilterSubMenuRenderer.subMenuItems;
+
+                if (subItems && subItems.length > 0) {
+                    var selectedItem = null;
+                    if (chatMode === 'live') {
+                        selectedItem = subItems.find(item => {
+                            var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
+                            return title.includes('실시간') || title.includes('live') || title.includes('all');
+                        });
+                        if (!selectedItem && subItems.length > 1) {
+                            selectedItem = subItems[1];
+                        }
+                    } else {
+                        selectedItem = subItems.find(item => {
+                            var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
+                            return title.includes('주요') || title.includes('top');
+                        });
+                    }
+                    if (!selectedItem) selectedItem = subItems[0];
+
+                    publicCont = selectedItem.continuation
+                        && selectedItem.continuation.reloadContinuationData
+                        && selectedItem.continuation.reloadContinuationData.continuation;
+
+                    if (publicCont) {
+                        console.log('✅ ' + chatModeLabel + ' continuation 획득');
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️  ytInitialData 파싱 실패, regex 폴백 사용');
+            }
+        }
+
+        if (!publicCont) {
+            var contMatch = publicHtml.match(/"continuation"\s*:\s*"([^"]+)"/);
+            if (contMatch) {
+                publicCont = contMatch[1];
+                console.log('✅ 공개 continuation 획득 (regex 폴백)');
+            }
+        }
+
+        return publicCont;
+    } catch (e) {
+        console.error('⚠️  fetchFreshContinuation 실패:', e.message);
+        return null;
+    }
+}
 
 async function initSession(videoId, chatMode) {
     // chatMode: 'live' = 실시간 채팅 (기본 - 모든 메시지), 'top' = 주요 채팅 (인기 메시지만)
@@ -323,66 +389,9 @@ async function initSession(videoId, chatMode) {
     }
 
     // 2. live_chat 페이지 (비인증) — continuation 가져오기
-    var publicHtml = await h2Get('/live_chat?v=' + videoId, {});
-
-    var publicCont = null;
-
-    var initDataMatch = publicHtml.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
-        || publicHtml.match(/window\["ytInitialData"\]\s*=\s*({.+?});\s*<\/script>/s);
-
-    if (initDataMatch) {
-        try {
-            var initData = JSON.parse(initDataMatch[1]);
-            var header = initData.contents
-                && initData.contents.liveChatRenderer
-                && initData.contents.liveChatRenderer.header
-                && initData.contents.liveChatRenderer.header.liveChatHeaderRenderer;
-            var subItems = header
-                && header.viewSelector
-                && header.viewSelector.sortFilterSubMenuRenderer
-                && header.viewSelector.sortFilterSubMenuRenderer.subMenuItems;
-
-            if (subItems && subItems.length > 0) {
-                var selectedItem = null;
-                if (chatMode === 'live') {
-                    // 실시간 채팅 탐색 (문구 또는 index 1)
-                    selectedItem = subItems.find(item => {
-                        var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
-                        return title.includes('실시간') || title.includes('live') || title.includes('all');
-                    });
-                    if (!selectedItem && subItems.length > 1) {
-                        selectedItem = subItems[1];
-                    }
-                } else {
-                    selectedItem = subItems.find(item => {
-                        var title = (item.title || item.defaultText || (item.sortFilterSubMenuItem && item.sortFilterSubMenuItem.title) || '').toLowerCase();
-                        return title.includes('주요') || title.includes('top');
-                    });
-                }
-                if (!selectedItem) selectedItem = subItems[0];
-
-                publicCont = selectedItem.continuation
-                    && selectedItem.continuation.reloadContinuationData
-                    && selectedItem.continuation.reloadContinuationData.continuation;
-
-                if (publicCont) {
-                    console.log('✅ ' + chatModeLabel + ' continuation 획득');
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️  ytInitialData 파싱 실패, regex 폴백 사용');
-        }
-    }
-
-    // 폴백: 첫 번째 continuation (구조 분석 실패 시)
+    var publicCont = await fetchFreshContinuation(videoId, chatMode);
     if (!publicCont) {
-        var contMatch = publicHtml.match(/"continuation"\s*:\s*"([^"]+)"/);
-        if (contMatch) {
-            publicCont = contMatch[1];
-            console.log('✅ 공개 continuation 획득 (regex 폴백)');
-        } else {
-            throw new Error('continuation 토큰 없음 — 라이브 방송 중인지 확인');
-        }
+        throw new Error('continuation 토큰 없음 — 라이브 방송 중인지 확인');
     }
 
     // 3. live_chat 페이지 (인증) — API 설정 + 쿠키 갱신
@@ -1043,4 +1052,4 @@ async function postCommunityText(text) {
     }
 }
 
-module.exports = { initSession, fetchChat, getSendParams, sendChat, banUser, blockUser, postCommunityText, hasPendingVerify };
+module.exports = { initSession, fetchChat, fetchFreshContinuation, getSendParams, sendChat, banUser, blockUser, postCommunityText, hasPendingVerify };
