@@ -9,9 +9,16 @@ module.exports = {
         logLevel: "error",            // yt-dlp 로그 출력 수준: "all" | "warning" | "error" | "none"
         // 추가 전달할 yt-dlp CLI 인자 배열 (예: ["--cookies", "../data/cookies.txt"])
         commandLine: [
-            "-f", "best[height<=1080]",
+            "-f", "b[height<=1080]/bv",
             "-o", "-",
             "--no-part",
+            "--js-runtimes", "node",
+            //"--list-formats",
+            //"--cookies", "../data/cookies.txt",
+            //"--fragment-retries", "infinite",
+            //"--extractor-args", "youtube:player-client=default",
+            //"--js-runtimes", "node",
+            //"--force-ipv4"
         ]
     },
     searcher: {
@@ -25,6 +32,16 @@ module.exports = {
             "../data/config.json",                                     // 설정파일 경로 (※주의: C++ searcher가 만약 json만 읽는다면 이 부분 변경이 필요할 수 있습니다)
             "16"                                                      // 프레임수 등
         ]
+    },
+    // ─── 동기화 ─────────────────────────────────────────────
+    sync: {
+        tolerance_sec: 60,          // 싱크 허용 오차 (초) — 이 범위 내면 동일 싱크로 판단
+        min_consecutive: 6,         // 연속 일치 판정에 필요한 최소 샘플 수 (2 이상; 기본값: 4)
+        init_delay_ms: 5000,        // 초기 동기화 지연 (ms) — 데몬 DB 로드 후 다운로더 시작까지 대기
+        segment_duration_min: 4,    // 세그먼트 최소 길이 (초) - 중복/유사 무시 대용
+        segment_duration_max: 20,   // 세그먼트 최대 길이 (초) — yt-dlp로 캡처할 클립 길이
+        restart_delay_ms: 60000,     // 재시작 대기 (ms) — yt-dlp 또는 데몬 비정상 종료 시 (기본값 3000)
+        max_restart_count: 30,      // 최대 재시작 횟수 — 초과 시 60초 대기 후 카운터 리셋
     },
     extraction: {
         fps: 30,          // 초당 추출할 프레임 수
