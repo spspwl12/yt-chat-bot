@@ -26,9 +26,16 @@ module.exports = {
 
     // ─── 도움말 ────────────────────────────────────────────────
     help: {
-        main: `ℹ️ 명령어: !몇화, !다음화, !시간표, !첫화, !마지막화, !날짜` +
-            `ℹ️ !몇화 사용법: !몇화 64화, !몇화 20 24 64 65, !몇화 고자라니` +
-            `ℹ️ 대사 검색 명령어는 남용을 막기 위해 긴 개인 쿨타임이 적용됩니다. (최대 100시간)`,
+        main:
+            `ℹ️ 명령어(개인쿨타임): !몇화!날짜(2분),!다음화!첫화!막화(2분),!시간표(10분),!스탯(30분)` +
+            `ℹ️ !몇화 사용법: !몇화 64화 / !몇화 20 24 / !몇화 고자라니` +
+            `ℹ️ 대사(!몇화 고자라니): 개인쿨타임30분 + (정확도 낮으면 쿨타임 폭등)` +
+            `ℹ️ 시간표: 1화)AA→07:30)BB (07:30분에 2화 BB 에피소드 시작)`,
+        main2:
+            `ℹ️ 일반쿨타임: 봇 응답 끝에 표시 (개인 쿨타임 영향 X)` +
+            `ℹ️ 개인쿨타임: 24시간내 사용당 1분씩 증가 (쿨타임 중 사용 시 초기화 + 1분 패널티)` +
+            `ℹ️ !쿨타임 확인: !쿨타임 [닉네임]` +
+            `ℹ️ 한정된 봇의 채팅수 및 도배 방지를 위해 쿨타임이 엄격하니 양해 바랍니다.`,
     },
 
     // ─── 에피소드 / 회차 안내 ─────────────────────────────────
@@ -94,14 +101,14 @@ module.exports = {
     // ─── 유저 스탯 조회 결과 ───────────────────────────────────
     stats: {
         user_stats: (name, totalMsgs, totalRank, daysCount, todayMsgs, todayRank, todayWatchStr, todayWatchRank, totalWatchStr, totalWatchRank, cooldownMsg) =>
-            `📊 [${name} 님의 스탯] 출석: ${daysCount}일 | 채팅수: ${todayMsgs}개 (${todayRank}위) | 시청시간: ${todayWatchStr} (${todayWatchRank}위) | 총 채팅수: ${totalMsgs}개 (${totalRank}위) | 총 시청시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
-        overview: (todayUsers, todayMsgs, totalUsers, totalMsgs, cooldownMsg) =>
-            `📊 [전체 통계] 오늘 활동 유저: ${todayUsers}명 | 오늘 채팅 수: ${todayMsgs}개 | 총 등록 유저: ${totalUsers}명 | 총 누적 채팅: ${totalMsgs}개 ${cooldownMsg}`,
+            `📊 [ ${name} 님의 스탯 ] 출석: ${daysCount}일 | 오늘 채팅수: ${todayMsgs}개 (${todayRank}위) | 오늘 참여시간: ${todayWatchStr} (${todayWatchRank}위) | 총 채팅수: ${totalMsgs}개 (${totalRank}위) | 총 참여시간: ${totalWatchStr} (${totalWatchRank}위) ${cooldownMsg}`,
+        overview: (todayUsers, todayMsgs, totalUsers, totalMsgs, top100MsgRatio, totalWatchStr, top100WatchRatio, cooldownMsg) =>
+            `📊 [전체 통계] 오늘 활동 유저: ${todayUsers}명 | 오늘 채팅: ${todayMsgs}개 | 총 등록 유저: ${totalUsers}명 | 총 누적 채팅: ${totalMsgs}개 (상위 100명 비율: ${top100MsgRatio}%) | 총 시청시간: ${totalWatchStr} (상위 100명 비율: ${top100WatchRatio}%) ※상위 100명이 100%에 가까울수록 유입이 없음을 의미함.${cooldownMsg}`,
         rank_header: (title) => `🏆 [${title}] `,
-        rank_item: (rankStr, name, valueStr) => `${rankStr} ${name}(${valueStr})`,
-        rank_separator: ` `,
+        rank_item: (rankStr, name, valueStr) => `${rankStr} ${name}`,
+        rank_separator: ` | `,
         rank_list: (title, itemsStr, cooldownMsg) => `🏆 [${title}] ${itemsStr} ${cooldownMsg}`.trim(),
-        invalid_arg: `⚠️ !스탯 뒤에 다음 단어만 인식합니다: ▶전체: 전체 통계 요약 ▶총시간: 전체 시청시간 순위 ▶총채팅: 전체 채팅수 순위 ▶채팅: 오늘 채팅수 순위 ▶시간: 오늘 시청시간 순위`,
+        invalid_arg: `⚠️ !스탯 뒤에 다음 단어만 인식합니다. ▶전체: 전체 통계 요약 ▶총시간: 전체 참여시간 순위 ▶총채팅: 전체 채팅수 순위 ▶채팅: 오늘 채팅수 순위 ▶시간: 오늘 참여시간 순위`,
     },
 
     // ─── 쿨타임 안내 ─────────────────────────────────────────
@@ -112,9 +119,9 @@ module.exports = {
 
     // ─── 쿨타임 조회 (!쿨타임) ───────────────────────────────
     coolcheck: {
-        item_active: (name, timeStr) => `[${name}] 🕐 ${timeStr}`,
-        item_clean: (name) => `[${name}] ✅ 쿨타임 없음`,
-        item_banned: (name) => `[${name}] 🚫 차단됨`,
+        item_active: (name, timeStr) => `${name} 님은 쿨타임 🕐 ${timeStr} 이 걸려 있습니다.`,
+        item_clean: (name) => `${name} 님은 쿨타임이 없습니다.`,
+        item_banned: (name) => `${name} 님은 쿨타임이 없습니다.`,
     },
 
     // ─── 날씨 조회 (!날씨) ───────────────────────────────────

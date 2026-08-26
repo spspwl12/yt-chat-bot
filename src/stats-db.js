@@ -126,6 +126,14 @@ class StatsTracker {
             SELECT COUNT(*) AS total_users, COALESCE(SUM(total_messages),0) AS total_messages,
                    COALESCE(SUM(total_watch_seconds),0) AS total_watch_seconds FROM users
         `);
+        this.stmts.top100MessagesSummary = this.db.prepare(`
+            SELECT COALESCE(SUM(total_messages), 0) AS top_messages
+            FROM (SELECT total_messages FROM users ORDER BY total_messages DESC LIMIT 100)
+        `);
+        this.stmts.top100WatchSummary = this.db.prepare(`
+            SELECT COALESCE(SUM(total_watch_seconds), 0) AS top_watch_seconds
+            FROM (SELECT total_watch_seconds FROM users ORDER BY total_watch_seconds DESC LIMIT 100)
+        `);
         this.stmts.globalTodaySummary = this.db.prepare(`
             SELECT COUNT(DISTINCT user_id) AS today_users, COALESCE(SUM(message_count),0) AS today_messages,
                    COALESCE(SUM(watch_seconds),0) AS today_watch_seconds
@@ -265,16 +273,37 @@ class StatsTracker {
         const userSummary  = this.stmts.globalUserSummary.get();
         const todaySummary = this.stmts.globalTodaySummary.get(currentDate);
 
+        const totalMessages = userSummary ? userSummary.total_messages : 0;
+        const totalWatchSec = userSummary ? userSummary.total_watch_seconds : 0;
+
+        const top100MsgRow   = this.stmts.top100MessagesSummary ? this.stmts.top100MessagesSummary.get() : null;
+        const top100WatchRow = this.stmts.top100WatchSummary ? this.stmts.top100WatchSummary.get() : null;
+
+        const top100Messages = top100MsgRow ? top100MsgRow.top_messages : 0;
+        const top100WatchSec = top100WatchRow ? top100WatchRow.top_watch_seconds : 0;
+
+        const top100MsgRatio = totalMessages > 0
+            ? ((top100Messages / totalMessages) * 100).toFixed(1)
+            : '0.0';
+
+        const top100WatchRatio = totalWatchSec > 0
+            ? ((top100WatchSec / totalWatchSec) * 100).toFixed(1)
+            : '0.0';
+
         return {
-            totalUsers:    userSummary  ? userSummary.total_users         : 0,
-            totalMessages: userSummary  ? userSummary.total_messages       : 0,
-            totalWatchSec: userSummary  ? userSummary.total_watch_seconds  : 0,
-            totalWatchStr: this.formatWatchTime(userSummary ? userSummary.total_watch_seconds : 0),
-            todayUsers:    todaySummary ? todaySummary.today_users         : 0,
-            todayMessages: todaySummary ? todaySummary.today_messages      : 0,
-            todayWatchSec: todaySummary ? todaySummary.today_watch_seconds : 0,
-            todayWatchStr: this.formatWatchTime(todaySummary ? todaySummary.today_watch_seconds : 0),
-            currentDate:   this.formatDateDisplay(currentDate)
+            totalUsers:        userSummary  ? userSummary.total_users         : 0,
+            totalMessages:     totalMessages,
+            totalWatchSec:     totalWatchSec,
+            totalWatchStr:     this.formatWatchTime(totalWatchSec),
+            top100Messages:    top100Messages,
+            top100MsgRatio:    top100MsgRatio,
+            top100WatchSec:    top100WatchSec,
+            top100WatchRatio:  top100WatchRatio,
+            todayUsers:        todaySummary ? todaySummary.today_users         : 0,
+            todayMessages:     todaySummary ? todaySummary.today_messages      : 0,
+            todayWatchSec:     todaySummary ? todaySummary.today_watch_seconds : 0,
+            todayWatchStr:     this.formatWatchTime(todaySummary ? todaySummary.today_watch_seconds : 0),
+            currentDate:       this.formatDateDisplay(currentDate)
         };
     }
 

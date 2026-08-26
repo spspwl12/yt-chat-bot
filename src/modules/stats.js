@@ -485,6 +485,9 @@ module.exports = {
                     overview.todayMessages.toLocaleString('ko-KR'),
                     overview.totalUsers.toLocaleString('ko-KR'),
                     overview.totalMessages.toLocaleString('ko-KR'),
+                    overview.top100MsgRatio,
+                    overview.totalWatchStr,
+                    overview.top100WatchRatio,
                     ctx.getCooldownMsg(cmd)
                 );
                 return `${builtMsg}${spaces}`;
