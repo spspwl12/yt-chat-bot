@@ -183,6 +183,8 @@
             <div class="sub-tabs">
                 <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
                         id="spam-warn-count">0</span></button>
+                <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
+                        id="spam-searchban-count">0</span></button>
                 <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
                         id="spam-ban-count">0</span></button>
             </div>
@@ -203,6 +205,28 @@
                                 </tr>
                             </thead>
                             <tbody id="spam-warn-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="spam-searchban-panel" class="sub-panel">
+                <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                    <div class="log-scroll" style="max-height: 500px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Channel ID</th>
+                                    <th>Usage</th>
+                                    <th>Warns</th>
+                                    <th>Remaining</th>
+                                    <th>Reason</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="spam-searchban-tbody">
                             </tbody>
                         </table>
                     </div>
