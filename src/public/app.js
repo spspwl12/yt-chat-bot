@@ -286,7 +286,7 @@ function switchTab(targetId, saveState = true) {
 
     // Fetch relevant data on tab switch
     if (ws && ws.readyState === WebSocket.OPEN) {
-        if (targetId === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
+        ws.send(JSON.stringify({ action: 'getState' }));
         if (targetId === 'tab-chat') ws.send(JSON.stringify({ action: 'getChat' }));
         if (targetId === 'tab-spam') ws.send(JSON.stringify({ action: 'getSpam' }));
         if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
@@ -384,10 +384,13 @@ function connectWS() {
         restoreSavedTab(); // 마지막으로 선택했던 탭 복원
 
         pinger = setInterval(() => {
-            const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
-            if (activeTab === 'tab-live') ws.send(JSON.stringify({ action: 'getState' }));
-            if (activeTab === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
-        }, 5000);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'getState' }));
+                const activeBtn = document.querySelector('.nav-btn.active');
+                const activeTab = activeBtn ? activeBtn.getAttribute('data-target') : null;
+                if (activeTab === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
+            }
+        }, 2000);
     };
 
     ws.onclose = () => {
