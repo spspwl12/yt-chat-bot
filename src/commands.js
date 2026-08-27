@@ -13,6 +13,9 @@ const {
     shutdown,
     getCooldownState,
     getWebModules,
+    getModuleList,
+    getDependencyGraph,
+    resolveDependencies,
     handleWebAction
 } = require('./module-manager.js');
 
@@ -40,6 +43,9 @@ module.exports = {
     commandManager,
     moduleManager,
     getWebModules,
+    getModuleList,
+    getDependencyGraph,
+    resolveDependencies,
     handleWebAction,
     onMatchResult,
     copyQuery,

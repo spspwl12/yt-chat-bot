@@ -191,14 +191,14 @@ function reloadVideoSub() {
     }
 }
 
-function reloadCommands() {
+function reloadCommands(targetModules = null) {
     try {
         const { reloadModules, reloadCommands: reloadCmds } = require('./module-manager.js');
         if (reloadModules) {
-            return reloadModules();
+            return reloadModules(targetModules);
         }
         if (reloadCmds) {
-            return reloadCmds();
+            return reloadCmds(targetModules);
         }
         return true;
     } catch (e) {

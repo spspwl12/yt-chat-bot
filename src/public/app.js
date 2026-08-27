@@ -381,6 +381,7 @@ function connectWS() {
         ws.send(JSON.stringify({ action: 'getState' }));
         tlLoadHistory(); // 타임라인 이력 로드
         loadWebModules(); // 웹 독립 모듈 목록 로드
+        loadAllModuleList(); // 전체 모듈 및 의존성 메타데이터 로드
         restoreSavedTab(); // 마지막으로 선택했던 탭 복원
 
         pinger = setInterval(() => {
@@ -749,10 +750,19 @@ function handleWSMessage(msg) {
             renderWebModulesList(payload);
             break;
 
+        case 'moduleList_data':
+            handleModuleListData(payload);
+            break;
+
         case 'reloadModules_result':
         case 'reloadCommands_result':
-            showToast(payload.success ? '⚡ 모든 모듈이 핫리로드되었습니다.' : `❌ 모듈 리로드 실패: ${payload.error || payload.message}`, !payload.success);
+            const reloadMsg = payload.success
+                ? (payload.message || (payload.isFullReload ? '⚡ 모든 모듈이 핫리로드되었습니다.' : '⚡ 선택된 모듈이 핫리로드되었습니다.'))
+                : `❌ 모듈 리로드 실패: ${payload.error || payload.message}`;
+            showToast(reloadMsg, !payload.success);
             if (payload.modules) renderWebModulesList(payload.modules);
+            if (payload.allModules) handleModuleListData(payload.allModules);
+            closeModuleReloadModal();
             refreshCurrentModule();
             break;
 
@@ -2259,9 +2269,14 @@ if (vmPreviewArea && vmConfigArea) {
 }
 
 // ══════════════════════════════════════════════
-//  Independent Module Management - Dynamic Injection Engine
+//  Independent Module Management & Hot-Reload Engine
 // ══════════════════════════════════════════════
 let webModulesList = [];
+let allModulesData = [];
+let selectedModuleNames = new Set();
+let autoSyncDependencies = true;
+let reloadSearchKeyword = '';
+let depNoticeTimeout = null;
 let currentActiveModuleId = null;
 
 function loadWebModules() {
@@ -2270,15 +2285,557 @@ function loadWebModules() {
     }
 }
 
-function reloadModules() {
+function loadAllModuleList() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        showToast('🔄 모든 모듈 및 명령어를 핫리로드하는 중...');
-        ws.send(JSON.stringify({ action: 'reloadModules' }));
+        ws.send(JSON.stringify({ action: 'getModuleList' }));
     }
 }
+
+/**
+ * 로컬 스토리지에서 선택된 모듈 및 의존성 연동 설정 복원
+ */
+function loadSavedSelectedModules() {
+    // 1. 의존성 자동 연동 설정 복원
+    try {
+        const savedSync = localStorage.getItem('bot_admin_reload_auto_sync');
+        if (savedSync !== null) {
+            autoSyncDependencies = JSON.parse(savedSync);
+        }
+    } catch {}
+
+    // 2. 선택된 모듈 목록 복원
+    try {
+        const savedSelected = localStorage.getItem('bot_admin_selected_reload_modules');
+        if (savedSelected !== null) {
+            const parsed = JSON.parse(savedSelected);
+            if (Array.isArray(parsed)) {
+                selectedModuleNames = new Set(parsed);
+                return true;
+            }
+        }
+    } catch {}
+    return false;
+}
+
+/**
+ * 선택된 모듈 및 의존성 연동 설정을 로컬 스토리지에 저장
+ */
+function saveSelectedReloadModules() {
+    try {
+        localStorage.setItem('bot_admin_selected_reload_modules', JSON.stringify(Array.from(selectedModuleNames)));
+    } catch (e) {
+        console.error('[ModuleManager] Failed to save selected modules to localStorage:', e);
+    }
+}
+
+// 스크립트 로드 즉시 로컬 스토리지 복원 시도
+loadSavedSelectedModules();
+
+function handleModuleListData(list) {
+    if (!Array.isArray(list)) return;
+    allModulesData = list;
+
+    // 저장된 설정이 없으면 최초 전체 선택으로 초기화 및 저장
+    if (localStorage.getItem('bot_admin_selected_reload_modules') === null) {
+        selectedModuleNames = new Set(list.map(m => m.name));
+        saveSelectedReloadModules();
+    } else {
+        loadSavedSelectedModules();
+    }
+
+    // 모달이 열려있는 상태라면 카드 그리드 갱신
+    const overlay = document.getElementById('module-reload-modal-overlay');
+    if (overlay && overlay.classList.contains('active')) {
+        renderReloadModulesGrid();
+        updateReloadModalFooter();
+    }
+}
+
+/**
+ * 모듈 핫리로드/관리 모달 열기 (저장된 선택 모듈 복원)
+ */
+function openModuleReloadModal() {
+    if (allModulesData.length === 0) {
+        loadAllModuleList();
+    }
+
+    // 저장된 선택 모듈 및 옵션 복원
+    const hasSaved = loadSavedSelectedModules();
+    if (!hasSaved) {
+        if (allModulesData.length > 0) {
+            selectedModuleNames = new Set(allModulesData.map(m => m.name));
+            saveSelectedReloadModules();
+        } else {
+            selectedModuleNames = new Set();
+        }
+    }
+
+    const searchInput = document.getElementById('reload-module-search');
+    if (searchInput) searchInput.value = '';
+    reloadSearchKeyword = '';
+
+    const autoSyncCheckbox = document.getElementById('reload-auto-sync-deps');
+    if (autoSyncCheckbox) autoSyncCheckbox.checked = autoSyncDependencies;
+
+    renderReloadModulesGrid();
+    updateReloadModalFooter();
+
+    const overlay = document.getElementById('module-reload-modal-overlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+/**
+ * 모듈 핫리로드 모달 닫기
+ */
+function closeModuleReloadModal() {
+    const overlay = document.getElementById('module-reload-modal-overlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+/**
+ * 특정 모듈이 필요로 하는 상위 의존 모듈 목록 계산 (단방향 의존성 전파)
+ */
+function getUpstreamDependencyNames(targetName) {
+    const resolved = new Set();
+    const queue = [targetName];
+
+    while (queue.length > 0) {
+        const curr = queue.shift();
+        if (!curr || resolved.has(curr)) continue;
+        resolved.add(curr);
+
+        const item = allModulesData.find(m => m.name === curr);
+        if (item && Array.isArray(item.dependencies)) {
+            for (const d of item.dependencies) {
+                if (!resolved.has(d)) queue.push(d);
+            }
+        }
+    }
+
+    return Array.from(resolved);
+}
+
+/**
+ * 모듈 리스트를 의존 관계가 있는 모듈끼리 인접하게 정렬
+ */
+function getSortedModules(list) {
+    if (!Array.isArray(list)) return [];
+    
+    // 복사본 생성
+    const items = [...list];
+    const result = [];
+    const visited = new Set();
+
+    // 1. 의존성이 있거나 피의존성이 있는 그룹을 묶어서 우선 정렬
+    items.forEach(mod => {
+        if (visited.has(mod.name)) return;
+
+        const hasDeps = Array.isArray(mod.dependencies) && mod.dependencies.length > 0;
+        const hasDependents = Array.isArray(mod.dependents) && mod.dependents.length > 0;
+
+        if (hasDeps || hasDependents) {
+            // 연관된 모듈들을 하나의 그룹으로 묶음
+            const group = [];
+            const queue = [mod.name];
+            while (queue.length > 0) {
+                const currName = queue.shift();
+                if (!currName || visited.has(currName)) continue;
+                visited.add(currName);
+                const item = items.find(m => m.name === currName);
+                if (item) {
+                    group.push(item);
+                    if (Array.isArray(item.dependencies)) item.dependencies.forEach(d => queue.push(d));
+                    if (Array.isArray(item.dependents)) item.dependents.forEach(d => queue.push(d));
+                }
+            }
+            // 상위 의존 모듈이 먼저 오고, 의존하는 모듈이 바로 뒤에 오도록 정렬 (예: generator -> poster, future -> episode)
+            group.sort((a, b) => {
+                if (Array.isArray(b.dependencies) && b.dependencies.includes(a.name)) return -1;
+                if (Array.isArray(a.dependencies) && a.dependencies.includes(b.name)) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            result.push(...group);
+        }
+    });
+
+    // 2. 나머지 독립 모듈들 추가
+    items.forEach(mod => {
+        if (!visited.has(mod.name)) {
+            visited.add(mod.name);
+            result.push(mod);
+        }
+    });
+
+    return result;
+}
+
+/**
+ * 모듈 리로드 모달 그리드 렌더링
+ */
+function renderReloadModulesGrid() {
+    const container = document.getElementById('reload-modules-grid');
+    if (!container) return;
+
+    if (allModulesData.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim);">
+                <div style="font-size: 2rem; margin-bottom: 8px;">⏳</div>
+                <div>모듈 메타데이터를 불러오는 중...</div>
+            </div>`;
+        return;
+    }
+
+    const sortedList = getSortedModules(allModulesData);
+
+    const filtered = sortedList.filter(mod => {
+        if (!reloadSearchKeyword) return true;
+        const kw = reloadSearchKeyword.toLowerCase();
+        const nameMatch = (mod.name && mod.name.toLowerCase().includes(kw)) || (mod.title && mod.title.toLowerCase().includes(kw));
+        const descMatch = mod.description && mod.description.toLowerCase().includes(kw);
+        const catMatch = mod.category && mod.category.toLowerCase().includes(kw);
+        const aliasMatch = Array.isArray(mod.aliases) && mod.aliases.some(a => a.toLowerCase().includes(kw));
+        return nameMatch || descMatch || catMatch || aliasMatch;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim);">
+                <div style="font-size: 1.8rem; margin-bottom: 8px;">🔍</div>
+                <div>검색 조건과 일치하는 모듈이 없습니다.</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(mod => {
+        const isChecked = selectedModuleNames.has(mod.name);
+        const hasDeps = Array.isArray(mod.dependencies) && mod.dependencies.length > 0;
+
+        let depBadgesHtml = '';
+        if (hasDeps) {
+            depBadgesHtml += `<span class="badge-dependency" title="의존 모듈: ${mod.dependencies.join(', ')}">🔗 의존: ${mod.dependencies.join(', ')}</span>`;
+        }
+
+        const aliasChips = (Array.isArray(mod.aliases) && mod.aliases.length > 0)
+            ? mod.aliases.slice(0, 4).map(a => `<span class="alias-chip">${a}</span>`).join('') +
+              (mod.aliases.length > 4 ? `<span class="alias-chip" style="color:var(--text-dim);">+${mod.aliases.length - 4}</span>` : '')
+            : '';
+
+        return `
+            <div class="reload-module-card ${isChecked ? 'is-selected' : ''}" 
+                 id="mod-card-${mod.name}" 
+                 data-module-name="${mod.name}"
+                 onclick="handleModuleCardClick('${mod.name}', event)">
+                <div class="reload-card-checkbox">
+                    <input type="checkbox" 
+                           id="chk-mod-${mod.name}" 
+                           ${isChecked ? 'checked' : ''} 
+                           onclick="event.stopPropagation(); handleModuleCheckChange('${mod.name}', this.checked);">
+                </div>
+                <div class="reload-card-body">
+                    <div class="reload-card-header-row">
+                        <span class="reload-card-icon">${mod.icon || '📦'}</span>
+                        <span class="reload-card-name">${mod.name}</span>
+                        <span class="badge ${mod.category === 'Services' ? 'badge-green' : 'badge-purple'}" style="font-size:0.65rem; padding:1px 5px;">${mod.badge || (mod.isCommand ? 'Command' : 'Service')}</span>
+                        <div class="reload-card-badges">
+                            ${depBadgesHtml}
+                        </div>
+                    </div>
+                    <div class="reload-card-desc" title="${mod.description || ''}">${mod.description || '독립 모듈'}</div>
+                    ${aliasChips ? `<div class="reload-card-aliases">${aliasChips}</div>` : ''}
+                </div>
+            </div>`;
+    }).join('');
+
+    // 카드 호버 시 연관 모듈 하이라이트 이벤트 바인딩
+    filtered.forEach(mod => {
+        const card = document.getElementById(`mod-card-${mod.name}`);
+        if (!card) return;
+
+        const upstreamDeps = getUpstreamDependencyNames(mod.name);
+
+        card.addEventListener('mouseenter', () => {
+            upstreamDeps.forEach(linkedName => {
+                if (linkedName !== mod.name) {
+                    const linkedCard = document.getElementById(`mod-card-${linkedName}`);
+                    if (linkedCard) linkedCard.classList.add('is-linked-highlight');
+                }
+            });
+        });
+
+        card.addEventListener('mouseleave', () => {
+            upstreamDeps.forEach(linkedName => {
+                const linkedCard = document.getElementById(`mod-card-${linkedName}`);
+                if (linkedCard) linkedCard.classList.remove('is-linked-highlight');
+            });
+        });
+    });
+}
+
+/**
+ * 모듈 카드 클릭 시 체크박스 토글
+ */
+function handleModuleCardClick(modName, event) {
+    const isChecked = selectedModuleNames.has(modName);
+    toggleModuleSelection(modName, !isChecked);
+}
+
+/**
+ * 체크박스 직접 변경 시 처리
+ */
+function handleModuleCheckChange(modName, checked) {
+    toggleModuleSelection(modName, checked);
+}
+
+/**
+ * 모듈 선택/해제 및 의존성 연계 처리 핵심 로직
+ * - 체크 시: 해당 모듈이 필요로 하는 상위 의존 모듈(dependencies)을 필수로 함께 체크
+ * - 체크 해제 시: 해당 모듈만 해제 (상위 모듈을 해제할 때 이를 참조하는 하위 모듈이 있다면 함께 해제)
+ */
+function toggleModuleSelection(modName, isChecked) {
+    if (autoSyncDependencies) {
+        if (isChecked) {
+            // 해당 모듈과 필요한 상위 의존 모듈을 함께 체크
+            const upstream = getUpstreamDependencyNames(modName);
+            upstream.forEach(name => selectedModuleNames.add(name));
+            if (upstream.length > 1) {
+                upstream.forEach(name => {
+                    const el = document.getElementById(`mod-card-${name}`);
+                    if (el) {
+                        el.classList.add('pulse-check');
+                        setTimeout(() => el.classList.remove('pulse-check'), 400);
+                    }
+                });
+            }
+        } else {
+            // 체크 해제: 현재 모듈을 해제하고, 현재 모듈을 의존하고 있는 하위 모듈들도 의존성이 깨지므로 함께 해제
+            selectedModuleNames.delete(modName);
+            allModulesData.forEach(m => {
+                if (Array.isArray(m.dependencies) && m.dependencies.includes(modName)) {
+                    selectedModuleNames.delete(m.name);
+                }
+            });
+        }
+    } else {
+        if (isChecked) {
+            selectedModuleNames.add(modName);
+        } else {
+            selectedModuleNames.delete(modName);
+        }
+    }
+
+    // 로컬 스토리지에 사용자 선택 상태 저장
+    saveSelectedReloadModules();
+
+    // 카드 UI 상태 실시간 반영
+    allModulesData.forEach(m => {
+        const card = document.getElementById(`mod-card-${m.name}`);
+        const chk = document.getElementById(`chk-mod-${m.name}`);
+        const selected = selectedModuleNames.has(m.name);
+        if (card) {
+            if (selected) card.classList.add('is-selected');
+            else card.classList.remove('is-selected');
+        }
+        if (chk) chk.checked = selected;
+    });
+
+    updateReloadModalFooter();
+}
+
+/**
+ * 모달 푸터 상태 텍스트 및 버튼 상태 갱신
+ */
+function updateReloadModalFooter() {
+    const countBadge = document.getElementById('reload-selected-count-badge');
+    const summaryText = document.getElementById('reload-selected-summary-text');
+    const reloadBtn = document.getElementById('btn-reload-selected');
+
+    const total = allModulesData.length || 0;
+    const selectedCount = selectedModuleNames.size;
+
+    if (countBadge) {
+        countBadge.textContent = `선택 ${selectedCount} / ${total}개`;
+        countBadge.className = 'badge ' + (selectedCount === 0 ? 'badge-blue' : (selectedCount === total ? 'badge-purple' : 'badge-green'));
+    }
+
+    if (summaryText) {
+        if (selectedCount === total) {
+            summaryText.textContent = '전체 모듈이 리로드 대상입니다.';
+            summaryText.title = '모든 모듈 선택됨';
+        } else if (selectedCount === 0) {
+            summaryText.textContent = '⚠️ 리로드할 모듈을 선택해주세요.';
+            summaryText.title = '선택된 모듈 없음';
+        } else {
+            const names = Array.from(selectedModuleNames);
+            const displayNames = names.length <= 4 ? names.join(', ') : `${names.slice(0, 3).join(', ')} 외 ${names.length - 3}개`;
+            summaryText.textContent = `선택: ${displayNames}`;
+            summaryText.title = `선택된 모듈 목록: ${names.join(', ')}`;
+        }
+    }
+
+    if (reloadBtn) {
+        reloadBtn.disabled = (selectedCount === 0);
+        reloadBtn.style.opacity = selectedCount === 0 ? '0.5' : '1';
+        reloadBtn.textContent = selectedCount === total
+            ? '⚡ 전체 모듈 리로드'
+            : `⚡ 선택된 모듈 리로드 (${selectedCount}개)`;
+    }
+}
+
+/**
+ * 프리셋: 전체 선택
+ */
+function selectAllReloadModules() {
+    selectedModuleNames = new Set(allModulesData.map(m => m.name));
+    saveSelectedReloadModules();
+    allModulesData.forEach(m => {
+        const card = document.getElementById(`mod-card-${m.name}`);
+        const chk = document.getElementById(`chk-mod-${m.name}`);
+        if (card) card.classList.add('is-selected');
+        if (chk) chk.checked = true;
+    });
+    updateReloadModalFooter();
+}
+
+/**
+ * 프리셋: 전체 해제
+ */
+function deselectAllReloadModules() {
+    selectedModuleNames.clear();
+    saveSelectedReloadModules();
+    allModulesData.forEach(m => {
+        const card = document.getElementById(`mod-card-${m.name}`);
+        const chk = document.getElementById(`chk-mod-${m.name}`);
+        if (card) card.classList.remove('is-selected');
+        if (chk) chk.checked = false;
+    });
+    updateReloadModalFooter();
+}
+
+/**
+ * 프리셋: 선택 반전
+ */
+function invertReloadModuleSelection() {
+    const newSet = new Set();
+    allModulesData.forEach(m => {
+        if (!selectedModuleNames.has(m.name)) newSet.add(m.name);
+    });
+    selectedModuleNames = newSet;
+
+    // 의존성 연동 모드일 경우 정합성 보정 (선택된 모듈들의 필수 상위 의존 모듈 추가)
+    if (autoSyncDependencies) {
+        const expanded = new Set();
+        selectedModuleNames.forEach(name => {
+            getUpstreamDependencyNames(name).forEach(c => expanded.add(c));
+        });
+        selectedModuleNames = expanded;
+    }
+
+    saveSelectedReloadModules();
+
+    allModulesData.forEach(m => {
+        const card = document.getElementById(`mod-card-${m.name}`);
+        const chk = document.getElementById(`chk-mod-${m.name}`);
+        const selected = selectedModuleNames.has(m.name);
+        if (card) {
+            if (selected) card.classList.add('is-selected');
+            else card.classList.remove('is-selected');
+        }
+        if (chk) chk.checked = selected;
+    });
+    updateReloadModalFooter();
+}
+
+/**
+ * 의존성 자동 연동 토글 변경
+ */
+function handleAutoSyncToggle(enabled) {
+    autoSyncDependencies = enabled;
+    try {
+        localStorage.setItem('bot_admin_reload_auto_sync', JSON.stringify(enabled));
+    } catch {}
+
+    if (enabled && selectedModuleNames.size > 0) {
+        // 켜질 때 현재 선택된 모듈들의 상위 의존 모듈 자동 동기화
+        const expanded = new Set();
+        selectedModuleNames.forEach(name => {
+            getUpstreamDependencyNames(name).forEach(c => expanded.add(c));
+        });
+        selectedModuleNames = expanded;
+
+        saveSelectedReloadModules();
+
+        allModulesData.forEach(m => {
+            const card = document.getElementById(`mod-card-${m.name}`);
+            const chk = document.getElementById(`chk-mod-${m.name}`);
+            const selected = selectedModuleNames.has(m.name);
+            if (card) {
+                if (selected) card.classList.add('is-selected');
+                else card.classList.remove('is-selected');
+            }
+            if (chk) chk.checked = selected;
+        });
+        updateReloadModalFooter();
+    }
+}
+
+/**
+ * 실시간 모듈 검색 필터링
+ */
+function filterReloadModules(keyword) {
+    reloadSearchKeyword = keyword.trim();
+    renderReloadModulesGrid();
+}
+
+/**
+ * 실제 모듈 리로드 실행
+ * @param {boolean} selectedOnly true: 선택된 모듈만, false: 전체 즉시 리로드
+ */
+function executeModuleReload(selectedOnly = true) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast('❌ 서버와 연결되어 있지 않습니다.', true);
+        return;
+    }
+
+    if (selectedOnly) {
+        if (selectedModuleNames.size === 0) {
+            showToast('⚠️ 리로드할 모듈을 1개 이상 선택해주세요.', true);
+            return;
+        }
+
+        if (selectedModuleNames.size === allModulesData.length) {
+            // 전체 리로드
+            showToast('🔄 모든 모듈 및 명령어를 핫리로드하는 중...');
+            ws.send(JSON.stringify({ action: 'reloadModules', payload: { modules: null } }));
+        } else {
+            // 선택적 리로드
+            const targets = Array.from(selectedModuleNames);
+            showToast(`🔄 선택된 ${targets.length}개 모듈 [${targets.join(', ')}] 핫리로드 요청 중...`);
+            ws.send(JSON.stringify({ action: 'reloadModules', payload: { modules: targets } }));
+        }
+    } else {
+        // 전체 즉시 리로드
+        showToast('🔄 모든 모듈 및 명령어를 핫리로드하는 중...');
+        ws.send(JSON.stringify({ action: 'reloadModules', payload: { modules: null } }));
+    }
+}
+
+function reloadModules() {
+    openModuleReloadModal();
+}
+
 const reloadCommands = reloadModules;
 window.reloadModules = reloadModules;
 window.reloadCommands = reloadModules;
+window.openModuleReloadModal = openModuleReloadModal;
+window.closeModuleReloadModal = closeModuleReloadModal;
+window.selectAllReloadModules = selectAllReloadModules;
+window.deselectAllReloadModules = deselectAllReloadModules;
+window.invertReloadModuleSelection = invertReloadModuleSelection;
+window.handleAutoSyncToggle = handleAutoSyncToggle;
+window.filterReloadModules = filterReloadModules;
+window.executeModuleReload = executeModuleReload;
+window.handleModuleCardClick = handleModuleCardClick;
+window.handleModuleCheckChange = handleModuleCheckChange;
 
 /**
  * 서버에서 받은 모듈 목록으로 콤보박스 갱신 및 초기/저장된 모듈 주입

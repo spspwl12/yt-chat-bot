@@ -594,21 +594,59 @@ async function handleAction(client, req) {
         eventBus.emit('simulate_chat', payload);
         sendWSFrame(client, JSON.stringify({ action: 'simulate_chat_result', payload: { success: true } }));
     }
-    // ── 명령어 / 독립 모듈 핫리로드 통합 ──
+    // ── 명령어 / 독립 모듈 핫리로드 통합 (전체 또는 특정 모듈 선택) ──
     else if (action === 'reloadCommands' || action === 'reloadModules') {
         try {
-            const success = commandsLib.reloadModules ? commandsLib.reloadModules() : commandsLib.reloadCommands();
+            const targetModules = payload && payload.modules ? payload.modules : null;
+            const result = commandsLib.reloadModules
+                ? commandsLib.reloadModules(targetModules)
+                : (commandsLib.reloadCommands ? commandsLib.reloadCommands(targetModules) : false);
+
+            const success = typeof result === 'boolean' ? result : (result && result.success);
+            const reloaded = (result && result.reloaded) ? result.reloaded : [];
+            const isFullReload = result && result.isFullReload !== undefined ? result.isFullReload : (!targetModules || targetModules === 'all');
             const modules = commandsLib.getWebModules ? commandsLib.getWebModules() : [];
+            const allModules = commandsLib.getModuleList ? commandsLib.getModuleList() : [];
+
+            let msg = '리로드 실패 (로그 확인)';
+            if (success) {
+                if (isFullReload) {
+                    msg = `모든 모듈(${allModules.length}개) 리로드 완료`;
+                } else {
+                    msg = `선택된 모듈 (${reloaded.join(', ')}) 리로드 완료`;
+                }
+            }
+
             const resultMsg = {
                 action: action === 'reloadCommands' ? 'reloadCommands_result' : 'reloadModules_result',
-                payload: { success, message: success ? '모든 모듈 리로드 완료' : '리로드 실패 (로그 확인)', modules }
+                payload: {
+                    success,
+                    message: msg,
+                    reloaded,
+                    isFullReload,
+                    modules,
+                    allModules
+                }
             };
             sendWSFrame(client, JSON.stringify(resultMsg));
             if (action === 'reloadCommands') {
-                sendWSFrame(client, JSON.stringify({ action: 'reloadModules_result', payload: { success, message: success ? '모든 모듈 리로드 완료' : '리로드 실패 (로그 확인)', modules } }));
+                sendWSFrame(client, JSON.stringify({
+                    action: 'reloadModules_result',
+                    payload: {
+                        success,
+                        message: msg,
+                        reloaded,
+                        isFullReload,
+                        modules,
+                        allModules
+                    }
+                }));
             }
         } catch (e) {
-            sendWSFrame(client, JSON.stringify({ action: action === 'reloadCommands' ? 'reloadCommands_result' : 'reloadModules_result', payload: { success: false, error: e.message } }));
+            sendWSFrame(client, JSON.stringify({
+                action: action === 'reloadCommands' ? 'reloadCommands_result' : 'reloadModules_result',
+                payload: { success: false, error: e.message }
+            }));
         }
     }
     // ── 새 기능: 검색 로그 ──
@@ -705,6 +743,11 @@ async function handleAction(client, req) {
     else if (action === 'getWebModules') {
         const modules = commandsLib.getWebModules ? commandsLib.getWebModules() : [];
         sendWSFrame(client, JSON.stringify({ action: 'webModules_data', payload: modules }));
+    }
+    // ── 전체 모듈 및 의존성 메타데이터 목록 조회 ──
+    else if (action === 'getModuleList') {
+        const list = commandsLib.getModuleList ? commandsLib.getModuleList() : [];
+        sendWSFrame(client, JSON.stringify({ action: 'moduleList_data', payload: list }));
     }
 
     // ── 독립 모듈 웹 액션 동적 디스패치 및 폴백 ──
