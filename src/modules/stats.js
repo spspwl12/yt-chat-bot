@@ -82,7 +82,7 @@ module.exports = {
         }
         try {
             statsTracker.close();
-        } catch {}
+        } catch { }
     },
 
     // 독립적 웹 뷰 및 웹소켓 액션 정의
@@ -91,7 +91,7 @@ module.exports = {
         name: 'stats',
         title: '유저 통계 DB (User Statistics Viewer)',
         icon: '📈',
-        description: '실시간 유저 채팅 수, 라이브 시청시간, 일자별 출석 및 종합 랭킹 조회',
+        description: '실시간 유저 채팅 수, 라이브 참여시간, 일자별 출석 및 종합 랭킹 조회',
         category: 'Database & Analytics',
         badge: 'DB',
 
@@ -148,9 +148,9 @@ module.exports = {
                         <label style="font-size: 0.82rem; color: var(--text-dim); white-space: nowrap;">정렬:</label>
                         <select id="stats-sort-by" class="form-input" style="width: auto; min-width: 170px; padding: 8px 12px; cursor: pointer;" onchange="statsModule.search(1)">
                             <option value="total_messages">💬 총 채팅 많은순</option>
-                            <option value="total_watch_seconds">⏱️ 총 시청시간 긴순</option>
+                            <option value="total_watch_seconds">⏱️ 총 참여시간 긴순</option>
                             <option value="today_messages">💬 오늘 채팅 많은순</option>
-                            <option value="today_watch_seconds">⏱️ 오늘 시청시간 긴순</option>
+                            <option value="today_watch_seconds">⏱️ 오늘 참여시간 긴순</option>
                             <option value="active_days">📅 출석 일수 많은순</option>
                             <option value="last_chat_time">🕒 최근 활동순</option>
                         </select>
@@ -172,7 +172,7 @@ module.exports = {
                                 <th style="width:50px; text-align:center;">순위</th>
                                 <th>유저명 / 채널 ID</th>
                                 <th style="text-align:right;">총 채팅</th>
-                                <th style="text-align:right;">총 시청시간</th>
+                                <th style="text-align:right;">총 참여시간</th>
                                 <th style="text-align:right;">오늘 채팅</th>
                                 <th style="text-align:right;">오늘 시청</th>
                                 <th style="text-align:center;">출석</th>
@@ -212,16 +212,16 @@ module.exports = {
                     </div>
                     <div class="stats-metric-grid">
                         <div class="stats-metric-box"><div class="metric-label">총 채팅 메시지</div><div class="metric-value" id="stats-detail-total-msgs" style="color:#f472b6;">--</div><div class="metric-rank" id="stats-detail-total-msgs-rank">전체 --위</div></div>
-                        <div class="stats-metric-box"><div class="metric-label">총 라이브 시청시간</div><div class="metric-value" id="stats-detail-total-watch" style="color:#34d399;">--</div><div class="metric-rank" id="stats-detail-total-watch-rank">전체 --위</div></div>
+                        <div class="stats-metric-box"><div class="metric-label">총 라이브 참여시간</div><div class="metric-value" id="stats-detail-total-watch" style="color:#34d399;">--</div><div class="metric-rank" id="stats-detail-total-watch-rank">전체 --위</div></div>
                         <div class="stats-metric-box"><div class="metric-label">오늘 채팅 메시지</div><div class="metric-value" id="stats-detail-today-msgs" style="color:#a78bfa;">--</div><div class="metric-rank" id="stats-detail-today-msgs-rank">오늘 --위</div></div>
-                        <div class="stats-metric-box"><div class="metric-label">오늘 라이브 시청시간</div><div class="metric-value" id="stats-detail-today-watch" style="color:#fbbf24;">--</div><div class="metric-rank" id="stats-detail-today-watch-rank">오늘 --위</div></div>
+                        <div class="stats-metric-box"><div class="metric-label">오늘 라이브 참여시간</div><div class="metric-value" id="stats-detail-today-watch" style="color:#fbbf24;">--</div><div class="metric-rank" id="stats-detail-today-watch-rank">오늘 --위</div></div>
                         <div class="stats-metric-box"><div class="metric-label">총 출석 일수</div><div class="metric-value" id="stats-detail-active-days" style="color:#60a5fa;">--일</div><div class="metric-rank">24시간 기준</div></div>
                         <div class="stats-metric-box"><div class="metric-label">최근 활동 시각</div><div class="metric-value" id="stats-detail-last-active" style="font-size:0.88rem; color:var(--text-main);">--</div><div class="metric-rank" id="stats-detail-last-date">--</div></div>
                     </div>
                     <h4 style="margin:16px 0 10px 0; font-size:0.88rem; color:var(--text-dim);">📅 최근 일자별 활동 이력 (최대 60일)</h4>
                     <div style="max-height:220px; overflow-y:auto; border:1px solid var(--surface-border); border-radius:8px;">
                         <table class="stats-data-table" style="font-size:0.8rem;">
-                            <thead><tr><th>날짜</th><th style="text-align:right;">채팅 수</th><th style="text-align:right;">시청시간</th></tr></thead>
+                            <thead><tr><th>날짜</th><th style="text-align:right;">채팅 수</th><th style="text-align:right;">참여시간</th></tr></thead>
                             <tbody id="stats-detail-daily-tbody"><tr><td colspan="3" style="text-align:center; color:var(--text-dim); padding:15px;">기록 없음</td></tr></tbody>
                         </table>
                     </div>
@@ -499,13 +499,13 @@ module.exports = {
             };
         }
 
-        // 2. 총시간: 전체 시청시간 랭킹
+        // 2. 총시간: 전체 참여시간 랭킹
         if (rawArg === '총시간' || rawArg === '전체시간') {
             ctx.setCooldown(cmd, 0, _input);
             const rows = statsTracker.getTopTotalWatch(30);
             return {
-                msg: buildRankMessage('총 시청시간 순위', rows, (r) => statsTracker.formatWatchTime(r.total_watch_seconds), cmd, ctx, 0),
-                proc: (attempt) => buildRankMessage('총 시청시간 순위', rows, (r) => statsTracker.formatWatchTime(r.total_watch_seconds), cmd, ctx, attempt)
+                msg: buildRankMessage('총 참여시간 순위', rows, (r) => statsTracker.formatWatchTime(r.total_watch_seconds), cmd, ctx, 0),
+                proc: (attempt) => buildRankMessage('총 참여시간 순위', rows, (r) => statsTracker.formatWatchTime(r.total_watch_seconds), cmd, ctx, attempt)
             };
         }
 
@@ -529,13 +529,13 @@ module.exports = {
             };
         }
 
-        // 5. 오늘시간 / 시간: 오늘 시청시간 랭킹
+        // 5. 오늘시간 / 시간: 오늘 참여시간 랭킹
         if (rawArg === '오늘시간' || rawArg === '시간') {
             ctx.setCooldown(cmd, 0, _input);
             const rows = statsTracker.getTopTodayWatch(30);
             return {
-                msg: buildRankMessage('오늘 시청시간 순위', rows, (r) => statsTracker.formatWatchTime(r.watch_seconds), cmd, ctx, 0),
-                proc: (attempt) => buildRankMessage('오늘 시청시간 순위', rows, (r) => statsTracker.formatWatchTime(r.watch_seconds), cmd, ctx, attempt)
+                msg: buildRankMessage('오늘 참여시간 순위', rows, (r) => statsTracker.formatWatchTime(r.watch_seconds), cmd, ctx, 0),
+                proc: (attempt) => buildRankMessage('오늘 참여시간 순위', rows, (r) => statsTracker.formatWatchTime(r.watch_seconds), cmd, ctx, attempt)
             };
         }
 
