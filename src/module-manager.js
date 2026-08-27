@@ -45,33 +45,37 @@ class ModuleManager {
             return;
         }
 
-        // 1패스: data 파일 및 관련 모든 모듈 캐시 삭제
-        const filesToInvalidate = [
-            '../data/config-youtube.js',
-            '../data/config-messages.js',
-            '../data/config-search.js',
-            '../data/profanity-list.js',
-            '../data/video-music.json',
-            '../data/video-metadata.json',
-            '../data/video-info.json',
-            '../data/video-sub.json',
-            './greeting.js',
-            './func.js',
-            './stats-db.js',
-            './command-context.js',
-        ];
-        for (const relPath of filesToInvalidate) {
-            try {
-                const resolved = require.resolve(path.join(__dirname, relPath));
+        // 1패스: modules/*.js 및 그 의존성 트리 전체를 재귀적으로 캐시 삭제
+        // (node_modules 및 module-manager.js 자신은 제외)
+        const selfPath = require.resolve(__filename);
+        const nodeModulesStr = path.sep + 'node_modules' + path.sep;
+        const invalidated = new Set();
+
+        const invalidateWithDeps = (filePath) => {
+            let resolved;
+            try { resolved = require.resolve(filePath); } catch { return; }
+            if (invalidated.has(resolved)) return;
+            if (resolved === selfPath) return;
+            if (resolved.includes(nodeModulesStr)) return;
+            invalidated.add(resolved);
+            const cached = require.cache[resolved];
+            if (cached) {
+                for (const child of cached.children) {
+                    invalidateWithDeps(child.id);
+                }
                 delete require.cache[resolved];
-            } catch {}
+            }
+        };
+
+        const files = fs.readdirSync(this.modulesDir).filter(f => f.endsWith('.js'));
+        for (const file of files) {
+            invalidateWithDeps(path.join(this.modulesDir, file));
         }
 
         // command-context.js fresh 재로딩
         this.context = require('./command-context.js');
 
-        // 2패스: 모든 모듈 캐시 삭제 후 fresh require
-        const files = fs.readdirSync(this.modulesDir).filter(f => f.endsWith('.js'));
+        // 2패스: 모든 모듈 fresh require
         for (const file of files) {
             const filePath = path.join(this.modulesDir, file);
 
@@ -89,8 +93,6 @@ class ModuleManager {
             }
 
             try {
-                const resolved = require.resolve(filePath);
-                delete require.cache[resolved];
                 const mod = require(filePath);
 
                 if (!mod || !mod.name) {
