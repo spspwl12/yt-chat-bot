@@ -319,14 +319,137 @@ function restoreSavedTab() {
     } catch {}
 }
 
-function showToast(message, isError = false) {
+function showToast(message, isError = false, duration = 3800) {
     const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    let type = isError ? 'error' : 'info';
+    let icon = isError ? '❌' : '✨';
+    let text = (message === null || message === undefined) ? '' : String(message);
+
+    const trimmed = text.trim();
+    if (trimmed.startsWith('❌')) {
+        type = 'error';
+        icon = '❌';
+        text = trimmed.substring(2).trim();
+    } else if (trimmed.startsWith('⚠️')) {
+        type = 'warning';
+        icon = '⚠️';
+        text = trimmed.substring(2).trim();
+    } else if (trimmed.startsWith('✅')) {
+        type = 'success';
+        icon = '✅';
+        text = trimmed.substring(2).trim();
+    } else if (trimmed.startsWith('🔄')) {
+        type = 'loading';
+        icon = '🔄';
+        text = trimmed.substring(2).trim();
+    } else if (trimmed.startsWith('⚡')) {
+        type = 'action';
+        icon = '⚡';
+        text = trimmed.substring(2).trim();
+    } else if (trimmed.startsWith('⏹️')) {
+        type = 'unload';
+        icon = '⏹️';
+        text = trimmed.substring(3).trim();
+    } else if (isError) {
+        type = 'error';
+        icon = '❌';
+    } else {
+        type = 'success';
+        icon = '✨';
+    }
+
     const toast = document.createElement('div');
-    toast.className = 'toast';
-    if (isError) toast.style.borderLeftColor = 'var(--error)';
-    toast.innerText = message;
+    toast.className = `modern-toast toast-${type}`;
+    toast.setAttribute('role', 'alert');
+
+    toast.innerHTML = `
+        <div class="toast-content">
+            <div class="toast-icon-wrap ${type === 'loading' ? 'toast-spin' : ''}">${icon}</div>
+            <div class="toast-body">
+                <div class="toast-message">${text}</div>
+            </div>
+            <button class="toast-close-btn" title="닫기" onclick="event.stopPropagation(); this.closest('.modern-toast').removeToast();">✕</button>
+        </div>
+        <div class="toast-progress-bar">
+            <div class="toast-progress-fill"></div>
+        </div>
+    `;
+
+    // 최대 5개 유지 (화면 가림 방지)
+    while (container.children.length >= 5) {
+        const first = container.firstElementChild;
+        if (first && typeof first.removeToast === 'function') {
+            first.removeToast();
+            break;
+        } else if (first) {
+            first.remove();
+        }
+    }
+
     container.appendChild(toast);
-    setTimeout(() => { toast.remove(); }, 3500);
+
+    let dismissTimer = null;
+    let startTime = Date.now();
+    let remaining = duration;
+    let isPaused = false;
+
+    const progressFill = toast.querySelector('.toast-progress-fill');
+    if (progressFill) {
+        progressFill.style.transition = `transform ${duration}ms linear`;
+        requestAnimationFrame(() => {
+            progressFill.style.transform = 'scaleX(0)';
+        });
+    }
+
+    const removeToast = () => {
+        if (toast.classList.contains('is-exiting')) return;
+        toast.classList.add('is-exiting');
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 280);
+    };
+
+    toast.removeToast = removeToast;
+
+    const startTimer = (time) => {
+        dismissTimer = setTimeout(removeToast, time);
+    };
+
+    startTimer(remaining);
+
+    // 마우스 호버 시 타이머 일시정지
+    toast.addEventListener('mouseenter', () => {
+        isPaused = true;
+        clearTimeout(dismissTimer);
+        const elapsed = Date.now() - startTime;
+        remaining = Math.max(600, remaining - elapsed);
+        if (progressFill) {
+            const computedStyle = window.getComputedStyle(progressFill);
+            const currentTransform = computedStyle.transform;
+            progressFill.style.transition = 'none';
+            progressFill.style.transform = currentTransform;
+        }
+    });
+
+    toast.addEventListener('mouseleave', () => {
+        if (!isPaused) return;
+        isPaused = false;
+        startTime = Date.now();
+        if (progressFill) {
+            progressFill.style.transition = `transform ${remaining}ms linear`;
+            progressFill.style.transform = 'scaleX(0)';
+        }
+        startTimer(remaining);
+    });
+
+    // 클릭 시 즉시 닫기
+    toast.addEventListener('click', (e) => {
+        if (!e.target.closest('.toast-close-btn')) {
+            removeToast();
+        }
+    });
 }
 
 function fmtTime(ts) {
@@ -762,7 +885,17 @@ function handleWSMessage(msg) {
             showToast(reloadMsg, !payload.success);
             if (payload.modules) renderWebModulesList(payload.modules);
             if (payload.allModules) handleModuleListData(payload.allModules);
-            closeModuleReloadModal();
+            refreshCurrentModule();
+            break;
+
+        case 'unloadModules_result':
+        case 'unloadCommands_result':
+            const unloadMsg = payload.success
+                ? (payload.message || '⏹️ 선택된 모듈이 언로드되었습니다.')
+                : `❌ 모듈 언로드 실패: ${payload.error || payload.message}`;
+            showToast(unloadMsg, !payload.success);
+            if (payload.modules) renderWebModulesList(payload.modules);
+            if (payload.allModules) handleModuleListData(payload.allModules);
             refreshCurrentModule();
             break;
 
@@ -2491,10 +2624,11 @@ function renderReloadModulesGrid() {
         if (!reloadSearchKeyword) return true;
         const kw = reloadSearchKeyword.toLowerCase();
         const nameMatch = (mod.name && mod.name.toLowerCase().includes(kw)) || (mod.title && mod.title.toLowerCase().includes(kw));
+        const fileMatch = mod.fileName && mod.fileName.toLowerCase().includes(kw);
         const descMatch = mod.description && mod.description.toLowerCase().includes(kw);
         const catMatch = mod.category && mod.category.toLowerCase().includes(kw);
         const aliasMatch = Array.isArray(mod.aliases) && mod.aliases.some(a => a.toLowerCase().includes(kw));
-        return nameMatch || descMatch || catMatch || aliasMatch;
+        return nameMatch || fileMatch || descMatch || catMatch || aliasMatch;
     });
 
     if (filtered.length === 0) {
@@ -2508,12 +2642,22 @@ function renderReloadModulesGrid() {
 
     container.innerHTML = filtered.map(mod => {
         const isChecked = selectedModuleNames.has(mod.name);
+        const isLoaded = mod.isLoaded !== false;
         const hasDeps = Array.isArray(mod.dependencies) && mod.dependencies.length > 0;
+        const isSubfolder = mod.fileName && mod.fileName.includes('/');
 
         let depBadgesHtml = '';
         if (hasDeps) {
             depBadgesHtml += `<span class="badge-dependency" title="의존 모듈: ${mod.dependencies.join(', ')}">🔗 의존: ${mod.dependencies.join(', ')}</span>`;
         }
+
+        const folderChip = isSubfolder
+            ? `<span class="alias-chip" style="color: #93c5fd; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3);" title="하위 폴더 모듈: src/modules/${mod.fileName}">📁 ${mod.fileName}</span>`
+            : '';
+
+        const statusBadge = isLoaded
+            ? `<span class="badge badge-loaded" title="정상 로드되어 활성화된 모듈">✅ 로드됨</span>`
+            : `<span class="badge badge-unloaded" title="현재 메모리에서 언로드된 상태 (명령어/서비스 비활성)">⏸️ 언로드됨</span>`;
 
         const aliasChips = (Array.isArray(mod.aliases) && mod.aliases.length > 0)
             ? mod.aliases.slice(0, 4).map(a => `<span class="alias-chip">${a}</span>`).join('') +
@@ -2521,7 +2665,7 @@ function renderReloadModulesGrid() {
             : '';
 
         return `
-            <div class="reload-module-card ${isChecked ? 'is-selected' : ''}" 
+            <div class="reload-module-card ${isChecked ? 'is-selected' : ''} ${!isLoaded ? 'is-unloaded' : ''}" 
                  id="mod-card-${mod.name}" 
                  data-module-name="${mod.name}"
                  onclick="handleModuleCardClick('${mod.name}', event)">
@@ -2535,13 +2679,17 @@ function renderReloadModulesGrid() {
                     <div class="reload-card-header-row">
                         <span class="reload-card-icon">${mod.icon || '📦'}</span>
                         <span class="reload-card-name">${mod.name}</span>
+                        ${statusBadge}
                         <span class="badge ${mod.category === 'Services' ? 'badge-green' : 'badge-purple'}" style="font-size:0.65rem; padding:1px 5px;">${mod.badge || (mod.isCommand ? 'Command' : 'Service')}</span>
                         <div class="reload-card-badges">
                             ${depBadgesHtml}
                         </div>
                     </div>
-                    <div class="reload-card-desc" title="${mod.description || ''}">${mod.description || '독립 모듈'}</div>
-                    ${aliasChips ? `<div class="reload-card-aliases">${aliasChips}</div>` : ''}
+                    <div class="reload-card-desc" title="${mod.description || ''}">${mod.description || (isLoaded ? '독립 모듈' : '언로드된 모듈')}</div>
+                    <div class="reload-card-aliases">
+                        ${folderChip}
+                        ${aliasChips}
+                    </div>
                 </div>
             </div>`;
     }).join('');
@@ -2819,6 +2967,25 @@ function executeModuleReload(selectedOnly = true) {
     }
 }
 
+/**
+ * 선택된 모듈 언로드 실행
+ */
+function executeModuleUnload() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast('❌ 서버와 연결되어 있지 않습니다.', true);
+        return;
+    }
+
+    if (selectedModuleNames.size === 0) {
+        showToast('⚠️ 언로드할 모듈을 1개 이상 선택해주세요.', true);
+        return;
+    }
+
+    const targets = Array.from(selectedModuleNames);
+    showToast(`⏹️ 선택된 ${targets.length}개 모듈 [${targets.join(', ')}] 언로드 요청 중...`);
+    ws.send(JSON.stringify({ action: 'unloadModules', payload: { modules: targets } }));
+}
+
 function reloadModules() {
     openModuleReloadModal();
 }
@@ -2834,6 +3001,7 @@ window.invertReloadModuleSelection = invertReloadModuleSelection;
 window.handleAutoSyncToggle = handleAutoSyncToggle;
 window.filterReloadModules = filterReloadModules;
 window.executeModuleReload = executeModuleReload;
+window.executeModuleUnload = executeModuleUnload;
 window.handleModuleCardClick = handleModuleCardClick;
 window.handleModuleCheckChange = handleModuleCheckChange;
 

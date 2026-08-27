@@ -649,6 +649,48 @@ async function handleAction(client, req) {
             }));
         }
     }
+    // ── 독립 모듈 언로드 (실행 중단 및 메모리/이벤트 해제) ──
+    else if (action === 'unloadCommands' || action === 'unloadModules') {
+        try {
+            const targetModules = payload && payload.modules ? payload.modules : null;
+            if (!targetModules || (Array.isArray(targetModules) && targetModules.length === 0)) {
+                sendWSFrame(client, JSON.stringify({
+                    action: 'unloadModules_result',
+                    payload: { success: false, error: '언로드할 모듈을 선택해주세요.' }
+                }));
+                return;
+            }
+
+            const result = commandsLib.unloadModules
+                ? commandsLib.unloadModules(targetModules)
+                : (commandsLib.commandManager && commandsLib.commandManager.unload ? commandsLib.commandManager.unload(targetModules) : { success: false, error: '언로드를 지원하지 않습니다.' });
+
+            const success = !!(result && result.success);
+            const unloaded = (result && result.unloaded) ? result.unloaded : [];
+            const modules = commandsLib.getWebModules ? commandsLib.getWebModules() : [];
+            const allModules = commandsLib.getModuleList ? commandsLib.getModuleList() : [];
+
+            const msg = success
+                ? `선택된 모듈 (${unloaded.join(', ')}) 언로드 완료`
+                : (result ? result.error : '언로드 실패');
+
+            sendWSFrame(client, JSON.stringify({
+                action: action === 'unloadCommands' ? 'unloadCommands_result' : 'unloadModules_result',
+                payload: {
+                    success,
+                    message: msg,
+                    unloaded,
+                    modules,
+                    allModules
+                }
+            }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({
+                action: action === 'unloadCommands' ? 'unloadCommands_result' : 'unloadModules_result',
+                payload: { success: false, error: e.message }
+            }));
+        }
+    }
     // ── 새 기능: 검색 로그 ──
     else if (action === 'getSearchLogs') {
         sendWSFrame(client, JSON.stringify({ action: 'search_logs', payload: searchLogs }));

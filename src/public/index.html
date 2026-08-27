@@ -7,8 +7,12 @@
     <title>YT Chat Bot Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=18">
 </head>
 
 <body>
@@ -36,19 +40,15 @@
             </div>
             <div class="timeline-total-count" style="display:flex; align-items:center; gap:6px;">
                 <span id="tl-total-count">이력 0건</span>
-                <button onclick="tlClearHistory()" style="background:rgba(239, 68, 68, 0.2); border:1px solid rgba(239, 68, 68, 0.4); color:#fca5a5; border-radius:4px; padding:2px 6px; font-size:0.6rem; cursor:pointer;">삭제</button>
+                <button onclick="tlClearHistory()"
+                    style="background:rgba(239, 68, 68, 0.2); border:1px solid rgba(239, 68, 68, 0.4); color:#fca5a5; border-radius:4px; padding:2px 6px; font-size:0.6rem; cursor:pointer;">삭제</button>
             </div>
         </div>
 
         <!-- 슬라이더 → 오른쪽 (flex:1) -->
         <div class="timeline-slider-wrap">
-            <input
-                type="range"
-                class="timeline-slider"
-                id="timeline-slider"
-                min="0" max="100000" value="100000"
-                step="1"
-            >
+            <input type="range" class="timeline-slider" id="timeline-slider" min="0" max="100000" value="100000"
+                step="1">
             <div class="timeline-tick-row" id="timeline-tick-row">
                 <span id="tl-tick-oldest">--</span>
                 <span id="tl-tick-mid">--</span>
@@ -58,9 +58,12 @@
 
         <!-- ══ Quick Action Buttons (타임라인 슬라이더 오른쪽) ══ -->
         <div class="timeline-actions-wrap">
-            <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute" style="background-color: var(--secondary);">🔊 <span class="btn-text">Mute: OFF</span></button>
-            <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp" style="background-color: var(--secondary);">📥 <span class="btn-text">yt-dlp: ON</span></button>
-            <button class="btn btn-sm tl-action-btn" style="background-color: #ef4444;" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄 <span class="btn-text">Reboot</span></button>
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute">🔊 <span class="btn-text">Mute:
+                    OFF</span></button>
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp">📥 <span class="btn-text">yt-dlp:
+                    ON</span></button>
+            <button class="btn btn-sm tl-action-btn btn-ban" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄 <span
+                    class="btn-text">Reboot</span></button>
         </div>
     </div>
 
@@ -77,543 +80,573 @@
     <!-- ══ 본문 레이아웃 (사이드바 + 메인 컨텐츠) ══ -->
     <div class="app-layout">
         <div class="sidebar glass" id="sidebar">
-        <h1>🤖 Bot Admin</h1>
-        <button class="nav-btn active" data-target="tab-live"><span class="nav-icon">📡</span> Live Monitor</button>
-        <button class="nav-btn" data-target="tab-chat"><span class="nav-icon">💬</span> Chat & Ban</button>
-        <button class="nav-btn" data-target="tab-spam"><span class="nav-icon">🛡️</span> Spam Users</button>
-        <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> pHash Logs</button>
-        <button class="nav-btn" data-target="tab-commands"><span class="nav-icon">📋</span> Command Logs</button>
-        <button class="nav-btn" data-target="tab-schedule"><span class="nav-icon">📅</span> Schedule</button>
-        <button class="nav-btn" data-target="tab-videomatching"><span class="nav-icon">🎬</span> Video Matching</button>
-        <button class="nav-btn" data-target="tab-modules"><span class="nav-icon">🧩</span> Module</button>
-        <button class="nav-btn" data-target="tab-editor"><span class="nav-icon">📝</span> Config & Data Editor</button>
+            <h1>🤖 Bot Admin</h1>
+            <button class="nav-btn active" data-target="tab-live"><span class="nav-icon">📡</span> Live Monitor</button>
+            <button class="nav-btn" data-target="tab-chat"><span class="nav-icon">💬</span> Chat & Ban</button>
+            <button class="nav-btn" data-target="tab-spam"><span class="nav-icon">🛡️</span> Spam Users</button>
+            <button class="nav-btn" data-target="tab-search"><span class="nav-icon">🔍</span> pHash Logs</button>
+            <button class="nav-btn" data-target="tab-commands"><span class="nav-icon">📋</span> Command Logs</button>
+            <button class="nav-btn" data-target="tab-schedule"><span class="nav-icon">📅</span> Schedule</button>
+            <button class="nav-btn" data-target="tab-videomatching"><span class="nav-icon">🎬</span> Video
+                Matching</button>
+            <button class="nav-btn" data-target="tab-modules"><span class="nav-icon">🧩</span> Module</button>
+            <button class="nav-btn" data-target="tab-editor"><span class="nav-icon">📝</span> Config & Data
+                Editor</button>
 
-        <div class="conn-status">
-            <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Disconnected</span>
-        </div>
-    </div>
-
-    <div class="content">
-        <!-- Live Monitor -->
-        <div id="tab-live" class="panel active">
-            <h2>📡 Live Status Monitor</h2>
-            <div class="status-grid">
-                <div class="status-card glass">
-                    <h3>Current Episode</h3>
-                    <p id="stat-episode">--</p>
-                </div>
-                <div class="status-card glass">
-                    <h3>Video Time</h3>
-                    <p id="stat-sec"
-                        style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">--
-                    </p>
-                </div>
-                <div class="status-card glass">
-                    <h3>pHash Logs</h3>
-                    <p id="stat-search-count"
-                        style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text;">0
-                    </p>
-                </div>
-                <div class="status-card glass">
-                    <h3>Commands Used</h3>
-                    <p id="stat-cmd-count"
-                        style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">0
-                    </p>
-                </div>
-            </div>
-            <div id="cooldown-monitor-section" style="display: none; margin-top: 10px; margin-bottom: 20px;">
-                <h3 style="font-size: 1rem; color: var(--text-dim); margin-bottom: 12px;">⏳ Command Cooldowns</h3>
-                <div class="status-grid" id="cooldown-grid"
-                    style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
-                </div>
-            </div>
-            <div
-                style="display:flex; gap:10px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--surface-border); flex-wrap: nowrap;">
-                <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;">🛠️ 디버깅:</span>
-                <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)"
-                    style="flex: 1; min-width: 120px;"
-                    onkeydown="if(event.key==='Enter') sendSimulatedChat()">
-                <button class="btn" onclick="sendSimulatedChat()" style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
+            <div class="conn-status">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">Disconnected</span>
             </div>
         </div>
 
-        <!-- Chat & Ban -->
-        <div id="tab-chat" class="panel">
-            <h2>💬 Real-time Chat & Moderation</h2>
-            <div class="chat-list glass" id="chat-container" style="height: 720px;">
-            </div>
-        </div>
-
-        <!-- Spam Users -->
-        <div id="tab-spam" class="panel">
-            <h2>🛡️ Spam Management</h2>
-
-            <div class="section-card glass" style="margin-bottom: 20px; border-left: 4px solid var(--primary);">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.1rem;">🛡️</span>
-                        <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-main);">Manual Add Block (수동 차단 / 유저 관리)</h3>
+        <div class="content">
+            <!-- Live Monitor -->
+            <div id="tab-live" class="panel active">
+                <h2>📡 Live Status Monitor</h2>
+                <div class="status-grid">
+                    <div class="status-card glass">
+                        <h3>Current Episode</h3>
+                        <p id="stat-episode">--</p>
                     </div>
-                    <span style="font-size: 0.78rem; color: var(--text-dim);">지정한 유저를 차단 또는 검색 기능에서 제한합니다.</span>
-                </div>
-                
-                <div class="manual-block-grid">
-                    <div class="manual-field-group">
-                        <label class="manual-label">Display Name <span style="color:var(--text-dim); font-weight:normal;">(선택)</span></label>
-                        <input type="text" id="spam-name" class="form-input" placeholder="유저 닉네임">
+                    <div class="status-card glass">
+                        <h3>Video Time</h3>
+                        <p id="stat-sec"
+                            style="background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text;">
+                            --
+                        </p>
                     </div>
-                    <div class="manual-field-group" style="flex: 1.4;">
-                        <label class="manual-label">Channel ID <span style="color:#ef4444;">*필수</span></label>
-                        <input type="text" id="spam-channel" class="form-input" placeholder="UC... 또는 채널 고유 ID">
+                    <div class="status-card glass">
+                        <h3>pHash Logs</h3>
+                        <p id="stat-search-count"
+                            style="background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text;">
+                            0
+                        </p>
                     </div>
-                    <div class="manual-field-group" style="flex: 1.2;">
-                        <label class="manual-label">Reason <span style="color:var(--text-dim); font-weight:normal;">(사유)</span></label>
-                        <input type="text" id="spam-reason" class="form-input" placeholder="도배 / 봇 오남용 등">
+                    <div class="status-card glass">
+                        <h3>Commands Used</h3>
+                        <p id="stat-cmd-count"
+                            style="background: linear-gradient(90deg, #c084fc, #a855f7); -webkit-background-clip: text;">
+                            0
+                        </p>
                     </div>
                 </div>
-
-                <div class="manual-block-actions" style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
-                    <button class="btn btn-ban" id="btn-add-hide" style="background-color: #ef4444; font-weight: 600;">🚫 유저 숨기기</button>
-                    <button class="btn" id="btn-add-spam" style="background-color: #f59e0b; font-weight: 600;">🛡️ 스팸 등록</button>
-                    <button class="btn" id="btn-add-search-ban" style="background-color: #8b5cf6; font-weight: 600;">🔍 대사검색 차단</button>
-                </div>
-            </div>
-
-            <div class="sub-tabs">
-                <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
-                        id="spam-warn-count">0</span></button>
-                <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
-                        id="spam-searchban-count">0</span></button>
-                <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
-                        id="spam-ban-count">0</span></button>
-            </div>
-
-            <div id="spam-warn-panel" class="sub-panel active">
-                <div class="glass" style="border-radius: 14px; overflow: hidden;">
-                    <div class="log-scroll" style="max-height: 500px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Channel ID</th>
-                                    <th>Usage</th>
-                                    <th>Warns</th>
-                                    <th>Remaining</th>
-                                    <th>Reason</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="spam-warn-tbody">
-                            </tbody>
-                        </table>
+                <div id="cooldown-monitor-section" style="display: none; margin-top: 10px; margin-bottom: 20px;">
+                    <h3 style="font-size: 1rem; color: var(--text-dim); margin-bottom: 12px;">⏳ Command Cooldowns</h3>
+                    <div class="status-grid" id="cooldown-grid"
+                        style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
                     </div>
                 </div>
-            </div>
-
-            <div id="spam-searchban-panel" class="sub-panel">
-                <div class="glass" style="border-radius: 14px; overflow: hidden;">
-                    <div class="log-scroll" style="max-height: 500px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Channel ID</th>
-                                    <th>Usage</th>
-                                    <th>Warns</th>
-                                    <th>Remaining</th>
-                                    <th>Reason</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="spam-searchban-tbody">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div id="spam-ban-panel" class="sub-panel">
-                <div class="glass" style="border-radius: 14px; overflow: hidden;">
-                    <div class="log-scroll" style="max-height: 500px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Channel ID</th>
-                                    <th>Reason</th>
-                                    <th>Banned At</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="spam-ban-tbody">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Search Logs (pHash 검색 결과) -->
-        <div id="tab-search" class="panel">
-            <h2>🔍 pHash Search Results</h2>
-            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
-                실시간 영상 매칭 결과 (searcher.exe → processSearchResult)
-            </p>
-            <div class="log-container glass">
-                <div class="log-scroll" id="search-log-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Rank</th>
-                                <th>File</th>
-                                <th>Similarity</th>
-                                <th>Hamming</th>
-                                <th>Matches</th>
-                                <th>Coverage</th>
-                                <th>DB Timestamp</th>
-                                <th>Clip TS</th>
-                                <th>Now</th>
-                                <th>Real TS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="search-log-tbody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <h3 style="margin-top: 20px;">⚠️ segment_duration 위반 로그</h3>
-            <div class="log-container glass">
-                <div class="log-scroll" id="violation-log-scroll" style="max-height: 250px;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>File</th>
-                                <th>DB Timestamp</th>
-                                <th>Current Time (now)</th>
-                                <th>Difference (s)</th>
-                                <th>Reason</th>
-                                <th>Match Count</th>
-                            </tr>
-                        </thead>
-                        <tbody id="violation-log-tbody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Lastquery History -->
-        <div id="tab-lastquery" class="panel">
-            <h2>📜 Last Query History</h2>
-            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
-                유저들의 !대사/!몇화 검색 질의 이력 (최근 1,000건, 실시간 수집 및 복원)
-            </p>
-            <div class="log-container glass">
-                <div class="log-scroll" id="lastquery-log-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 15%">Time</th>
-                                <th style="width: 20%">User</th>
-                                <th style="width: 15%">Command</th>
-                                <th style="width: 50%">Query (대사/검색어)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="lastquery-log-tbody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Command Logs -->
-        <div id="tab-commands" class="panel">
-            <h2>📋 Command Usage Logs</h2>
-            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
-                유저 명령어 사용 내역 (실시간)
-            </p>
-            <div class="log-container glass">
-                <div class="log-scroll" id="cmd-log-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 90px;">Time</th>
-                                <th style="width: 140px;">User</th>
-                                <th style="width: 90px;">Command</th>
-                                <th style="width: 80px;">Group</th>
-                                <th style="width: 130px;">Args</th>
-                                <th style="max-width: 360px; width: 35%;">Response</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cmd-log-tbody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Independent Module Viewer (동적 주입 - 각 모듈이 자체 UI 정의) -->
-        <div id="tab-modules" class="panel">
-            <div class="module-header-bar glass">
-                <div class="module-header-left">
-                    <h2>🧩 Module Viewer</h2>
-                    <div class="module-select-box">
-                        <label for="unified-module-select" class="module-select-label">선택 모듈:</label>
-                        <select id="unified-module-select" class="module-select-input" onchange="switchModule(this.value)">
-                            <option value="">모듈 로드 중...</option>
-                        </select>
-                    </div>
-                    <span id="module-status-badge" class="badge badge-purple" style="font-size: 0.78rem;">Module</span>
-                </div>
-                <div class="module-header-right">
-                    <span id="active-module-desc-inline" style="font-size: 0.8rem; color: var(--text-dim); margin-right: 8px;"></span>
-                    <button class="btn btn-sm" onclick="openModuleReloadModal()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 2px 8px rgba(99,102,241,0.3);" title="독립 모듈 핫리로드 및 관리">⚙️ 모듈 관리</button>
-                    <button class="btn btn-sm" id="module-refresh-btn" onclick="refreshCurrentModule()" style="background: var(--secondary);" title="현재 모듈 데이터 새로고침">🔄 새로고침</button>
-                </div>
-            </div>
-
-            <!-- 모듈 스타일 주입 슬롯 -->
-            <style id="module-injected-styles"></style>
-
-            <!-- 모듈 패널 동적 주입 컨테이너 -->
-            <div id="module-panel-mount" style="margin-top: 18px;"></div>
-
-            <!-- 모듈 스크립트 주입 슬롯 -->
-            <div id="module-injected-scripts"></div>
-        </div>
-
-        <!-- Broadcast Schedule -->
-        <div id="tab-schedule" class="panel">
-            <h2>📅 Broadcast Schedule</h2>
-            <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
-                현재 방송 및 향후 편성표 (다음 150개 회차 한정)
-            </p>
-            <div class="log-container glass">
-                <div class="log-scroll" id="schedule-scroll" style="max-height: 600px;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 20%">Date</th>
-                                <th style="width: 20%">Time</th>
-                                <th style="width: 60%">Episode</th>
-                            </tr>
-                        </thead>
-                        <tbody id="schedule-tbody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-
-        <!-- Video Matching Panel -->
-        <div id="tab-videomatching" class="panel">
-            <h2>🎬 Video Matching &amp; Live Crop</h2>
-
-            <!-- Action Bar -->
-            <div class="vm-action-bar" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <button class="btn" onclick="refreshLiveFrame()" id="btn-refresh-frame">
-                    <span>📷</span> 미리보기 캡처
-                </button>
-                <button class="btn" onclick="saveVideoMatchingConfig()"
-                    style="background: var(--secondary); box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
-                    <span>💾</span> 설정 저장 (즉시 적용)
-                </button>
-                <span id="vm-save-status" class="vm-status-badge" style="display:none;"></span>
                 <div
-                    style="display: flex; align-items: center; gap: 8px; margin-left: auto; background: rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 20px;">
-                    <span style="font-size: 0.8rem;">💡 밝기</span>
-                    <input type="range" id="vm-brightness" min="50" max="300" value="100" style="width: 100px;">
+                    style="display:flex; gap:10px; margin-top: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--surface-border); flex-wrap: nowrap;">
+                    <span
+                        style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;">🛠️
+                        디버깅:</span>
+                    <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)"
+                        style="flex: 1; min-width: 120px;" onkeydown="if(event.key==='Enter') sendSimulatedChat()">
+                    <button class="btn" onclick="sendSimulatedChat()"
+                        style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
                 </div>
             </div>
 
-            <!-- Main Layout -->
-            <div class="vm-panel">
-                <!-- Preview Area -->
-                <div class="vm-preview-area">
+            <!-- Chat & Ban -->
+            <div id="tab-chat" class="panel">
+                <h2>💬 Real-time Chat & Moderation</h2>
+                <div class="chat-list glass" id="chat-container" style="height: 720px;">
+                </div>
+            </div>
+
+            <!-- Spam Users -->
+            <div id="tab-spam" class="panel">
+                <h2>🛡️ Spam Management</h2>
+
+                <div class="section-card glass" style="margin-bottom: 20px; border-left: 4px solid var(--primary);">
                     <div
-                        style="font-size:0.78rem; color:var(--text-dim); align-self:flex-start; display:flex; align-items:center; gap:6px;">
-                        <span
-                            style="width:8px;height:8px;border-radius:50%;background:var(--secondary);display:inline-block;box-shadow:0 0 6px var(--secondary);"></span>
-                        Live Preview — 드래그로 Crop 영역 선택
+                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.1rem;">🛡️</span>
+                            <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-main);">Manual
+                                Add Block (수동 차단 / 유저 관리)</h3>
+                        </div>
+                        <span style="font-size: 0.78rem; color: var(--text-dim);">지정한 유저를 차단 또는 검색 기능에서 제한합니다.</span>
                     </div>
-                    <div id="vm-video-wrapper"
-                        style="position: relative; display: flex; justify-content: center; width: 100%; overflow: hidden; padding-top: 10px;">
-                        <div style="position: relative; display: inline-block;">
-                            <img id="vm-preview-img"
-                                style="max-width: 100%; max-height: 80vh; display: none; cursor: crosshair; object-fit: contain; border-radius: 6px; user-select: none;"
-                                alt="Live preview" draggable="false" />
-                            <div id="vm-preview-placeholder" class="vm-preview-placeholder">
-                                <span style="font-size:2.5rem;">📷</span>
-                                <span>미리보기 없음</span>
-                                <span style="font-size:0.75rem;">위의 <b>미리보기 캡처</b> 버튼을 누르세요</span>
-                            </div>
-                            <div id="vm-crop-overlay"
-                                style="position: absolute; border: 2px dashed #00f0ff; background: rgba(0, 240, 255, 0.08); pointer-events: none; display: none; border-radius: 2px;">
-                            </div>
-                            <canvas id="vm-crop-magnifier" width="120" height="120"
-                                style="display: none; position: absolute; border: 2px solid #00f0ff; border-radius: 50%; z-index: 100; pointer-events: none; box-shadow: 0 0 15px rgba(0,240,255,0.5);"></canvas>
+
+                    <div class="manual-block-grid">
+                        <div class="manual-field-group">
+                            <label class="manual-label">Display Name <span
+                                    style="color:var(--text-dim); font-weight:normal;">(선택)</span></label>
+                            <input type="text" id="spam-name" class="form-input" placeholder="유저 닉네임">
+                        </div>
+                        <div class="manual-field-group" style="flex: 1.4;">
+                            <label class="manual-label">Channel ID <span style="color:#ef4444;">*필수</span></label>
+                            <input type="text" id="spam-channel" class="form-input" placeholder="UC... 또는 채널 고유 ID">
+                        </div>
+                        <div class="manual-field-group" style="flex: 1.2;">
+                            <label class="manual-label">Reason <span
+                                    style="color:var(--text-dim); font-weight:normal;">(사유)</span></label>
+                            <input type="text" id="spam-reason" class="form-input" placeholder="도배 / 봇 오남용 등">
                         </div>
                     </div>
 
+                    <div class="manual-block-actions"
+                        style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+                        <button class="btn btn-ban" id="btn-add-hide"
+                            style="background-color: #ef4444; font-weight: 600;">🚫 유저 숨기기</button>
+                        <button class="btn" id="btn-add-spam" style="background-color: #f59e0b; font-weight: 600;">🛡️
+                            스팸 등록</button>
+                        <button class="btn" id="btn-add-search-ban"
+                            style="background-color: #8b5cf6; font-weight: 600;">🔍 대사검색 차단</button>
+                    </div>
                 </div>
 
-                <!-- Config Area -->
-                <div class="vm-config-area">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
+                            id="spam-warn-count">0</span></button>
+                    <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
+                            id="spam-searchban-count">0</span></button>
+                    <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
+                            id="spam-ban-count">0</span></button>
+                </div>
 
-                    <!-- Crop Region -->
-                    <div class="vm-config-card">
-                        <h4>✂️ Crop Region</h4>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>X</label>
-                                <input type="number" id="vm-crop-x" class="input-text" placeholder="0">
-                            </div>
-                            <div class="vm-field">
-                                <label>Y</label>
-                                <input type="number" id="vm-crop-y" class="input-text" placeholder="0">
-                            </div>
-                        </div>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>Width</label>
-                                <input type="number" id="vm-crop-w" class="input-text" placeholder="0">
-                            </div>
-                            <div class="vm-field">
-                                <label>Height</label>
-                                <input type="number" id="vm-crop-h" class="input-text" placeholder="0">
-                            </div>
-                        </div>
-                        <label class="vm-crop-toggle">
-                            <input type="checkbox" id="vm-crop-enabled">
-                            <span>Crop 활성화</span>
-                            <span id="vm-crop-status-badge" class="badge badge-red"
-                                style="font-size:0.68rem;">OFF</span>
-                        </label>
-                    </div>
-
-                    <!-- Extraction -->
-                    <div class="vm-config-card">
-                        <h4>🎞️ Extraction</h4>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>FPS</label>
-                                <input type="number" id="vm-ext-fps" class="input-text" placeholder="2">
-                            </div>
-                            <div class="vm-field">
-                                <label>Width</label>
-                                <input type="number" id="vm-ext-w" class="input-text" placeholder="64">
-                            </div>
-                        </div>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>Height</label>
-                                <input type="number" id="vm-ext-h" class="input-text" placeholder="64">
-                            </div>
+                <div id="spam-warn-panel" class="sub-panel active">
+                    <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                        <div class="log-scroll" style="max-height: 500px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Channel ID</th>
+                                        <th>Usage</th>
+                                        <th>Warns</th>
+                                        <th>Remaining</th>
+                                        <th>Reason</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="spam-warn-tbody">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+                </div>
 
-                    <!-- pHash -->
-                    <div class="vm-config-card">
-                        <h4>🔷 pHash</h4>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>Resize W</label>
-                                <input type="number" id="vm-ph-rw" class="input-text" placeholder="64">
-                            </div>
-                            <div class="vm-field">
-                                <label>Resize H</label>
-                                <input type="number" id="vm-ph-rh" class="input-text" placeholder="64">
-                            </div>
-                        </div>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>DCT Size</label>
-                                <input type="number" id="vm-ph-dct" class="input-text" placeholder="64">
-                            </div>
-                            <div class="vm-field">
-                                <label>Low Freq</label>
-                                <input type="number" id="vm-ph-low" class="input-text" placeholder="16">
-                            </div>
-                        </div>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>Hash Bits</label>
-                                <input type="number" id="vm-ph-bits" class="input-text" placeholder="256">
-                            </div>
+                <div id="spam-searchban-panel" class="sub-panel">
+                    <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                        <div class="log-scroll" style="max-height: 500px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Channel ID</th>
+                                        <th>Usage</th>
+                                        <th>Warns</th>
+                                        <th>Remaining</th>
+                                        <th>Reason</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="spam-searchban-tbody">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Matching & Stream -->
-                    <div class="vm-config-card">
-                        <h4>🎯 Matching & Stream</h4>
-                        <div class="vm-field-row">
-                            <div class="vm-field">
-                                <label>Threshold</label>
-                                <input type="number" id="vm-match-th" class="input-text" placeholder="30">
-                            </div>
-                            <div class="vm-field">
-                                <label>Top N</label>
-                                <input type="number" id="vm-match-topn" class="input-text" placeholder="5">
+                <div id="spam-ban-panel" class="sub-panel">
+                    <div class="glass" style="border-radius: 14px; overflow: hidden;">
+                        <div class="log-scroll" style="max-height: 500px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Channel ID</th>
+                                        <th>Reason</th>
+                                        <th>Banned At</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="spam-ban-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Logs (pHash 검색 결과) -->
+            <div id="tab-search" class="panel">
+                <h2>🔍 pHash Search Results</h2>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                    실시간 영상 매칭 결과 (searcher.exe → processSearchResult)
+                </p>
+                <div class="log-container glass">
+                    <div class="log-scroll" id="search-log-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Rank</th>
+                                    <th>File</th>
+                                    <th>Similarity</th>
+                                    <th>Hamming</th>
+                                    <th>Matches</th>
+                                    <th>Coverage</th>
+                                    <th>DB Timestamp</th>
+                                    <th>Clip TS</th>
+                                    <th>Now</th>
+                                    <th>Real TS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="search-log-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 20px;">⚠️ segment_duration 위반 로그</h3>
+                <div class="log-container glass">
+                    <div class="log-scroll" id="violation-log-scroll" style="max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>File</th>
+                                    <th>DB Timestamp</th>
+                                    <th>Current Time (now)</th>
+                                    <th>Difference (s)</th>
+                                    <th>Reason</th>
+                                    <th>Match Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="violation-log-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lastquery History -->
+            <div id="tab-lastquery" class="panel">
+                <h2>📜 Last Query History</h2>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                    유저들의 !대사/!몇화 검색 질의 이력 (최근 1,000건, 실시간 수집 및 복원)
+                </p>
+                <div class="log-container glass">
+                    <div class="log-scroll" id="lastquery-log-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%">Time</th>
+                                    <th style="width: 20%">User</th>
+                                    <th style="width: 15%">Command</th>
+                                    <th style="width: 50%">Query (대사/검색어)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lastquery-log-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command Logs -->
+            <div id="tab-commands" class="panel">
+                <h2>📋 Command Usage Logs</h2>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                    유저 명령어 사용 내역 (실시간)
+                </p>
+                <div class="log-container glass">
+                    <div class="log-scroll" id="cmd-log-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Time</th>
+                                    <th style="width: 140px;">User</th>
+                                    <th style="width: 90px;">Command</th>
+                                    <th style="width: 80px;">Group</th>
+                                    <th style="width: 130px;">Args</th>
+                                    <th style="max-width: 360px; width: 35%;">Response</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cmd-log-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Independent Module Viewer (동적 주입 - 각 모듈이 자체 UI 정의) -->
+            <div id="tab-modules" class="panel">
+                <div class="module-header-bar glass">
+                    <div class="module-header-left">
+                        <h2>🧩 Module Viewer</h2>
+                        <div class="module-select-box">
+                            <label for="unified-module-select" class="module-select-label">선택 모듈:</label>
+                            <select id="unified-module-select" class="module-select-input"
+                                onchange="switchModule(this.value)">
+                                <option value="">모듈 로드 중...</option>
+                            </select>
+                        </div>
+                        <span id="module-status-badge" class="badge badge-purple"
+                            style="font-size: 0.78rem;">Module</span>
+                    </div>
+                    <div class="module-header-right">
+                        <span id="active-module-desc-inline"
+                            style="font-size: 0.8rem; color: var(--text-dim); margin-right: 8px;"></span>
+                        <button class="btn btn-sm" onclick="openModuleReloadModal()"
+                            style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 2px 8px rgba(99,102,241,0.3);"
+                            title="독립 모듈 핫리로드 및 관리">⚙️ 모듈 관리</button>
+                        <button class="btn btn-sm" id="module-refresh-btn" onclick="refreshCurrentModule()"
+                            style="background: var(--secondary);" title="현재 모듈 데이터 새로고침">🔄 새로고침</button>
+                    </div>
+                </div>
+
+                <!-- 모듈 스타일 주입 슬롯 -->
+                <style id="module-injected-styles"></style>
+
+                <!-- 모듈 패널 동적 주입 컨테이너 -->
+                <div id="module-panel-mount" style="margin-top: 18px;"></div>
+
+                <!-- 모듈 스크립트 주입 슬롯 -->
+                <div id="module-injected-scripts"></div>
+            </div>
+
+            <!-- Broadcast Schedule -->
+            <div id="tab-schedule" class="panel">
+                <h2>📅 Broadcast Schedule</h2>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                    현재 방송 및 향후 편성표 (다음 150개 회차 한정)
+                </p>
+                <div class="log-container glass">
+                    <div class="log-scroll" id="schedule-scroll" style="max-height: 600px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%">Date</th>
+                                    <th style="width: 20%">Time</th>
+                                    <th style="width: 60%">Episode</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedule-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Video Matching Panel -->
+            <div id="tab-videomatching" class="panel">
+                <h2>🎬 Video Matching &amp; Live Crop</h2>
+
+                <!-- Action Bar -->
+                <div class="vm-action-bar" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <button class="btn" onclick="refreshLiveFrame()" id="btn-refresh-frame">
+                        <span>📷</span> 미리보기 캡처
+                    </button>
+                    <button class="btn" onclick="saveVideoMatchingConfig()"
+                        style="background: var(--secondary); box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
+                        <span>💾</span> 설정 저장 (즉시 적용)
+                    </button>
+                    <span id="vm-save-status" class="vm-status-badge" style="display:none;"></span>
+                    <div
+                        style="display: flex; align-items: center; gap: 8px; margin-left: auto; background: rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 20px;">
+                        <span style="font-size: 0.8rem;">💡 밝기</span>
+                        <input type="range" id="vm-brightness" min="50" max="300" value="100" style="width: 100px;">
+                    </div>
+                </div>
+
+                <!-- Main Layout -->
+                <div class="vm-panel">
+                    <!-- Preview Area -->
+                    <div class="vm-preview-area">
+                        <div
+                            style="font-size:0.78rem; color:var(--text-dim); align-self:flex-start; display:flex; align-items:center; gap:6px;">
+                            <span
+                                style="width:8px;height:8px;border-radius:50%;background:var(--secondary);display:inline-block;box-shadow:0 0 6px var(--secondary);"></span>
+                            Live Preview — 드래그로 Crop 영역 선택
+                        </div>
+                        <div id="vm-video-wrapper"
+                            style="position: relative; display: flex; justify-content: center; width: 100%; overflow: hidden; padding-top: 10px;">
+                            <div style="position: relative; display: inline-block;">
+                                <img id="vm-preview-img"
+                                    style="max-width: 100%; max-height: 80vh; display: none; cursor: crosshair; object-fit: contain; border-radius: 6px; user-select: none;"
+                                    alt="Live preview" draggable="false" />
+                                <div id="vm-preview-placeholder" class="vm-preview-placeholder">
+                                    <span style="font-size:2.5rem;">📷</span>
+                                    <span>미리보기 없음</span>
+                                    <span style="font-size:0.75rem;">위의 <b>미리보기 캡처</b> 버튼을 누르세요</span>
+                                </div>
+                                <div id="vm-crop-overlay"
+                                    style="position: absolute; border: 2px dashed #00f0ff; background: rgba(0, 240, 255, 0.08); pointer-events: none; display: none; border-radius: 2px;">
+                                </div>
+                                <canvas id="vm-crop-magnifier" width="120" height="120"
+                                    style="display: none; position: absolute; border: 2px solid #00f0ff; border-radius: 50%; z-index: 100; pointer-events: none; box-shadow: 0 0 15px rgba(0,240,255,0.5);"></canvas>
                             </div>
                         </div>
-                        <div class="vm-field-row" style="margin-bottom:12px;">
-                            <label class="vm-crop-toggle" style="margin-top:0;">
-                                <input type="checkbox" id="vm-match-early">
-                                <span>Early Exit (빠른 종료)</span>
+
+                    </div>
+
+                    <!-- Config Area -->
+                    <div class="vm-config-area">
+
+                        <!-- Crop Region -->
+                        <div class="vm-config-card">
+                            <h4>✂️ Crop Region</h4>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>X</label>
+                                    <input type="number" id="vm-crop-x" class="input-text" placeholder="0">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Y</label>
+                                    <input type="number" id="vm-crop-y" class="input-text" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>Width</label>
+                                    <input type="number" id="vm-crop-w" class="input-text" placeholder="0">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Height</label>
+                                    <input type="number" id="vm-crop-h" class="input-text" placeholder="0">
+                                </div>
+                            </div>
+                            <label class="vm-crop-toggle">
+                                <input type="checkbox" id="vm-crop-enabled">
+                                <span>Crop 활성화</span>
+                                <span id="vm-crop-status-badge" class="badge badge-red"
+                                    style="font-size:0.68rem;">OFF</span>
                             </label>
                         </div>
-                        <div class="vm-field" style="margin-bottom:12px;">
-                            <label>YouTube Live Stream URL</label>
-                            <input type="text" id="vm-search-url" class="input-text"
-                                placeholder="https://www.youtube.com/watch?v=...">
+
+                        <!-- Extraction -->
+                        <div class="vm-config-card">
+                            <h4>🎞️ Extraction</h4>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>FPS</label>
+                                    <input type="number" id="vm-ext-fps" class="input-text" placeholder="2">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Width</label>
+                                    <input type="number" id="vm-ext-w" class="input-text" placeholder="64">
+                                </div>
+                            </div>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>Height</label>
+                                    <input type="number" id="vm-ext-h" class="input-text" placeholder="64">
+                                </div>
+                            </div>
                         </div>
-                        <div class="vm-field">
-                            <label>yt-dlp Custom CLI Arguments</label>
-                            <input type="text" id="vm-ytdlp-cmdline" class="input-text"
-                                placeholder='["--cookies", "../data/cookies.txt"]'>
+
+                        <!-- pHash -->
+                        <div class="vm-config-card">
+                            <h4>🔷 pHash</h4>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>Resize W</label>
+                                    <input type="number" id="vm-ph-rw" class="input-text" placeholder="64">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Resize H</label>
+                                    <input type="number" id="vm-ph-rh" class="input-text" placeholder="64">
+                                </div>
+                            </div>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>DCT Size</label>
+                                    <input type="number" id="vm-ph-dct" class="input-text" placeholder="64">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Low Freq</label>
+                                    <input type="number" id="vm-ph-low" class="input-text" placeholder="16">
+                                </div>
+                            </div>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>Hash Bits</label>
+                                    <input type="number" id="vm-ph-bits" class="input-text" placeholder="256">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Matching & Stream -->
+                        <div class="vm-config-card">
+                            <h4>🎯 Matching & Stream</h4>
+                            <div class="vm-field-row">
+                                <div class="vm-field">
+                                    <label>Threshold</label>
+                                    <input type="number" id="vm-match-th" class="input-text" placeholder="30">
+                                </div>
+                                <div class="vm-field">
+                                    <label>Top N</label>
+                                    <input type="number" id="vm-match-topn" class="input-text" placeholder="5">
+                                </div>
+                            </div>
+                            <div class="vm-field-row" style="margin-bottom:12px;">
+                                <label class="vm-crop-toggle" style="margin-top:0;">
+                                    <input type="checkbox" id="vm-match-early">
+                                    <span>Early Exit (빠른 종료)</span>
+                                </label>
+                            </div>
+                            <div class="vm-field" style="margin-bottom:12px;">
+                                <label>YouTube Live Stream URL</label>
+                                <input type="text" id="vm-search-url" class="input-text"
+                                    placeholder="https://www.youtube.com/watch?v=...">
+                            </div>
+                            <div class="vm-field">
+                                <label>yt-dlp Custom CLI Arguments</label>
+                                <input type="text" id="vm-ytdlp-cmdline" class="input-text"
+                                    placeholder='["--cookies", "../data/cookies.txt"]'>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Unified JS / JSON Config & Data Editor -->
+            <div id="tab-editor" class="panel">
+                <div class="editor-header-bar glass">
+                    <div class="editor-header-left">
+                        <h2>📝 Config &amp; Data Editor</h2>
+                        <div class="editor-select-box">
+                            <label for="unified-file-select" class="editor-select-label">선택 파일:</label>
+                            <select id="unified-file-select" class="editor-select-input"
+                                onchange="switchEditorFile(this.value)">
+                                <option value="youtube">config-youtube.js (⚙️ 봇 기본 및 쿨타임 설정)</option>
+                                <option value="messages">config-messages.js (💬 봇 응답 메시지 템플릿)</option>
+                                <option value="search">config-search.js (🔍 비디오 매칭/다운로더 설정)</option>
+                                <option value="profanity">profanity-list.js (🛡️ 욕설/비속어 차단 목록)</option>
+                                <option value="videoMusic">video-music.json (🎵 BGM/음악 데이터베이스)</option>
+                                <option value="videoMetadata">video-metadata.json (🏷️ 방송 회차 메타데이터)</option>
+                                <option value="videoInfo">video-info.json (🎬 에피소드 비디오 정보 DB)</option>
+                            </select>
                         </div>
                     </div>
+                    <div class="editor-header-right">
+                        <button class="btn btn-sm" onclick="reloadVideoSub()"
+                            style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 3px 10px rgba(99,102,241,0.3);"
+                            title="video-sub.json 대사 파일 서버 리로드">📜 대사파일 리로드</button>
+                        <button id="editor-format-btn" class="btn btn-sm" onclick="formatCurrentEditorJson()"
+                            style="display:none; background:var(--surface-border);" title="JSON 예쁘게 정렬">✨ JSON
+                            정렬</button>
+                        <button class="btn btn-sm" onclick="reloadCurrentEditorFile()"
+                            style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
+                        <button class="btn btn-sm" onclick="saveCurrentEditorFile()"
+                            style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">💾
+                            저장 및 실시간 적용</button>
+                    </div>
+                </div>
 
+                <div class="config-block glass" style="margin-top: 16px;">
+                    <textarea id="unified-code-editor" class="code-editor" spellcheck="false"
+                        style="min-height: 820px; height: 82vh;"></textarea>
                 </div>
             </div>
         </div>
-
-        <!-- Unified JS / JSON Config & Data Editor -->
-        <div id="tab-editor" class="panel">
-            <div class="editor-header-bar glass">
-                <div class="editor-header-left">
-                    <h2>📝 Config &amp; Data Editor</h2>
-                    <div class="editor-select-box">
-                        <label for="unified-file-select" class="editor-select-label">선택 파일:</label>
-                        <select id="unified-file-select" class="editor-select-input" onchange="switchEditorFile(this.value)">
-                            <option value="youtube">config-youtube.js (⚙️ 봇 기본 및 쿨타임 설정)</option>
-                            <option value="messages">config-messages.js (💬 봇 응답 메시지 템플릿)</option>
-                            <option value="search">config-search.js (🔍 비디오 매칭/다운로더 설정)</option>
-                            <option value="profanity">profanity-list.js (🛡️ 욕설/비속어 차단 목록)</option>
-                            <option value="videoMusic">video-music.json (🎵 BGM/음악 데이터베이스)</option>
-                            <option value="videoMetadata">video-metadata.json (🏷️ 방송 회차 메타데이터)</option>
-                            <option value="videoInfo">video-info.json (🎬 에피소드 비디오 정보 DB)</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="editor-header-right">
-                    <button class="btn btn-sm" onclick="reloadVideoSub()" style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 3px 10px rgba(99,102,241,0.3);" title="video-sub.json 대사 파일 서버 리로드">📜 대사파일 리로드</button>
-                    <button id="editor-format-btn" class="btn btn-sm" onclick="formatCurrentEditorJson()" style="display:none; background:var(--surface-border);" title="JSON 예쁘게 정렬">✨ JSON 정렬</button>
-                    <button class="btn btn-sm" onclick="reloadCurrentEditorFile()" style="background:var(--secondary);" title="서버 파일 다시 불러오기">🔄 새로고침</button>
-                    <button class="btn btn-sm" onclick="saveCurrentEditorFile()" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">💾 저장 및 실시간 적용</button>
-                </div>
-            </div>
-
-            <div class="config-block glass" style="margin-top: 16px;">
-                <textarea id="unified-code-editor" class="code-editor" spellcheck="false" style="min-height: 820px; height: 82vh;"></textarea>
-            </div>
-        </div>
-    </div>
     </div>
 
     <div id="toast-container"></div>
@@ -628,14 +661,15 @@
     </div>
 
     <!-- ══ Module Hot-Reload Selector Modal ══ -->
-    <div class="module-reload-overlay" id="module-reload-modal-overlay" onclick="if(event.target===this)closeModuleReloadModal()">
-        <div class="module-reload-modal glass" id="module-reload-modal">
+    <div class="module-reload-overlay" id="module-reload-modal-overlay"
+        onclick="if(event.target===this)closeModuleReloadModal()">
+        <div class="module-reload-modal glass" id="module-reload-modal" onclick="event.stopPropagation()">
             <div class="reload-modal-header">
                 <div class="reload-modal-title">
-                    <span class="reload-modal-icon">⚡</span>
+                    <span class="reload-modal-icon">⚙️</span>
                     <div>
-                        <h3>모듈 핫리로드 (Module Hot-Reload)</h3>
-                        <p class="reload-modal-subtitle">리로드할 모듈을 선택하세요. (기본값: 전체 모듈 리로드)</p>
+                        <h3>모듈 관리 (Module Management)</h3>
+                        <p class="reload-modal-subtitle">리로드 또는 언로드할 모듈을 선택하세요. (기본값: 전체 모듈 리로드)</p>
                     </div>
                 </div>
                 <button class="reload-modal-close" onclick="closeModuleReloadModal()" title="닫기">✕</button>
@@ -650,13 +684,15 @@
                 </div>
                 <div class="reload-modal-options">
                     <label class="toggle-control" title="모듈 선택 시 상호 의존 관계가 있는 모듈을 자동으로 함께 선택하거나 해제합니다.">
-                        <input type="checkbox" id="reload-auto-sync-deps" checked onchange="handleAutoSyncToggle(this.checked)">
+                        <input type="checkbox" id="reload-auto-sync-deps" checked
+                            onchange="handleAutoSyncToggle(this.checked)">
                         <span class="toggle-slider"></span>
                         <span class="toggle-label">🔗 의존성 자동 연동</span>
                     </label>
                 </div>
                 <div class="reload-modal-search">
-                    <input type="text" id="reload-module-search" placeholder="🔍 모듈명 / 명령어 검색..." oninput="filterReloadModules(this.value)">
+                    <input type="text" id="reload-module-search" placeholder="🔍 모듈명 / 명령어 검색..."
+                        oninput="filterReloadModules(this.value)">
                 </div>
             </div>
 
@@ -669,12 +705,19 @@
             <div class="reload-modal-footer">
                 <div class="reload-status-info">
                     <span id="reload-selected-count-badge" class="badge badge-purple">선택 15 / 15개</span>
-                    <span id="reload-selected-summary-text" class="reload-summary-text">전체 모듈이 리로드 대상입니다.</span>
+                    <span id="reload-selected-summary-text" class="reload-summary-text">전체 모듈이 대상입니다.</span>
                 </div>
                 <div class="reload-modal-actions">
-                    <button class="btn btn-sm" onclick="executeModuleReload(false)" style="background: var(--secondary);" title="선택 상태와 무관하게 모든 모듈 즉시 리로드">⚡ 전체 즉시 리로드</button>
-                    <button class="btn btn-sm" id="btn-reload-selected" onclick="executeModuleReload(true)" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 2px 8px rgba(99,102,241,0.35);">⚡ 선택된 모듈 리로드</button>
-                    <button class="btn btn-sm" onclick="closeModuleReloadModal()" style="background: rgba(255,255,255,0.1);">닫기</button>
+                    <button class="btn btn-sm" onclick="executeModuleReload(false)"
+                        style="background: var(--secondary);" title="선택 상태와 무관하게 모든 모듈 즉시 리로드">⚡ 전체 즉시 리로드</button>
+                    <button class="btn btn-sm" id="btn-reload-selected" onclick="executeModuleReload(true)"
+                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 2px 8px rgba(99,102,241,0.35);"
+                        title="선택된 모듈을 로드 또는 리로드">⚡ 선택 모듈 리로드</button>
+                    <button class="btn btn-sm" id="btn-unload-selected" onclick="executeModuleUnload()"
+                        style="background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 2px 8px rgba(239,68,68,0.35);"
+                        title="선택된 모듈을 메모리에서 언로드 (실행 중지)">⏹️ 선택 모듈 언로드</button>
+                    <button class="btn btn-sm" onclick="closeModuleReloadModal()"
+                        style="background: rgba(255,255,255,0.1);">닫기</button>
                 </div>
             </div>
         </div>
