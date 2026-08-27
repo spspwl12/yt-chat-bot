@@ -63,7 +63,6 @@ class ModuleManager {
             selfPath,
             require.resolve('./tracker.js'),
             require.resolve('./video-matcher/search.js'),
-            require.resolve('./sub-manager.js'),
             require.resolve('./innertube.js'),
             require.resolve('./event-bus.js'),
             require.resolve('./config-manager.js'),
