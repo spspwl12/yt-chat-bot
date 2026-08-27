@@ -23,13 +23,22 @@ class ModuleManager {
      * command-context.js 포함 관련 모듈 전체 캐시 삭제 후 fresh require
      */
     loadModules() {
+        // 리로드 공백(destroy→init 사이) 동안 chat 이벤트 손실 방지용 임시 버퍼
+        const chatBuffer = [];
+        const chatBufferListener = (msg) => chatBuffer.push(msg);
+        eventBus.on('chat', chatBufferListener);
+
         // 기존 모듈 정리 (stop/destroy 훅 실행)
         const prevModules = this.modules ? new Map(this.modules) : new Map();
         if (this.modules && this.modules.size > 0) {
             for (const [name, mod] of this.modules) {
                 try {
+                    // 💡 [필수] 만약 모듈 내부에 이벤트 해제 로직이 없다면 여기서 확실히 해제 유도
                     if (typeof mod.destroy === 'function') mod.destroy();
                     else if (typeof mod.stop === 'function') mod.stop();
+
+                    // 만약 모듈 안에 리스너 해제 함수를 따로 안 만들었다면 
+                    // eventBus.removeAllListeners(`chat:${name}`) 같은 네임스페이스 구조를 권장합니다.
                 } catch (err) {
                     console.warn(`⚠️ [ModuleManager] 모듈 정리 중 에러 (${name}):`, err.message);
                 }
@@ -42,27 +51,52 @@ class ModuleManager {
 
         if (!fs.existsSync(this.modulesDir)) {
             console.warn(`⚠️ [ModuleManager] 모듈 디렉토리가 없습니다: ${this.modulesDir}`);
+            // 💡 에러 시 버퍼 리스너를 해제해 주지 않으면 여기서도 누수가 납니다.
+            eventBus.off('chat', chatBufferListener);
             return;
         }
 
         // 1패스: modules/*.js 및 그 의존성 트리 전체를 재귀적으로 캐시 삭제
-        // (node_modules 및 module-manager.js 자신은 제외)
         const selfPath = require.resolve(__filename);
         const nodeModulesStr = path.sep + 'node_modules' + path.sep;
+        const coreSingletons = new Set([
+            selfPath,
+            require.resolve('./tracker.js'),
+            require.resolve('./video-matcher/search.js'),
+            require.resolve('./sub-manager.js'),
+            require.resolve('./innertube.js'),
+            require.resolve('./event-bus.js'),
+            require.resolve('./config-manager.js'),
+        ]);
         const invalidated = new Set();
 
         const invalidateWithDeps = (filePath) => {
             let resolved;
             try { resolved = require.resolve(filePath); } catch { return; }
             if (invalidated.has(resolved)) return;
-            if (resolved === selfPath) return;
+            if (coreSingletons.has(resolved)) return;
             if (resolved.includes(nodeModulesStr)) return;
             invalidated.add(resolved);
             const cached = require.cache[resolved];
             if (cached) {
-                for (const child of cached.children) {
-                    invalidateWithDeps(child.id);
+                if (Array.isArray(cached.children)) {
+                    for (const child of cached.children) {
+                        invalidateWithDeps(child.id);
+                    }
+                    cached.children = [];
                 }
+
+                // 부모 모듈 참조 제거 (현재 캐시 순회 방식은 정확하며 안전합니다)
+                for (const cacheId in require.cache) {
+                    const parentModule = require.cache[cacheId];
+                    if (parentModule && Array.isArray(parentModule.children)) {
+                        const idx = parentModule.children.indexOf(cached);
+                        if (idx !== -1) {
+                            parentModule.children.splice(idx, 1);
+                        }
+                    }
+                }
+
                 delete require.cache[resolved];
             }
         };
@@ -71,6 +105,7 @@ class ModuleManager {
         for (const file of files) {
             invalidateWithDeps(path.join(this.modulesDir, file));
         }
+        invalidateWithDeps(path.join(__dirname, 'command-context.js'));
 
         // command-context.js fresh 재로딩
         this.context = require('./command-context.js');
@@ -79,10 +114,9 @@ class ModuleManager {
         for (const file of files) {
             const filePath = path.join(this.modulesDir, file);
 
-            // 심볼릭 링크(symlink)를 통한 모듈 디렉터리 외부 파일 접근 방지
             try {
                 const realPath = fs.realpathSync(filePath);
-                const realDir  = fs.realpathSync(this.modulesDir);
+                const realDir = fs.realpathSync(this.modulesDir);
                 if (!realPath.startsWith(realDir + path.sep) && realPath !== realDir) {
                     console.warn(`⚠️ [ModuleManager] 심볼릭 링크 외부 경로 스킵: ${file} → ${realPath}`);
                     continue;
@@ -102,9 +136,7 @@ class ModuleManager {
 
                 newModules.set(mod.name, mod);
 
-                // 명령어가 정의된 모듈인 경우에만 alias 및 group 등록
                 if (typeof mod.execute === 'function') {
-                    // 단일 그룹 모듈
                     if (mod.group && Array.isArray(mod.aliases)) {
                         const group = mod.group;
                         if (!newCommandGroups[group]) newCommandGroups[group] = [];
@@ -117,7 +149,6 @@ class ModuleManager {
                         }
                     }
 
-                    // 다중 그룹 모듈 (예: future-episode)
                     if (mod.groups && typeof mod.groups === 'object') {
                         for (const [group, aliases] of Object.entries(mod.groups)) {
                             if (!newCommandGroups[group]) newCommandGroups[group] = [];
@@ -132,7 +163,6 @@ class ModuleManager {
                     }
                 }
 
-                // 모듈 초기화 훅 (init 또는 start) 실행
                 try {
                     if (typeof mod.init === 'function') {
                         mod.init({ eventBus, moduleManager: this });
@@ -152,11 +182,23 @@ class ModuleManager {
         this.aliasToModule = newAliasMap;
         this.commandGroups = newCommandGroups;
 
-        // context에 명령어 그룹 resolver 주입
         this.context.setCommandGroupResolver((cmd) => {
             const entry = this.aliasToModule.get(cmd);
             return entry ? entry.group : cmd;
         }, this.commandGroups);
+
+        // 리로드 공백 동안 버퍼에 쌓인 chat 이벤트 플러시 후 버퍼 리스너 제거
+        eventBus.off('chat', chatBufferListener);
+        if (chatBuffer.length > 0) {
+            console.log(`📦 [ModuleManager] 리로드 공백 중 버퍼된 chat ${chatBuffer.length}건 재처리`);
+
+            // 💡 setImmediate를 사용해 동기적 실행 스택이 꼬이는 것을 방지합니다.
+            setImmediate(() => {
+                for (const msg of chatBuffer) {
+                    eventBus.emit('chat', msg);
+                }
+            });
+        }
 
         console.log(`✅ [ModuleManager] ${this.modules.size}개 모듈 로드 완료 (${this.aliasToModule.size}개 명령어 등록)`);
     }
