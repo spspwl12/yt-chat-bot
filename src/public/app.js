@@ -1381,10 +1381,10 @@ function updateMuteBtn(muted) {
     const btn = document.getElementById('btn-toggle-mute');
     if (!btn) return;
     if (muted) {
-        btn.innerText = '🔇 Mute: ON';
+        btn.innerHTML = '\uD83D\uDD07 <span class="btn-text">Mute: ON</span>';
         btn.style.backgroundColor = 'var(--error)';
     } else {
-        btn.innerText = '🔊 Mute: OFF';
+        btn.innerHTML = '\uD83D\uDD0A <span class="btn-text">Mute: OFF</span>';
         btn.style.backgroundColor = 'var(--secondary)';
     }
 }
@@ -1401,10 +1401,10 @@ function updateYtdlpBtn(running) {
     const btn = document.getElementById('btn-toggle-ytdlp');
     if (!btn) return;
     if (running) {
-        btn.innerText = '📥 yt-dlp: ON';
+        btn.innerHTML = '\uD83D\uDCE5 <span class="btn-text">yt-dlp: ON</span>';
         btn.style.backgroundColor = 'var(--secondary)';
     } else {
-        btn.innerText = '⏸️ yt-dlp: OFF';
+        btn.innerHTML = '\u23F8\uFE0F <span class="btn-text">yt-dlp: OFF</span>';
         btn.style.backgroundColor = 'var(--error)';
     }
 }
