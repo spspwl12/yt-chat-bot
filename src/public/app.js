@@ -1,4 +1,4 @@
-let ws;
+﻿let ws;
 let pinger;
 let searchLogCount = 0;
 let cmdLogCount = 0;
@@ -663,7 +663,14 @@ function handleWSMessage(msg) {
                 img.src = payload.image;
                 img.style.display = 'block';
                 if (placeholder) placeholder.style.display = 'none';
-                img.onload = () => drawCropFromInputs();
+                img.onload = () => {
+                    // wrapper를 이미지 실제 렌더 크기에 맞춤
+                    const wrapper = document.getElementById('vm-video-wrapper');
+                    if (wrapper) {
+                        wrapper.style.minHeight = '';
+                    }
+                    drawCropFromInputs();
+                };
             } else {
                 showToast('미리보기 캡처 실패: ' + (payload.error || '알 수 없는 오류'), true);
             }
@@ -929,43 +936,77 @@ function handleWSMessage(msg) {
 }
 
 // ── Cooldown Render ──
+// 50색 팔레트 — 색상환에서 균등 분포, 인접색 최대한 다르게
+const COOLDOWN_PALETTE = [
+    '#e53935','#d81b60','#8e24aa','#5e35b1','#3949ab',
+    '#1e88e5','#039be5','#00acc1','#00897b','#43a047',
+    '#7cb342','#c0ca33','#fdd835','#ffb300','#fb8c00',
+    '#f4511e','#6d4c41','#757575','#546e7a','#ec407a',
+    '#ab47bc','#7e57c2','#5c6bc0','#42a5f5','#26c6da',
+    '#26a69a','#66bb6a','#d4e157','#ffca28','#ffa726',
+    '#ff7043','#8d6e63','#bdbdbd','#78909c','#f06292',
+    '#ba68c8','#9575cd','#7986cb','#64b5f6','#4dd0e1',
+    '#4db6ac','#81c784','#aed581','#fff176','#ffd54f',
+    '#ffb74d','#ff8a65','#a1887f','#e0e0e0','#90a4ae',
+];
+
+// config-youtube.js group_times 키 순서 인덱스로 색상 배정
+const COOLDOWN_GROUP_COLORS = {
+    'greeting, help':              COOLDOWN_PALETTE[0],
+    'episode, time, date':         COOLDOWN_PALETTE[5],
+    'next, nextnext, first, last': COOLDOWN_PALETTE[13],
+    'timetable':                   COOLDOWN_PALETTE[20],
+    'music':                       COOLDOWN_PALETTE[26],
+    'stats, coolcheck':            COOLDOWN_PALETTE[30],
+    'weather, dice, menu':         COOLDOWN_PALETTE[35],
+};
+
+function getCooldownColor(groupName) {
+    for (const [key, color] of Object.entries(COOLDOWN_GROUP_COLORS)) {
+        if (key.split(',').map(k => k.trim()).includes(groupName)) return color;
+    }
+    return '#6366f1';
+}
+
 function renderCooldowns(state) {
     const section = document.getElementById('cooldown-monitor-section');
     const grid = document.getElementById('cooldown-grid');
-
     section.style.display = 'block';
     grid.innerHTML = '';
 
-    const entries = state.mode === 'global'
-        ? [['Global (전체)', state.global]]
-        : Object.entries(state.groups);
-
-    for (const [group, info] of entries) {
+    if (state.mode === 'global') {
+        const info = state.global;
         const card = document.createElement('div');
         card.className = 'status-card glass';
-        card.style.padding = '12px';
+        card.style.padding = '0'; card.style.minHeight = '0';
+        card.style.borderTopColor = '#6366f1';
+        const t = document.createElement('h3'); t.innerText = 'Global';
+        t.style.cssText = 'padding:7px 12px 0;font-size:0.65rem;';
+        const p = document.createElement('p'); p.style.cssText = 'font-size:1rem;padding:2px 12px 8px;';
+        if (info.remainingMs > 0) { p.innerText = secToTime(info.remainingMs/1000); p.style.color='#ef4444'; p.style.webkitTextFillColor='#ef4444'; }
+        else { p.innerText = 'Ready'; p.style.color='#10b981'; p.style.webkitTextFillColor='#10b981'; }
+        card.appendChild(t); card.appendChild(p); grid.appendChild(card);
+        return;
+    }
 
-        const title = document.createElement('h3');
-        title.innerText = group;
-
-        const timeStr = document.createElement('p');
-        timeStr.style.fontSize = '1.2rem';
-
-        if (info.remainingMs > 0) {
-            timeStr.innerText = secToTime(info.remainingMs / 1000);
-            timeStr.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
-            timeStr.style.webkitBackgroundClip = 'text';
-            timeStr.style.webkitTextFillColor = 'transparent';
-        } else {
-            timeStr.innerText = 'Ready';
-            timeStr.style.background = 'linear-gradient(90deg, #10b981, #059669)';
-            timeStr.style.webkitBackgroundClip = 'text';
-            timeStr.style.webkitTextFillColor = 'transparent';
-        }
-
-        card.appendChild(title);
-        card.appendChild(timeStr);
-        grid.appendChild(card);
+    // per-command: COOLDOWN_GROUP_COLORS 키 순서대로 그룹핑해서 같은 그룹 뭉쳐서 렌더
+    const groupsData = state.groups;
+    for (const [colorKey, color] of Object.entries(COOLDOWN_GROUP_COLORS)) {
+        const members = colorKey.split(',').map(k => k.trim());
+        members.forEach(groupName => {
+            if (!(groupName in groupsData)) return;
+            const info = groupsData[groupName];
+            const card = document.createElement('div');
+            card.className = 'status-card glass';
+            card.style.padding = '0'; card.style.minHeight = '0';
+            card.style.borderTopColor = color;
+            const t = document.createElement('h3'); t.innerText = groupName;
+            t.style.cssText = 'padding:7px 12px 0;font-size:0.65rem;';
+            const p = document.createElement('p'); p.style.cssText = 'font-size:1rem;padding:2px 12px 8px;';
+            if (info.remainingMs > 0) { p.innerText = secToTime(info.remainingMs/1000); p.style.color='#ef4444'; p.style.webkitTextFillColor='#ef4444'; }
+            else { p.innerText = 'Ready'; p.style.color='#10b981'; p.style.webkitTextFillColor='#10b981'; }
+            card.appendChild(t); card.appendChild(p); grid.appendChild(card);
+        });
     }
 }
 
@@ -1030,7 +1071,11 @@ function renderChats(chats) {
 function appendChats(chatsArr) {
     const container = document.getElementById('chat-container');
     chatsArr.forEach(c => {
-        container.insertBefore(createChatElement(c), container.firstChild);
+        const el = createChatElement(c);
+        el.classList.add('chat-item--new');
+        container.insertBefore(el, container.firstChild);
+        // 애니메이션 끝나면 클래스 제거
+        setTimeout(() => el.classList.remove('chat-item--new'), 2000);
     });
     while (container.children.length > MAX_CHAT_DOM_ELEMENTS) {
         container.removeChild(container.lastChild);
@@ -1112,28 +1157,33 @@ function renderSpamWarnTable() {
 
         const detailBtn = document.createElement('button');
         detailBtn.className = 'btn btn-sm';
-        detailBtn.style.background = 'var(--info)';
+        detailBtn.style.background = '#4a4cb8';
+        detailBtn.style.borderColor = '#6366f1';
+        detailBtn.style.color = '#ffffff';
         detailBtn.textContent = '상세';
         detailBtn.addEventListener('click', () => showUserDetail(u.channelId));
         group.appendChild(detailBtn);
 
         const hideBtn = document.createElement('button');
         hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.style.background = '#ef4444';
         hideBtn.textContent = '유저 숨기기';
         hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
         group.appendChild(hideBtn);
 
         const searchBtn = document.createElement('button');
         searchBtn.className = 'btn btn-sm';
-        searchBtn.style.background = '#8b5cf6';
+        searchBtn.style.background = '#5a2880';
+        searchBtn.style.borderColor = '#a855f7';
+        searchBtn.style.color = '#ffffff';
         searchBtn.textContent = '대사차단';
         searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
         group.appendChild(searchBtn);
 
         const spamBtn = document.createElement('button');
-        spamBtn.className = 'btn btn-ban btn-sm';
-        spamBtn.style.background = '#f59e0b';
+        spamBtn.className = 'btn btn-sm';
+        spamBtn.style.background = '#7a5000';
+        spamBtn.style.borderColor = '#f59e0b';
+        spamBtn.style.color = '#ffffff';
         spamBtn.textContent = '스팸 추가';
         spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
         group.appendChild(spamBtn);
@@ -1188,28 +1238,33 @@ function renderSpamSearchBanTable() {
 
         const detailBtn = document.createElement('button');
         detailBtn.className = 'btn btn-sm';
-        detailBtn.style.background = 'var(--info)';
+        detailBtn.style.background = '#4a4cb8';
+        detailBtn.style.borderColor = '#6366f1';
+        detailBtn.style.color = '#ffffff';
         detailBtn.textContent = '상세';
         detailBtn.addEventListener('click', () => showUserDetail(u.channelId));
         group.appendChild(detailBtn);
 
         const unblockBtn = document.createElement('button');
         unblockBtn.className = 'btn btn-sm';
-        unblockBtn.style.background = '#8b5cf6';
+        unblockBtn.style.background = '#5a2880';
+        unblockBtn.style.borderColor = '#a855f7';
+        unblockBtn.style.color = '#ffffff';
         unblockBtn.textContent = '대사차단 해제';
         unblockBtn.addEventListener('click', () => execAllowSearch(u.channelId));
         group.appendChild(unblockBtn);
 
         const hideBtn = document.createElement('button');
         hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.style.background = '#ef4444';
         hideBtn.textContent = '유저 숨기기';
         hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
         group.appendChild(hideBtn);
 
         const spamBtn = document.createElement('button');
-        spamBtn.className = 'btn btn-ban btn-sm';
-        spamBtn.style.background = '#f59e0b';
+        spamBtn.className = 'btn btn-sm';
+        spamBtn.style.background = '#7a5000';
+        spamBtn.style.borderColor = '#f59e0b';
+        spamBtn.style.color = '#ffffff';
         spamBtn.textContent = '스팸 추가';
         spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
         group.appendChild(spamBtn);
@@ -1241,7 +1296,6 @@ function renderSpamBanTable() {
 
         const hideBtn = document.createElement('button');
         hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.style.background = '#ef4444';
         hideBtn.textContent = '유저 숨기기';
         hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
         group.appendChild(hideBtn);
@@ -1249,11 +1303,15 @@ function renderSpamBanTable() {
         const searchBtn = document.createElement('button');
         searchBtn.className = 'btn btn-sm';
         if (u.searchBanned) {
-            searchBtn.style.background = 'var(--secondary)';
+            searchBtn.style.background = '#5a2880';
+            searchBtn.style.borderColor = '#a855f7';
+            searchBtn.style.color = '#ffffff';
             searchBtn.textContent = '검색 허용';
             searchBtn.addEventListener('click', () => execAllowSearch(u.channelId));
         } else {
-            searchBtn.style.background = '#8b5cf6';
+            searchBtn.style.background = '#5a2880';
+            searchBtn.style.borderColor = '#a855f7';
+            searchBtn.style.color = '#ffffff';
             searchBtn.textContent = '대사차단';
             searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
         }
@@ -1440,7 +1498,6 @@ function createCmdLogRow(d) {
                 <td style="white-space:nowrap; vertical-align:top; width:90px;">${fmtTime(d.time)}</td>
                 <td style="font-weight:600; color:#fcd34d; white-space:nowrap; vertical-align:top; width:140px;">${escapeHtml(d.user)}</td>
                 <td style="color:#a78bfa; font-weight:600; white-space:nowrap; vertical-align:top; width:90px;">${escapeHtml(d.cmd)}</td>
-                <td style="white-space:nowrap; vertical-align:top; width:80px;"><span class="badge ${groupBadge(d.group)}">${d.group}</span></td>
                 <td style="vertical-align:top; word-break:break-word; max-width:130px; width:130px;">${escapeHtml(d.args) || '<span style="color:var(--text-dim)">—</span>'}</td>
                 <td style="vertical-align:top; word-break:break-word; max-width:360px; font-size:0.84rem; color:var(--text-main); line-height:1.45;">${escapeHtml(d.response) || '<span style="color:var(--text-dim)">—</span>'}</td>
             `;
@@ -1523,12 +1580,13 @@ function updateMuteBtn(muted) {
     isMutedUI = muted;
     const btn = document.getElementById('btn-toggle-mute');
     if (!btn) return;
+    btn.style.cssText = '';
     if (muted) {
         btn.innerHTML = '\uD83D\uDD07 <span class="btn-text">Mute: ON</span>';
-        btn.style.backgroundColor = 'var(--error)';
+        btn.className = 'btn btn-sm tl-action-btn btn-state-on';
     } else {
         btn.innerHTML = '\uD83D\uDD0A <span class="btn-text">Mute: OFF</span>';
-        btn.style.backgroundColor = 'var(--secondary)';
+        btn.className = 'btn btn-sm tl-action-btn btn-state-off';
     }
 }
 
@@ -1543,12 +1601,13 @@ function updateYtdlpBtn(running) {
     isYtdlpRunningUI = running;
     const btn = document.getElementById('btn-toggle-ytdlp');
     if (!btn) return;
+    btn.style.cssText = '';
     if (running) {
-        btn.innerHTML = '\uD83D\uDCE5 <span class="btn-text">yt-dlp: ON</span>';
-        btn.style.backgroundColor = 'var(--secondary)';
+        btn.innerHTML = '\uD83D\uDCE5 <span class="btn-text">pHash: ON</span>';
+        btn.className = 'btn btn-sm tl-action-btn btn-state-on';
     } else {
-        btn.innerHTML = '\u23F8\uFE0F <span class="btn-text">yt-dlp: OFF</span>';
-        btn.style.backgroundColor = 'var(--error)';
+        btn.innerHTML = '\u23F8\uFE0F <span class="btn-text">pHash: OFF</span>';
+        btn.className = 'btn btn-sm tl-action-btn btn-state-off';
     }
 }
 
@@ -2229,6 +2288,10 @@ function drawCropFromInputs() {
     const rect = imgEl.getBoundingClientRect();
     if (rect.width === 0) return;
 
+    const wrapperRect = overlayEl.parentElement.getBoundingClientRect();
+    const offX = rect.left - wrapperRect.left;
+    const offY = rect.top - wrapperRect.top;
+
     const scaleX = rect.width / imgEl.naturalWidth;
     const scaleY = rect.height / imgEl.naturalHeight;
 
@@ -2239,8 +2302,8 @@ function drawCropFromInputs() {
 
     if (cw > 0 && ch > 0) {
         overlayEl.style.display = 'block';
-        overlayEl.style.left = (cx * scaleX) + 'px';
-        overlayEl.style.top = (cy * scaleY) + 'px';
+        overlayEl.style.left = (offX + cx * scaleX) + 'px';
+        overlayEl.style.top = (offY + cy * scaleY) + 'px';
         overlayEl.style.width = (cw * scaleX) + 'px';
         overlayEl.style.height = (ch * scaleY) + 'px';
     } else {
@@ -2266,10 +2329,13 @@ imgEl.addEventListener('mousedown', (e) => {
     isDragging = true;
     e.preventDefault();
     const rect = imgEl.getBoundingClientRect();
+    const wrapperRect = overlayEl.parentElement.getBoundingClientRect();
     startX = e.clientX - rect.left;
     startY = e.clientY - rect.top;
-    overlayEl.style.left = startX + 'px';
-    overlayEl.style.top = startY + 'px';
+    const offX = rect.left - wrapperRect.left;
+    const offY = rect.top - wrapperRect.top;
+    overlayEl.style.left = (offX + startX) + 'px';
+    overlayEl.style.top = (offY + startY) + 'px';
     overlayEl.style.width = '0px';
     overlayEl.style.height = '0px';
     overlayEl.style.display = 'block';
@@ -2279,6 +2345,9 @@ imgEl.addEventListener('mousedown', (e) => {
 window.addEventListener('mousemove', (e) => {
     if (imgEl.naturalWidth === 0) return;
     const rect = imgEl.getBoundingClientRect();
+    const wrapperRect = overlayEl.parentElement.getBoundingClientRect();
+    const offX = rect.left - wrapperRect.left;
+    const offY = rect.top - wrapperRect.top;
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
 
@@ -2290,10 +2359,10 @@ window.addEventListener('mousemove', (e) => {
         const mx = Math.max(0, Math.min(rawX, rect.width));
         const my = Math.max(0, Math.min(rawY, rect.height));
 
-        let magLeft = mx + 15;
-        let magTop = my + 15;
-        if (magLeft + 120 > rect.width) magLeft = mx - 135;
-        if (magTop + 120 > rect.height) magTop = my - 135;
+        let magLeft = offX + mx + 15;
+        let magTop = offY + my + 15;
+        if (mx + 135 > rect.width) magLeft = offX + mx - 135;
+        if (my + 135 > rect.height) magTop = offY + my - 135;
 
         magnifierEl.style.display = 'block';
         magnifierEl.style.left = magLeft + 'px';
@@ -2337,8 +2406,8 @@ window.addEventListener('mousemove', (e) => {
     const width = Math.abs(curX - startX);
     const height = Math.abs(curY - startY);
 
-    overlayEl.style.left = left + 'px';
-    overlayEl.style.top = top + 'px';
+    overlayEl.style.left = (offX + left) + 'px';
+    overlayEl.style.top = (offY + top) + 'px';
     overlayEl.style.width = width + 'px';
     overlayEl.style.height = height + 'px';
 });
@@ -2347,8 +2416,12 @@ window.addEventListener('mouseup', (e) => {
     if (!isDragging) return;
     isDragging = false;
 
-    // 드래그 종료 시, 마우스가 이미지 밖에 있으면 돋보기 숨김
     const rect = imgEl.getBoundingClientRect();
+    const wrapperRect = overlayEl.parentElement.getBoundingClientRect();
+    const offX = rect.left - wrapperRect.left;
+    const offY = rect.top - wrapperRect.top;
+
+    // 드래그 종료 시, 마우스가 이미지 밖에 있으면 돋보기 숨김
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     if (rawX < 0 || rawX > rect.width || rawY < 0 || rawY > rect.height) {
@@ -2358,15 +2431,16 @@ window.addEventListener('mouseup', (e) => {
     const scaleX = imgEl.naturalWidth / rect.width;
     const scaleY = imgEl.naturalHeight / rect.height;
 
-    const left = parseFloat(overlayEl.style.left) || 0;
-    const top = parseFloat(overlayEl.style.top) || 0;
-    const width = parseFloat(overlayEl.style.width) || 0;
+    // overlay 좌표는 wrapper 기준이므로 이미지 오프셋 빼서 이미지 기준 px로 역산
+    const left  = (parseFloat(overlayEl.style.left)   || 0) - offX;
+    const top   = (parseFloat(overlayEl.style.top)    || 0) - offY;
+    const width  = parseFloat(overlayEl.style.width)  || 0;
     const height = parseFloat(overlayEl.style.height) || 0;
 
     updateCropInputs(
-        Math.round(left * scaleX),
-        Math.round(top * scaleY),
-        Math.round(width * scaleX),
+        Math.round(Math.max(0, left)  * scaleX),
+        Math.round(Math.max(0, top)   * scaleY),
+        Math.round(width  * scaleX),
         Math.round(height * scaleY)
     );
 });
