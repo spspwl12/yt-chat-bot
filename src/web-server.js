@@ -19,7 +19,7 @@ try {
 }
 
 const chatHistory = require('./chat-history.js');
-const { banUser, blockUser } = require('./innertube.js');
+const { banUser, blockUser, reloadCookies } = require('./innertube.js');
 const search_lib = require('./video-matcher/search.js');
 const { extractLatestSegmentFrame } = require('./video-matcher/live-downloader.js');
 const configManager = require('./config-manager.js');
@@ -575,6 +575,23 @@ async function handleAction(client, req) {
             sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success } }));
         } catch (e) {
             sendWSFrame(client, JSON.stringify({ action: 'reloadVideoSub_result', payload: { success: false, error: e.message } }));
+        }
+    }
+    // ── session.json 쿠키 리로드 ──
+    else if (action === 'reload_cookie') {
+        try {
+            const res = typeof reloadCookies === 'function'
+                ? reloadCookies()
+                : { success: false, error: 'reloadCookies 미지원' };
+            sendWSFrame(client, JSON.stringify({
+                action: 'reload_cookie_result',
+                payload: res
+            }));
+        } catch (e) {
+            sendWSFrame(client, JSON.stringify({
+                action: 'reload_cookie_result',
+                payload: { success: false, error: e.message }
+            }));
         }
     }
     // ── 새 기능: 봇 재부팅 (설정 리로드) ──

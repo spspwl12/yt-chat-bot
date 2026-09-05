@@ -363,23 +363,23 @@ body {
 }
 
 .tl-action-btn {
-    font-size: 0.75rem;
-    padding: 4px 10px;
+    font-size: 0.95rem;
+    padding: 0;
+    width: 32px;
     height: 28px;
+    min-width: 32px;
     border-radius: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
     white-space: nowrap;
     flex-shrink: 0;
-    font-weight: 600;
-    letter-spacing: -0.01em;
     border: 1px solid #6366f1;
     background: #4a4cb8;
     color: #ffffff;
     box-shadow: none;
     transition: background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
 }
 
 .tl-action-btn:hover {
@@ -937,7 +937,10 @@ th {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    background: rgba(14, 20, 34, 0.95);
+    background: rgba(14, 20, 34, 0.98);
+    position: sticky;
+    top: 0;
+    z-index: 3;
 }
 
 td {
@@ -961,6 +964,103 @@ tr:hover td {
 .log-scroll {
     max-height: 320px;
     overflow-y: auto;
+}
+
+/* ── 테이블 전용 풀-하이트 & 다중 테이블 분배 레이아웃 ── */
+.panel-table-page.active {
+    display: flex !important;
+    flex-direction: column;
+    height: calc(100vh - 104px);
+    max-height: calc(100vh - 104px);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.panel-table-page h2 {
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.table-section-title {
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+/* 테이블 1개 메뉴: 창 크기 전체 꽉 채움 */
+.log-container.full-table {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.log-container.full-table .log-scroll {
+    flex: 1 1 0%;
+    max-height: none !important;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* 테이블 2개 이상 메뉴 (tab-search 등): 화면 높이를 1:1로 균등 분배 */
+.log-container.split-table {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.log-container.split-table .log-scroll {
+    flex: 1 1 0%;
+    max-height: none !important;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Spam 탭 서브패널 테이블 */
+.spam-sub-table {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.spam-sub-table.active {
+    display: flex !important;
+}
+
+.spam-sub-table .glass {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.spam-sub-table .log-scroll {
+    flex: 1 1 0%;
+    max-height: none !important;
+    height: 100%;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .panel-table-page.active {
+        height: auto;
+        max-height: none;
+        overflow: visible;
+    }
+    .log-container.full-table,
+    .log-container.split-table,
+    .spam-sub-table {
+        min-height: 320px;
+    }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2414,8 +2514,10 @@ textarea.code-editor:focus {
         font-size: 0.7rem;
     }
     .tl-action-btn {
-        padding: 2px 6px;
-        font-size: 0.7rem;
+        padding: 0;
+        width: 28px;
+        min-width: 28px;
+        font-size: 0.85rem;
         height: 26px;
     }
 }

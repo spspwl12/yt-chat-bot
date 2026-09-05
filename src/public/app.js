@@ -823,6 +823,15 @@ function handleWSMessage(msg) {
             }
             break;
 
+        case 'reload_cookie_result':
+            if (payload && payload.success) {
+                const sapisidStatus = payload.hasSapisid ? '인증(SAPISID) 정상' : 'SAPISID 없음';
+                showToast(`🍪 쿠키 리로드 성공! (${payload.count}개 항목, ${sapisidStatus})`);
+            } else {
+                showToast(`❌ 쿠키 리로드 실패: ${(payload && payload.error) || '알 수 없는 오류'}`, true);
+            }
+            break;
+
         case 'search_logs':
             renderSearchLogs(payload);
             break;
@@ -1578,10 +1587,12 @@ function updateMuteBtn(muted) {
     if (!btn) return;
     btn.style.cssText = '';
     if (muted) {
-        btn.innerHTML = '\uD83D\uDD07 <span class="btn-text">Mute: ON</span>';
+        btn.innerHTML = '🔇';
+        btn.title = 'Mute: ON (음소거 중, 클릭 시 해제)';
         btn.className = 'btn btn-sm tl-action-btn btn-state-on';
     } else {
-        btn.innerHTML = '\uD83D\uDD0A <span class="btn-text">Mute: OFF</span>';
+        btn.innerHTML = '🔊';
+        btn.title = 'Mute: OFF (음소거 해제 중, 클릭 시 음소거)';
         btn.className = 'btn btn-sm tl-action-btn btn-state-off';
     }
 }
@@ -1599,10 +1610,12 @@ function updateYtdlpBtn(running) {
     if (!btn) return;
     btn.style.cssText = '';
     if (running) {
-        btn.innerHTML = '\uD83D\uDCE5 <span class="btn-text">pHash: ON</span>';
+        btn.innerHTML = '📥';
+        btn.title = 'pHash: ON (동작 중, 클릭 시 정지)';
         btn.className = 'btn btn-sm tl-action-btn btn-state-on';
     } else {
-        btn.innerHTML = '\u23F8\uFE0F <span class="btn-text">pHash: OFF</span>';
+        btn.innerHTML = '⏸️';
+        btn.title = 'pHash: OFF (정지됨, 클릭 시 시작)';
         btn.className = 'btn btn-sm tl-action-btn btn-state-off';
     }
 }
@@ -1834,6 +1847,17 @@ window.reloadMetadataFromServer = function () {
 
 window.reloadCommands = function () {
     reloadModules();
+};
+
+window.reloadCookie = function () {
+    if (confirm('session.json 파일에서 최신 쿠키를 다시 불러와 봇 세션에 즉시 적용하시겠습니까?')) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'reload_cookie' }));
+            showToast('🍪 쿠키 리로드 요청 중...');
+        } else {
+            showToast('서버와 연결되어 있지 않습니다.', true);
+        }
+    }
 };
 
 window.rebootBot = function () {

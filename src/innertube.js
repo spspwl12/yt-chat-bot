@@ -122,6 +122,39 @@ function saveCookiesToConfig() {
     } catch (e) { /* 실패해도 메모리 쿠키 유지 */ }
 }
 
+function reloadCookies() {
+    try {
+        const p = (path2 && path2.findPath) ? path2.findPath('../data/session.json') : sessionPath;
+        if (fs.existsSync(p)) {
+            const raw = fs.readFileSync(p, 'utf-8').replace(/^\uFEFF/, '').trim();
+            const parsed = JSON.parse(raw);
+            cookies.cookie = parsed.cookie || '';
+        }
+
+        // 기존 cookieJar 키 모두 제거 후 재파싱
+        for (var k in cookieJar) {
+            delete cookieJar[k];
+        }
+        initCookieJar(cookies.cookie || '');
+
+        var count = Object.keys(cookieJar).length;
+        var sapisid = extractSapisid();
+        console.log(`🍪 [Cookie Reload] 쿠키 리로드 완료: ${count}개 로드 (SAPISID: ${sapisid ? '정상' : '미발견'})`);
+
+        return {
+            success: true,
+            count: count,
+            hasSapisid: !!sapisid
+        };
+    } catch (e) {
+        console.error('❌ [Cookie Reload] 실패:', e.message);
+        return {
+            success: false,
+            error: e.message
+        };
+    }
+}
+
 function getCookieString() {
     var parts = [];
     var keys = Object.keys(cookieJar);
@@ -1052,4 +1085,4 @@ async function postCommunityText(text) {
     }
 }
 
-module.exports = { initSession, fetchChat, fetchFreshContinuation, getSendParams, sendChat, banUser, blockUser, postCommunityText, hasPendingVerify };
+module.exports = { initSession, fetchChat, fetchFreshContinuation, getSendParams, sendChat, banUser, blockUser, postCommunityText, hasPendingVerify, reloadCookies };

@@ -51,12 +51,10 @@
 
         <!-- ══ Quick Action Buttons (타임라인 슬라이더 오른쪽) ══ -->
         <div class="timeline-actions-wrap">
-            <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute">🔊 <span class="btn-text">Mute:
-                    OFF</span></button>
-            <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp">📥 <span class="btn-text">pHash:
-                    ON</span></button>
-            <button class="btn btn-sm tl-action-btn btn-ban" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄 <span
-                    class="btn-text">Reboot</span></button>
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute" title="음소거 토글 (현재: OFF)">🔊</button>
+            <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp" title="pHash 토글 (현재: ON)">📥</button>
+            <button class="btn btn-sm tl-action-btn" id="btn-reload-cookie" onclick="reloadCookie()" title="쿠키 리로드 (session.json)">🍪</button>
+            <button class="btn btn-sm tl-action-btn btn-ban" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄</button>
         </div>
     </div>
 
@@ -149,10 +147,10 @@
             </div>
 
             <!-- Spam Users -->
-            <div id="tab-spam" class="panel">
+            <div id="tab-spam" class="panel panel-table-page">
                 <h2>🛡️ Spam Management</h2>
 
-                <div class="section-card glass" style="margin-bottom: 20px; border-left: 4px solid var(--primary);">
+                <div class="section-card glass" style="margin-bottom: 14px; border-left: 4px solid var(--primary); flex-shrink: 0;">
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -192,7 +190,7 @@
                     </div>
                 </div>
 
-                <div class="sub-tabs">
+                <div class="sub-tabs" style="flex-shrink: 0;">
                     <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
                             id="spam-warn-count">0</span></button>
                     <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
@@ -201,9 +199,9 @@
                             id="spam-ban-count">0</span></button>
                 </div>
 
-                <div id="spam-warn-panel" class="sub-panel active">
-                    <div class="glass" style="border-radius: 0; overflow: hidden;">
-                        <div class="log-scroll" style="max-height: 360px;">
+                <div id="spam-warn-panel" class="sub-panel active spam-sub-table">
+                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                        <div class="log-scroll">
                             <table>
                                 <thead>
                                     <tr>
@@ -223,9 +221,9 @@
                     </div>
                 </div>
 
-                <div id="spam-searchban-panel" class="sub-panel">
-                    <div class="glass" style="border-radius: 0; overflow: hidden;">
-                        <div class="log-scroll" style="max-height: 360px;">
+                <div id="spam-searchban-panel" class="sub-panel spam-sub-table">
+                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                        <div class="log-scroll">
                             <table>
                                 <thead>
                                     <tr>
@@ -245,9 +243,9 @@
                     </div>
                 </div>
 
-                <div id="spam-ban-panel" class="sub-panel">
-                    <div class="glass" style="border-radius: 0; overflow: hidden;">
-                        <div class="log-scroll" style="max-height: 360px;">
+                <div id="spam-ban-panel" class="sub-panel spam-sub-table">
+                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                        <div class="log-scroll">
                             <table>
                                 <thead>
                                     <tr>
@@ -267,12 +265,12 @@
             </div>
 
             <!-- Search Logs (pHash 검색 결과) -->
-            <div id="tab-search" class="panel">
+            <div id="tab-search" class="panel panel-table-page">
                 <h2>🔍 pHash Search Results</h2>
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; flex-shrink: 0;">
                     실시간 영상 매칭 결과 (searcher.exe → processSearchResult)
                 </p>
-                <div class="log-container glass">
+                <div class="log-container glass split-table">
                     <div class="log-scroll" id="search-log-scroll">
                         <table>
                             <thead>
@@ -296,9 +294,9 @@
                     </div>
                 </div>
 
-                <h3 style="margin-top: 20px;">⚠️ segment_duration 위반 로그</h3>
-                <div class="log-container glass">
-                    <div class="log-scroll" id="violation-log-scroll" style="max-height: 250px;">
+                <h3 class="table-section-title">⚠️ segment_duration 위반 로그</h3>
+                <div class="log-container glass split-table">
+                    <div class="log-scroll" id="violation-log-scroll">
                         <table>
                             <thead>
                                 <tr>
@@ -319,12 +317,12 @@
             </div>
 
             <!-- Lastquery History -->
-            <div id="tab-lastquery" class="panel">
+            <div id="tab-lastquery" class="panel panel-table-page">
                 <h2>📜 Last Query History</h2>
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; flex-shrink: 0;">
                     유저들의 !대사/!몇화 검색 질의 이력 (최근 1,000건, 실시간 수집 및 복원)
                 </p>
-                <div class="log-container glass">
+                <div class="log-container glass full-table">
                     <div class="log-scroll" id="lastquery-log-scroll">
                         <table>
                             <thead>
@@ -343,12 +341,12 @@
             </div>
 
             <!-- Command Logs -->
-            <div id="tab-commands" class="panel">
+            <div id="tab-commands" class="panel panel-table-page">
                 <h2>📋 Command Usage Logs</h2>
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; flex-shrink: 0;">
                     유저 명령어 사용 내역 (실시간)
                 </p>
-                <div class="log-container glass">
+                <div class="log-container glass full-table">
                     <div class="log-scroll" id="cmd-log-scroll">
                         <table>
                             <thead>
@@ -403,13 +401,13 @@
             </div>
 
             <!-- Broadcast Schedule -->
-            <div id="tab-schedule" class="panel">
+            <div id="tab-schedule" class="panel panel-table-page">
                 <h2>📅 Broadcast Schedule</h2>
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px;">
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; flex-shrink: 0;">
                     현재 방송 및 향후 편성표 (다음 150개 회차 한정)
                 </p>
-                <div class="log-container glass">
-                    <div class="log-scroll" id="schedule-scroll" style="max-height: 450px;">
+                <div class="log-container glass full-table">
+                    <div class="log-scroll" id="schedule-scroll">
                         <table>
                             <thead>
                                 <tr>
