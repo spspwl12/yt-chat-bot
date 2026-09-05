@@ -23,10 +23,19 @@ function formatMs(ms) {
 module.exports = {
     name: 'coolcheck',
     group: 'coolcheck',
+    icon: '⏳',
     aliases: ['!쿨타임'],
     description: '상대방 쿨타임 잔여 시간 조회 (닉네임 부분 검색)',
 
-    async execute({ cmd, args, _input, ctx }) {
+    web: {
+        title: '쿨타임 조회',
+        icon: '⏳',
+        description: '상대방 쿨타임 잔여 시간 조회 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
+
+    async execute({ cmd, args, channelId, _input, ctx }) {
         const rawArg = (args && args.length > 0 && typeof args[0] === 'string')
             ? args[0].trim()
             : '';
@@ -39,6 +48,13 @@ module.exports = {
             return ctx.returnWarning(warnText, cmd, _input);
         }
 
+        // 입력값 안전 제한 (50자 초과 시 차단)
+        if (rawArg.length > 50) {
+            return ctx.returnWarning('⚠️ 닉네임이 너무 깁니다. (50자 이내로 입력해 주세요)', cmd, _input);
+        }
+
+        const selfChannelId = channelId || (_input && _input.channelId);
+
         const spamGuard = _input && _input.spamGuard;
         if (!spamGuard) {
             const failText = msg.error && msg.error.coolcheck_failed
@@ -48,11 +64,25 @@ module.exports = {
         }
 
         const searchTerm = rawArg.toLowerCase();
+
+        // 자기 자신 조회 차단 - 검색 루프 진입 전에 처리
+        if (selfChannelId) {
+            const selfTrackerEntry = spamGuard.tracker && spamGuard.tracker.get(selfChannelId);
+            const selfName = (selfTrackerEntry && selfTrackerEntry.displayName || '').toLowerCase();
+            if (selfName && selfName.includes(searchTerm)) {
+                const selfCheckText = msg.error && msg.error.coolcheck_self
+                    ? msg.error.coolcheck_self
+                    : '⚠️ 자기 자신의 쿨타임은 조회할 수 없습니다.';
+                return ctx.returnWarning(selfCheckText, cmd, _input);
+            }
+        }
+
         const candidateMap = new Map(); // channelId -> displayName
 
         // 1. spamGuard.tracker 검색 (현재 쿨타임/이력 보유 유저)
         if (spamGuard.tracker) {
             for (const [chId, r] of spamGuard.tracker.entries()) {
+                if (chId === selfChannelId) continue; // 본인 제외
                 const name = (r.displayName || '').trim();
                 if (name && name.toLowerCase().includes(searchTerm)) {
                     candidateMap.set(chId, { displayName: name, tracker: r });
@@ -63,6 +93,7 @@ module.exports = {
         // 2. spamGuard.banned 검색 (차단된 유저)
         if (spamGuard.banned) {
             for (const [chId, bData] of spamGuard.banned.entries()) {
+                if (chId === selfChannelId) continue; // 본인 제외
                 const name = (bData.displayName || '').trim();
                 if (name && name.toLowerCase().includes(searchTerm)) {
                     const existing = candidateMap.get(chId) || {};
@@ -77,6 +108,7 @@ module.exports = {
                 const dbResults = statsTracker.searchUsers({ query: rawArg, limit: 20 });
                 if (dbResults && Array.isArray(dbResults.users)) {
                     for (const u of dbResults.users) {
+                        if (u.channelId === selfChannelId) continue; // 본인 제외
                         if (u.channelId && u.displayName) {
                             const existing = candidateMap.get(u.channelId) || {};
                             candidateMap.set(u.channelId, { ...existing, displayName: u.displayName, dbUser: u });
@@ -95,6 +127,7 @@ module.exports = {
                 : `⚠️ "${rawArg}" 닉네임을 가진 유저를 찾을 수 없습니다.`;
             return ctx.returnWarning(notFoundText, cmd, _input);
         }
+
 
         // 후보 유저 목록 구성 및 활동성 점수 계산
         const candidates = [];
@@ -145,6 +178,7 @@ module.exports = {
 
         // 가장 활동성이 높은 유저 1명 선택
         const topUser = candidates[0];
+
         const chId = topUser.channelId;
         const cleanName = topUser.name;
 

@@ -15,8 +15,17 @@ const DICE_EMOJIS = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 module.exports = {
     name: 'dice',
     group: 'dice',
+    icon: '🎲',
     aliases: ['!주사위', '!dice', '!굴리기'],
     description: '랜덤 주사위 굴리기 및 선택지 추첨',
+
+    web: {
+        title: '주사위 굴리기',
+        icon: '🎲',
+        description: '랜덤 주사위 굴리기 및 선택지 추첨 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, displayName, _input, ctx }) {
         const rawArg = (args && args.length > 0 && typeof args[0] === 'string')
@@ -26,6 +35,11 @@ module.exports = {
         const cooldownMsg = ctx.getCooldownMsg(cmd);
 
         ctx.setCooldown(cmd, 0, _input);
+
+        // 입력값 안전 제한 (200자 초과 시 차단)
+        if (rawArg.length > 200) {
+            return ctx.returnWarning('⚠️ 입력값이 너무 깁니다. (200자 이내)', cmd, _input);
+        }
 
         // 1. 인자가 없는 경우: 1~6 기본 주사위
         if (!rawArg) {

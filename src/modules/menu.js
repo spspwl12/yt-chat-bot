@@ -204,8 +204,17 @@ const ALL_COMBINED = [
 module.exports = {
     name: 'menu',
     group: 'menu',
+    icon: '🍱',
     aliases: ['!점심', '!점메추', '!저녁', '!저메추', '!메뉴', '!야식', '!아침'],
     description: '점심/저녁/야식/아침 상황별 300+종 음식 추천',
+
+    web: {
+        title: '오늘의 메뉴',
+        icon: '🍽️',
+        description: '오늘의 점심/저녁 메뉴 랜덤 추천 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, displayName, _input, ctx }) {
         const rawArg = (args && args.length > 0 && typeof args[0] === 'string')

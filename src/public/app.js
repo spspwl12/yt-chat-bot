@@ -1,4 +1,4 @@
-﻿let ws;
+let ws;
 let pinger;
 let searchLogCount = 0;
 let cmdLogCount = 0;
@@ -936,41 +936,19 @@ function handleWSMessage(msg) {
 }
 
 // ── Cooldown Render ──
-// 50색 팔레트 — 색상환에서 균등 분포, 인접색 최대한 다르게
-const COOLDOWN_PALETTE = [
-    '#e53935','#d81b60','#8e24aa','#5e35b1','#3949ab',
-    '#1e88e5','#039be5','#00acc1','#00897b','#43a047',
-    '#7cb342','#c0ca33','#fdd835','#ffb300','#fb8c00',
-    '#f4511e','#6d4c41','#757575','#546e7a','#ec407a',
-    '#ab47bc','#7e57c2','#5c6bc0','#42a5f5','#26c6da',
-    '#26a69a','#66bb6a','#d4e157','#ffca28','#ffa726',
-    '#ff7043','#8d6e63','#bdbdbd','#78909c','#f06292',
-    '#ba68c8','#9575cd','#7986cb','#64b5f6','#4dd0e1',
-    '#4db6ac','#81c784','#aed581','#fff176','#ffd54f',
-    '#ffb74d','#ff8a65','#a1887f','#e0e0e0','#90a4ae',
-];
-
-// config-youtube.js group_times 키 순서 인덱스로 색상 배정
-const COOLDOWN_GROUP_COLORS = {
-    'greeting, help':              COOLDOWN_PALETTE[0],
-    'episode, time, date':         COOLDOWN_PALETTE[5],
-    'next, nextnext, first, last': COOLDOWN_PALETTE[13],
-    'timetable':                   COOLDOWN_PALETTE[20],
-    'music':                       COOLDOWN_PALETTE[26],
-    'stats, coolcheck':            COOLDOWN_PALETTE[30],
-    'weather, dice, menu':         COOLDOWN_PALETTE[35],
-};
-
-function getCooldownColor(groupName) {
-    for (const [key, color] of Object.entries(COOLDOWN_GROUP_COLORS)) {
-        if (key.split(',').map(k => k.trim()).includes(groupName)) return color;
-    }
-    return '#6366f1';
+// 초록색(Ready: 125°~175°)을 제외한 360° 색상 공간을 균등 분할하여 최대 색상 대비를 보장하는 동적 색상 생성기
+function generateDistinctGroupColor(index, total) {
+    if (total <= 1) return 'hsl(215, 88%, 58%)';
+    const usableHue = 310; // 360° 중 125°~175°(초록 50°) 제외
+    const offset = (index / total) * usableHue;
+    const hue = offset < 125 ? offset : (175 + (offset - 125));
+    return `hsl(${Math.round(hue)}, 90%, 56%)`;
 }
 
 function renderCooldowns(state) {
     const section = document.getElementById('cooldown-monitor-section');
     const grid = document.getElementById('cooldown-grid');
+    if (!section || !grid) return;
     section.style.display = 'block';
     grid.innerHTML = '';
 
@@ -989,17 +967,35 @@ function renderCooldowns(state) {
         return;
     }
 
-    // per-command: COOLDOWN_GROUP_COLORS 키 순서대로 그룹핑해서 같은 그룹 뭉쳐서 렌더
-    const groupsData = state.groups;
-    for (const [colorKey, color] of Object.entries(COOLDOWN_GROUP_COLORS)) {
-        const members = colorKey.split(',').map(k => k.trim());
-        members.forEach(groupName => {
-            if (!(groupName in groupsData)) return;
-            const info = groupsData[groupName];
+    // per-command: 존재하는 전체 고유 그룹 수에 맞춰 색상환을 균등 분할하여 색상 중복/유사도 원천 차단
+    const groupsData = state.groups || {};
+    const uniqueKeys = [];
+    for (const [groupName, info] of Object.entries(groupsData)) {
+        const gKey = info.groupKey || groupName;
+        if (!uniqueKeys.includes(gKey)) {
+            uniqueKeys.push(gKey);
+        }
+    }
+
+    const groupClusters = new Map(); // gKey -> { color, items: [{ groupName, info }] }
+    uniqueKeys.forEach((gKey, idx) => {
+        const color = generateDistinctGroupColor(idx, uniqueKeys.length);
+        groupClusters.set(gKey, { color, items: [] });
+    });
+
+    for (const [groupName, info] of Object.entries(groupsData)) {
+        const gKey = info.groupKey || groupName;
+        groupClusters.get(gKey).items.push({ groupName, info });
+    }
+
+    // 그룹별 카드 렌더링 (동일 그룹은 모두 동일한 borderTopColor 적용)
+    for (const [, cluster] of groupClusters) {
+        const groupColor = cluster.color;
+        cluster.items.forEach(({ groupName, info }) => {
             const card = document.createElement('div');
             card.className = 'status-card glass';
             card.style.padding = '0'; card.style.minHeight = '0';
-            card.style.borderTopColor = color;
+            card.style.borderTopColor = groupColor;
             const t = document.createElement('h3'); t.innerText = groupName;
             t.style.cssText = 'padding:7px 12px 0;font-size:0.65rem;';
             const p = document.createElement('p'); p.style.cssText = 'font-size:1rem;padding:2px 12px 8px;';

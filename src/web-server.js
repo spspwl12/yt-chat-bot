@@ -839,7 +839,17 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                 const mimeTypes = {
                     '.html': 'text/html; charset=utf-8',
                     '.js': 'application/javascript; charset=utf-8',
-                    '.css': 'text/css; charset=utf-8'
+                    '.css': 'text/css; charset=utf-8',
+                    '.woff2': 'font/woff2',
+                    '.woff': 'font/woff',
+                    '.ttf': 'font/ttf',
+                    '.svg': 'image/svg+xml',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.webp': 'image/webp',
+                    '.ico': 'image/x-icon',
+                    '.json': 'application/json; charset=utf-8'
                 };
 
                 if (mimeTypes[ext]) {
@@ -852,29 +862,34 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                         return;
                     }
 
-                    fs.readFile(filePath, 'utf8', (err, data) => {
+                    fs.readFile(filePath, (err, data) => {
                         if (err) {
                             res.writeHead(404, { 'Content-Type': 'text/plain' });
                             res.end('Not Found');
                         } else {
+                            const isCompressible = ['.html', '.js', '.css', '.json', '.svg'].includes(ext);
                             const acceptEncoding = (req.headers['accept-encoding'] || '').toLowerCase();
-                            let compressedData = Buffer.from(data, 'utf8');
+                            let responseData = data;
                             let encodingHeader = null;
 
-                            if (acceptEncoding.includes('br') && typeof zlib.brotliCompressSync === 'function') {
-                                compressedData = zlib.brotliCompressSync(compressedData);
-                                encodingHeader = 'br';
-                            } else if (acceptEncoding.includes('gzip')) {
-                                compressedData = zlib.gzipSync(compressedData);
-                                encodingHeader = 'gzip';
-                            } else if (acceptEncoding.includes('deflate')) {
-                                compressedData = zlib.deflateSync(compressedData);
-                                encodingHeader = 'deflate';
+                            if (isCompressible) {
+                                if (acceptEncoding.includes('br') && typeof zlib.brotliCompressSync === 'function') {
+                                    responseData = zlib.brotliCompressSync(responseData);
+                                    encodingHeader = 'br';
+                                } else if (acceptEncoding.includes('gzip')) {
+                                    responseData = zlib.gzipSync(responseData);
+                                    encodingHeader = 'gzip';
+                                } else if (acceptEncoding.includes('deflate')) {
+                                    responseData = zlib.deflateSync(responseData);
+                                    encodingHeader = 'deflate';
+                                }
                             }
 
                             const headers = {
                                 'Content-Type': mimeTypes[ext],
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                'Cache-Control': (ext === '.woff2' || ext === '.woff' || ext === '.ttf')
+                                    ? 'public, max-age=31536000, immutable'
+                                    : 'no-cache, no-store, must-revalidate',
                                 'Vary': 'Accept-Encoding'
                             };
                             if (encodingHeader) {
@@ -882,7 +897,7 @@ function startServer(port, spamGuard, getEpisodeInfo) {
                             }
 
                             res.writeHead(200, headers);
-                            res.end(compressedData);
+                            res.end(responseData);
                         }
                     });
                     return;

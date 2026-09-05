@@ -63,10 +63,12 @@ module.exports = {
     // 모듈 라이프사이클 훅 (완전 독립형 이벤트 바인딩)
     init({ eventBus }) {
         if (!eventBus) return;
-        boundEventBus = eventBus;
-        if (chatListener) {
-            eventBus.off('chat', chatListener);
+        // 이전 리스너가 있으면 이전에 바인딩된 eventBus에서 제거 (누수 방지)
+        if (chatListener && boundEventBus) {
+            boundEventBus.off('chat', chatListener);
+            chatListener = null;
         }
+        boundEventBus = eventBus;
         chatListener = (msg) => {
             if (msg && msg.text && msg.channelId) {
                 statsTracker.recordChatMessage(msg);

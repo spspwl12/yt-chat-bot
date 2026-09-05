@@ -34,8 +34,17 @@ function getMusicFreq(musics) {
 module.exports = {
     name: 'music',
     group: 'music',
+    icon: '🎵',
     aliases: ['!음악', '!노래', '!브금', '!곡', '!사운드', '!bgm'],
     description: '현재/과거 재생 음악 및 음악 등장 회차 검색',
+
+    web: {
+        title: '음악 검색',
+        icon: '🎵',
+        description: '현재 재생 중인 음악 및 노래 검색 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, rtn, _input, ctx }) {
         if (cfg.music && !cfg.music.enable) {
@@ -155,6 +164,12 @@ module.exports = {
         }
 
         const query = args.join(' ');
+        if (query.length > 100) {
+            return {
+                msg: ctx.returnWarning('⚠️ 검색어가 너무 깁니다. (100자 이내)', cmd, _input),
+                proc: () => `⚠️ 검색어가 너무 깁니다. ${ctx.getCooldownMsg(cmd)}`
+            };
+        }
         const searchInfo = musicSearcher.search(query);
         if (searchInfo && searchInfo.length > 0) {
             searchInfo.sort((a, b) => b.score - a.score);

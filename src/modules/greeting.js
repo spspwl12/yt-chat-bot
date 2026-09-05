@@ -1,4 +1,4 @@
-const data = {
+﻿const data = {
     // 호칭
     honorifics: ["님"],
     // 시간대 인사
@@ -217,8 +217,17 @@ function generateGreeting(nick) {
 module.exports = {
     name: 'greeting',
     group: 'greeting',
+    icon: '👋',
     aliases: ['!인사'],
     description: '랜덤하고 다채로운 맞춤형 인사 멘트 생성',
+
+    web: {
+        title: '인사 응답',
+        icon: '👋',
+        description: '시청자 인사 및 자동 응답 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
     generateGreeting,
 
     async execute({ args, displayName }) {

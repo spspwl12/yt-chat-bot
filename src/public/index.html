@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YT Chat Bot Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=33">
+    <link rel="stylesheet" href="style.css?v=35">
 </head>
 
 <body>
@@ -130,12 +130,12 @@
                     </div>
                 </div>
                 <div
-                    style="display:flex; gap:10px; margin-top: 20px; align-items: center; background: rgba(14, 20, 34, 0.7); padding: 12px 14px; border-radius: 0; border: 1px solid var(--surface-border); flex-wrap: nowrap;">
+                    style="display:flex; gap:10px; margin-top: 20px; align-items: center; background: rgba(14, 20, 34, 0.7); padding: 12px 14px; border-radius: 0; border: 1px solid var(--surface-border); flex-wrap: wrap;">
                     <span
                         style="color: var(--text-dim); font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;">🛠️
                         디버깅:</span>
                     <input type="text" id="debug-chat-input" class="form-input" placeholder="가상 명령어 입력 (예: !몇화 웬만해선)"
-                        style="flex: 1; min-width: 120px;" onkeydown="if(event.key==='Enter') sendSimulatedChat()">
+                        style="flex: 1; min-width: 0;" onkeydown="if(event.key==='Enter') sendSimulatedChat()">
                     <button class="btn" onclick="sendSimulatedChat()"
                         style="white-space: nowrap; flex-shrink: 0; padding: 8px 16px;">가상 입력</button>
                 </div>
@@ -182,12 +182,13 @@
 
                     <div class="manual-block-actions"
                         style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
-                        <button class="btn btn-ban" id="btn-add-hide"
-                            style="font-weight: 600;">🚫 유저 숨기기</button>
-                        <button class="btn" id="btn-add-spam" style="background:#7a5000; border-color:#f59e0b; color:#ffffff; font-weight: 600;">🛡️
+                        <button class="btn btn-ban" id="btn-add-hide" style="font-weight: 600;">🚫 유저 숨기기</button>
+                        <button class="btn" id="btn-add-spam"
+                            style="background:#7a5000; border-color:#f59e0b; color:#ffffff; font-weight: 600;">🛡️
                             스팸 등록</button>
                         <button class="btn" id="btn-add-search-ban"
-                            style="background:#5a2880; border-color:#a855f7; color:#ffffff; font-weight: 600;">🔍 대사검색 차단</button>
+                            style="background:#5a2880; border-color:#a855f7; color:#ffffff; font-weight: 600;">🔍 대사검색
+                            차단</button>
                     </div>
                 </div>
 
@@ -386,7 +387,8 @@
                             style="background: #5a2880; border-color: #a855f7; color: #ffffff;"
                             title="독립 모듈 핫리로드 및 관리">⚙️<span class="btn-label"> 모듈 관리</span></button>
                         <button class="btn btn-sm" id="module-refresh-btn" onclick="refreshCurrentModule()"
-                            style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;" title="현재 모듈 데이터 새로고침">🔄<span class="btn-label"> 새로고침</span></button>
+                            style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;"
+                            title="현재 모듈 데이터 새로고침">🔄<span class="btn-label"> 새로고침</span></button>
                     </div>
                 </div>
 
@@ -454,16 +456,14 @@
                             Live Preview — 드래그로 Crop 영역 선택
                         </div>
                         <div id="vm-video-wrapper" class="vm-video-wrapper">
-                            <img id="vm-preview-img" class="vm-preview-img"
-                                alt="Live preview" draggable="false" />
+                            <img id="vm-preview-img" class="vm-preview-img" alt="Live preview" draggable="false" />
                             <div id="vm-preview-placeholder" class="vm-preview-placeholder">
                                 <span style="font-size:2.5rem;">📷</span>
                                 <span>미리보기 없음</span>
                                 <span style="font-size:0.75rem;">위의 <b>미리보기 캡처</b> 버튼을 누르세요</span>
                             </div>
                             <div id="vm-crop-overlay" class="vm-crop-overlay"></div>
-                            <canvas id="vm-crop-magnifier" width="120" height="120"
-                                class="vm-crop-magnifier"></canvas>
+                            <canvas id="vm-crop-magnifier" width="120" height="120" class="vm-crop-magnifier"></canvas>
                         </div>
                     </div>
 
@@ -612,11 +612,14 @@
                             style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;"
                             title="video-sub.json 대사 파일 서버 리로드">📜<span class="btn-label"> 대사파일 리로드</span></button>
                         <button id="editor-format-btn" class="btn btn-sm" onclick="formatCurrentEditorJson()"
-                            style="display:none; background: #4a4cb8; border-color: #6366f1; color: #ffffff;" title="JSON 예쁘게 정렬">✨<span class="btn-label"> JSON 정렬</span></button>
+                            style="display:none; background: #4a4cb8; border-color: #6366f1; color: #ffffff;"
+                            title="JSON 예쁘게 정렬">✨<span class="btn-label"> JSON 정렬</span></button>
                         <button class="btn btn-sm" onclick="reloadCurrentEditorFile()"
-                            style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;" title="서버 파일 다시 불러오기">🔄<span class="btn-label"> 새로고침</span></button>
+                            style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;"
+                            title="서버 파일 다시 불러오기">🔄<span class="btn-label"> 새로고침</span></button>
                         <button class="btn btn-sm" onclick="saveCurrentEditorFile()"
-                            style="background: #7a5000; border-color: #f59e0b; color: #ffffff;">💾<span class="btn-label"> 저장 및 실시간 적용</span></button>
+                            style="background: #7a5000; border-color: #f59e0b; color: #ffffff;">💾<span
+                                class="btn-label"> 저장 및 실시간 적용</span></button>
                     </div>
                 </div>
 
@@ -688,10 +691,11 @@
                 </div>
                 <div class="reload-modal-actions">
                     <button class="btn btn-sm" onclick="executeModuleReload(false)"
-                        style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;" title="선택 상태와 무관하게 모든 모듈 즉시 리로드">⚡ 전체 즉시 리로드</button>
+                        style="background: #4a4cb8; border-color: #6366f1; color: #ffffff;"
+                        title="선택 상태와 무관하게 모든 모듈 즉시 리로드">⚡ 전체 즉시 리로드</button>
                     <button class="btn btn-sm" id="btn-reload-selected" onclick="executeModuleReload(true)"
-                        style="background: #5a2880; border-color: #a855f7; color: #ffffff;"
-                        title="선택된 모듈을 로드 또는 리로드">⚡ 선택 모듈 리로드</button>
+                        style="background: #5a2880; border-color: #a855f7; color: #ffffff;" title="선택된 모듈을 로드 또는 리로드">⚡
+                        선택 모듈 리로드</button>
                     <button class="btn btn-sm" id="btn-unload-selected" onclick="executeModuleUnload()"
                         style="background: #1a6090; border-color: #0ea5e9; color: #ffffff;"
                         title="선택된 모듈을 메모리에서 언로드 (실행 중지)">⏹️ 선택 모듈 언로드</button>

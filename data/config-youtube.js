@@ -21,13 +21,13 @@ module.exports = {
         enable_user_cooldown_warn: false, // 개인 쿨타임 걸린 유저에게 경고 메시지 출력 여부
         group_warns: {              // 명령어 그룹별 부여할 기본 Warns (경고/도배 패널티 수치)
             "greeting, help": 10,
-            "episode, time, date": 0,
+            "episode, time, date, cycle": 0,
             "next, nextnext, first, last": 0,
             "timetable": 10,
             "music": 2,
-            "stats": 1,
+            "stats": 30,
             "coolcheck": 1,
-            "weather, dice, menu": 1,
+            "weather, dice, menu, searchrank, exchange, crypto, fortune": 10,
         }
     },
     // ─── 쿨타임 설정 ────────────────────────────────────────
@@ -37,23 +37,24 @@ module.exports = {
         error_offset_min: 0,        // 에러 발생 시 쿨타임 차감량 (분) → 실질 대기 = time_min - error_offset_min
         group_times: {              // 명령어 그룹별 개별 쿨타임 (모드가 per-command일 때 적용)
             "greeting, help": 60,
-            "episode, time, date": 1,
+            "episode, time, date, cycle": 1,
             "next, nextnext, first, last": 1,
             "timetable": 2,
             "music": 2,
-            "stats": 1,
+            "stats": 5,
             "coolcheck": 1,
-            "weather, dice, menu": 1,
+            "weather, dice, menu, searchrank, exchange, crypto, fortune": 10,
         }
     },
     // ─── 유저 스탯 설정 ──────────────────────────────────────────
     stats: {
         enable: true,                   // 스탯 기능 사용 여부
         db_path: "../data/chat_stats.db", // sqlite3 DB 파일 경로
-        watch_threshold_min: 10,        // 라이브 시청시간 판정 기준 (분) - 이 시간 이내 연속 채팅 시 시청시간 누적
+        watch_threshold_min: 5,        // 라이브 시청시간 판정 기준 (분) - 이 시간 이내 연속 채팅 시 시청시간 누적
         exclude_channel_ids: ["UCtC1Mlh_p9reIImKeNgbQzg"],        // 스탯 집계에서 제외할 channel_id 목록 (봇 계정 등)
         rank_chat_len_limit: 160,       // 랭킹 채팅 출력 최대 글자 수 (기본 160)
-        rank_chat_nick_len_limit: 10,   // 랭킹 닉네임 최대 글자 수 (기본 10, 초과 시 ... 표기)
+        rank_chat_nick_len_limit: 5,   // 랭킹 닉네임 최대 글자 수 (기본 10, 초과 시 ... 표기)
+        anti_macro_enable: true,   // 참여시간 파밍 방지 (비슷한 시간간격, 동일/순환 이모지 및 채팅 매크로 감지 시 시청시간 누적 제외)
     },
     // ─── 입력 제한 ──────────────────────────────────────────
     input: {
@@ -75,7 +76,7 @@ module.exports = {
     },
     // ─── 음악 명령어 설정 ────────────────────────────────────────
     music: {
-        enable: true,               // 음악 검색 기능 사용 여부
+        enable: false,               // 음악 검색 기능 사용 여부
         max_length: 150,            // !음악 (단일) 출력 최대 길이 (이 길이를 초과하면 오래된 곡부터 잘림)
         history_sec: 180,           // 검색어가 없을 때 과거 재생된 음악을 역추적할 최대 시간 (초)
         frequent_penalty_enable: true, // 자주 등장하는 곡(오프닝, 엔딩 등) 우선순위 하향 여부
@@ -86,16 +87,7 @@ module.exports = {
     episode: {
         start: 1,                   // 에피소드 시작 화
         end: 124,                   // 에피소드 마지막 화
-    },
-    // ─── 동기화 ─────────────────────────────────────────────
-    sync: {
-        tolerance_sec: 60,          // 싱크 허용 오차 (초) — 이 범위 내면 동일 싱크로 판단
-        min_consecutive: 6,         // 연속 일치 판정에 필요한 최소 샘플 수 (2 이상; 기본값: 4)
-        init_delay_ms: 5000,        // 초기 동기화 지연 (ms) — 데몬 DB 로드 후 다운로더 시작까지 대기
-        segment_duration_min: 4,    // 세그먼트 최소 길이 (초) - 중복/유사 무시 대용
-        segment_duration_max: 20,   // 세그먼트 최대 길이 (초) — yt-dlp로 캡처할 클립 길이
-        restart_delay_ms: 3000,     // 재시작 대기 (ms) — yt-dlp 또는 데몬 비정상 종료 시
-        max_restart_count: 30,      // 최대 재시작 횟수 — 초과 시 60초 대기 후 카운터 리셋
+        stream_start_time: "2026-07-10 19:00:00", // 최초 스트리밍 방송 시작 일시
     },
     // ─── 에피소드 변경 알림 ──────────────────────────────────
     notice: {

@@ -69,8 +69,17 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
 module.exports = {
     name: 'episode',
     group: 'episode',
+    icon: '🎬',
     aliases: ['!대사', '!몇회', '!몇화', '!몆화', '!몆회', '!몇편', '!편수', '!화차', '!현재회차', '!현재몇편', '!현재몇화', '!지금몇화', '!지금몇회', '!지금몇편', '!지금회차', '!회차', '!ㅁㅎ'],
     description: '현재 회차, 에피소드 예정 시간, 다중 회차 및 대사 검색',
+
+    web: {
+        title: '회차 정보',
+        icon: '🎬',
+        description: '현재/다음/예약 회차 정보 조회 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, rtn, _input, ctx }) {
         if (!args || args.length <= 0) {
@@ -79,6 +88,9 @@ module.exports = {
         }
 
         const query = args[0];
+        if (typeof query === 'string' && query.length > 100) {
+            return ctx.returnWarning('⚠️ 검색어가 너무 깁니다. (100자 이내)', cmd, _input);
+        }
 
         // ─── 복수 에피소드 번호 감지 ──────────────────────────────
         const multiTokens = query.trim().split(/[\s,]+/);

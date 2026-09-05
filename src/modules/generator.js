@@ -403,6 +403,9 @@ function generateScheduleImages() {
     console.log(`📊 [편성표] 현재 사이클 이미지: ${currentPath}`);
     console.log(`📊 [편성표] 다음 사이클 이미지: ${nextPath}`);
 
+    // 오래된 이미지 자동 정리 (디스크 누수 방지)
+    cleanupOldImages(4);
+
     return { currentImage, nextImage, currentPath, nextPath };
 }
 
@@ -427,7 +430,16 @@ function cleanupOldImages(keepCount = 4) {
 
 module.exports = {
     name: 'generator',
+    icon: '🖼️',
     description: '1~293화 편성표 텍스트 및 Canvas 이미지 생성기',
+
+    web: {
+        title: '편성표 생성기',
+        icon: '🖼️',
+        description: '1~293화 편성표 텍스트 및 Canvas 이미지 생성 모듈',
+        category: 'Schedule',
+        badge: 'Generator'
+    },
     generateScheduleImages,
     generateScheduleText,
     buildCycleData,

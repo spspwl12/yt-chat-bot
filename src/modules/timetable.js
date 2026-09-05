@@ -108,14 +108,26 @@ function printTimeTable(rtn, change, cmd, ctx, limitLength = cfg.timetable.defau
 module.exports = {
     name: 'timetable',
     group: 'timetable',
+    icon: '📑',
     aliases: ['!시간표', '!편성표', '!방영표', '!방송표', '!상영표', '!스케줄', '!스케쥴', '!스캐쥴', '!스캐줄', '!편성', '!순서'],
     description: '곧 방영될 회차들의 목록과 예상 시작 시각 요약 출력',
+
+    web: {
+        title: '시간표',
+        icon: '🗓️',
+        description: '방영 시간표 및 일정 안내 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, rtn, _input, ctx }) {
         let startIdx = null;
 
         if (args && args.length > 0) {
             const query = args.join(' ').trim();
+            if (query.length > 100) {
+                return ctx.returnWarning('⚠️ 검색어가 너무 깁니다. (100자 이내)', cmd, _input);
+            }
             if (query.length > 0) {
                 const foundIdx = findEpisodeIndex(query);
                 if (foundIdx !== -1) {

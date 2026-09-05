@@ -1,4 +1,4 @@
-const cfg = require('../../data/config-youtube.js');
+﻿const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
 const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces } = require('../func.js');
@@ -88,6 +88,7 @@ function printNowEpisode(rtn, cmd, ctx) {
 
 module.exports = {
     name: 'future',
+    icon: '⏭️',
     groups: {
         'next': ['!다음', '!다음화', '!다음회', '!다음편', '!다음회차'],
         'nextnext': ['!다다음', '!다다음화', '!다다음회', '!다다음편', '!다다음회차'],
@@ -101,6 +102,14 @@ module.exports = {
         '!마지막', '!마지막화', '!마지막회', '!마지막편', '!최종화', '!최종회', '!최종편', '!막화', '!막회'
     ],
     description: '다음, 다다음, 첫화, 마지막화 방영 예정 정보 조회',
+
+    web: {
+        title: '미래 회차',
+        icon: '🔜',
+        description: '다음화/그다음화 예정 회차 정보 조회 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, group, rtn, _input, ctx }) {
         if (group === 'next') {

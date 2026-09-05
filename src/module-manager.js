@@ -305,14 +305,6 @@ class ModuleManager {
         const list = [];
         const seenNames = new Set();
 
-        // 모듈 기본 아이콘 매핑
-        const defaultIcons = {
-            coolcheck: '⏳', date: '📅', dice: '🎲', episode: '🎬',
-            future: '⏭️', generator: '🖼️', greeting: '👋', help: '❓',
-            menu: '🍱', music: '🎵', poster: '📢', stats: '📊',
-            time: '⏰', timetable: '📑', weather: '⛅'
-        };
-
         for (const entry of fileEntries) {
             const mod = this.modules.get(entry.modName) || this.modules.get(entry.fileName);
             const isLoaded = !!mod;
@@ -331,8 +323,8 @@ class ModuleManager {
                 ...Array.from(node.dependents)
             ]));
 
-            const title = (mod && mod.web && mod.web.title) || cached.title || modName;
-            const icon = (mod && mod.web && mod.web.icon) || cached.icon || defaultIcons[modName] || defaultIcons[entry.modName] || (isCommand ? '⚡' : '⚙️');
+            const title = (mod && mod.web && mod.web.title) || (mod && mod.title) || cached.title || modName;
+            const icon = (mod && (mod.icon || (mod.web && mod.web.icon))) || cached.icon || (isCommand ? '⚡' : '⚙️');
             const description = (mod && mod.web && mod.web.description) || (mod && mod.description) || cached.description || (isLoaded ? '독립 모듈' : '현재 언로드된 모듈');
             const category = (mod && mod.web && mod.web.category) || cached.category || (isCommand ? 'Commands' : 'Services');
             const badge = (mod && mod.web && mod.web.badge) || cached.badge || (isCommand ? 'Command' : 'Service');
@@ -571,8 +563,8 @@ class ModuleManager {
 
                     // 메타데이터 캐싱
                     this.knownModuleMeta.set(mod.name, {
-                        title: (mod.web && mod.web.title) || mod.name,
-                        icon: (mod.web && mod.web.icon) || null,
+                        title: (mod.web && mod.web.title) || mod.title || mod.name,
+                        icon: mod.icon || (mod.web && mod.web.icon) || null,
                         description: (mod.web && mod.web.description) || mod.description || '',
                         category: (mod.web && mod.web.category) || null,
                         badge: (mod.web && mod.web.badge) || null,

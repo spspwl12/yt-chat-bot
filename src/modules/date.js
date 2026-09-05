@@ -8,8 +8,17 @@ const retryPattern = ["$1", "$1 ", " $1", "", ""];
 module.exports = {
     name: 'date',
     group: 'date',
+    icon: '📅',
     aliases: ['!날짜', '!날자'],
     description: '특정 날짜 및 시간에 방영될 회차 정보 조회',
+
+    web: {
+        title: '날짜 예약 조회',
+        icon: '📅',
+        description: '특정 날짜/시간에 방영될 회차 정보 조회 모듈',
+        category: 'Commands',
+        badge: 'Command'
+    },
 
     async execute({ cmd, args, rtn, _input, ctx }) {
         if (!args || args.length === 0) {
@@ -17,6 +26,9 @@ module.exports = {
         }
 
         const dtStr = args.join(' ');
+        if (dtStr.length > 100) {
+            return ctx.returnWarning('⚠️ 입력값이 너무 깁니다. (100자 이내)', cmd, _input);
+        }
         const dtParsed = parseKoreanDate(dtStr);
         if (!dtParsed) {
             return ctx.returnWarning(msg.error.date_invalid_format, cmd, _input);

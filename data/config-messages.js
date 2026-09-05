@@ -22,19 +22,18 @@ module.exports = {
         coolcheck_missing_name: (cmd) => `⚠️ 닉네임을 입력해 주세요. (예: ${cmd} 닉네임)`,
         coolcheck_not_found: (name) => `⚠️ "${name}" 닉네임을 가진 유저를 찾을 수 없습니다.`,
         coolcheck_failed: `⚠️ 쿨타임 정보를 불러올 수 없습니다.`,
+        coolcheck_self: `⚠️ 자기 자신의 쿨타임은 조회할 수 없습니다.`,
     },
 
     // ─── 도움말 ────────────────────────────────────────────────
     help: {
         main:
-            `ℹ️ 명령어(개인쿨타임): !몇화!날짜(2분),!다음화!첫화!막화(2분),!시간표(10분),!스탯(30분)` +
-            `ℹ️ !몇화 사용법: !몇화 64화 / !몇화 20 24 / !몇화 고자라니` +
-            `ℹ️ 대사(!몇화 고자라니): 개인쿨타임30분 + (정확도 낮으면 쿨타임 폭등)` +
-            `ℹ️ 시간표: 1화)AA→07:30)BB (07:30분에 2화 BB 에피소드 시작)`,
+            `ℹ️ 명령어: 몇화,다음화,첫화,막화,날짜,시간표` +
+            `ℹ️ 몇화 사용법: !몇화 64화 / !몇화 20 24 / !몇화 고자라니 [대사검색]` +
+            `ℹ️ 대사 검색은 매우 무거운 명령어입니다.`,
         main2:
-            `ℹ️ 일반쿨타임: 봇 응답 끝에 표시 (개인 쿨타임 영향 X)` +
-            `ℹ️ 개인쿨타임: 24시간내 사용당 1분씩 증가 (쿨타임 중 사용 시 초기화 + 1분 패널티)` +
-            `ℹ️ !쿨타임 확인: !쿨타임 [닉네임]` +
+            `ℹ️ 개인쿨타임 중 명령어 사용 시 다시 시간을 잽니다.` +
+            `ℹ️ 개인쿨타임 확인: !쿨타임 [닉네임]` +
             `ℹ️ 한정된 봇의 채팅수 및 도배 방지를 위해 쿨타임이 엄격하니 양해 바랍니다.`,
     },
 
@@ -92,6 +91,23 @@ module.exports = {
             `🎬 "${unicodenum}. ${title}" 방영중 ${timestr}초 남음 ${cooldownMsg}`,
     },
 
+    // ─── 바퀴수 / 완주 횟수 조회 (!바퀴, !회차수) ──────────────
+    cycle: {
+        current: (
+            currentRepeat,
+            completedRepeats,
+            percent,
+            unicodenum,
+            title,
+            cooldownMsg,
+            currentAlias,
+            lastEpisode,
+            remainingCycleMin,
+            remainingEpMin,
+        ) =>
+            `🔄 현재 ${currentRepeat}트 입니다. ${currentAlias}/${lastEpisode}화 ${remainingEpMin}분 남았습니다. ${cooldownMsg}`.trim(),
+    },
+
     // ─── 시간표 반복문 출력 ───────────────────────────────────
     timetable: {
         first_item: (unicodenum, title) => `${unicodenum}화)${title}`,
@@ -126,12 +142,52 @@ module.exports = {
 
     // ─── 날씨 조회 (!날씨) ───────────────────────────────────
     weather: {
-        national_summary: (weatherList, cooldownMsg) => `🌤️ [전국 날씨] ${weatherList} ${cooldownMsg}`,
-        city_weather: (city, temp, desc, emoji, cooldownMsg) =>
-            `${emoji} [${city} 날씨] 현재 기온: ${temp}°C (${desc}) ${cooldownMsg}`,
+        national_summary: (weatherList, sunStr, cooldownMsg, headerEmoji = '⛅') =>
+            `${headerEmoji} [전국 날씨] ${weatherList} | ${sunStr} ${cooldownMsg}`.trim(),
+        city_weather: (city, temp, desc, emoji, sunStr, cooldownMsg) =>
+            `${emoji} [${city} 날씨] 현재 기온: ${temp}°C (${desc}) | ${sunStr} ${cooldownMsg}`.trim(),
+        tomorrow_national_summary: (weatherList, sunStr, cooldownMsg, headerEmoji = '⛅') =>
+            `${headerEmoji} [내일 날씨] ${weatherList} | ${sunStr} ${cooldownMsg}`.trim(),
+        tomorrow_city_weather: (city, minTemp, maxTemp, desc, emoji, pop, precip, sunStr, cooldownMsg) => {
+            const rainInfo = pop > 0 ? (precip > 0 ? `, 강수확률 ${pop}%, 예상 강수량 ${precip}mm` : `, 강수확률 ${pop}%`) : '';
+            return `${emoji} [내일 ${city} 날씨] 최저 ${minTemp}°C / 최고 ${maxTemp}°C (${desc}${rainInfo}) | ${sunStr} ${cooldownMsg}`.trim();
+        },
         fetch_error: (cooldownMsg) => `⚠️ 날씨 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`,
-        invalid_city: (query, cooldownMsg) =>
-            `⚠️ "${query}" 지역의 날씨 정보를 찾을 수 없습니다. (예: 서울, 부산, 대구 등) ${cooldownMsg}`,
+        invalid_city: (query, cooldownMsg) => `⚠️ "${query}" 지역의 날씨 정보를 찾을 수 없습니다. (예: 서울, 부산, 수원, 강릉, 제주 등) ${cooldownMsg}`,
+    },
+
+    // ─── 환율 조회 (!환율, !달러, !엔화, !유로, !위안) ────────
+    exchange: {
+        summary: (rateListStr, cooldownMsg) => `💱 [실시간 환율] ${rateListStr} ${cooldownMsg}`.trim(),
+        single: (title, detailsStr, cooldownMsg) => `${title} ${detailsStr} ${cooldownMsg}`.trim(),
+        fetch_error: (cooldownMsg) => `⚠️ 환율 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`.trim(),
+    },
+
+    // ─── 가상화폐 시세 (!비트코인, !코인) ─────────────────────
+    crypto: {
+        summary: (coinListStr, cooldownMsg) => `🪙 [가상화폐 실시간 시세] ${coinListStr} ${cooldownMsg}`.trim(),
+        single: (name, symbol, priceStr, changeStr, highLowStr, cooldownMsg) =>
+            `🪙 [${name}(${symbol})] 현재가: ${priceStr} (${changeStr})${highLowStr ? ` | ${highLowStr}` : ''} ${cooldownMsg}`.trim(),
+        not_found: (query, cooldownMsg) => `⚠️ "${query}" 코인을 찾을 수 없습니다. (예: 비트코인, 이더리움, 리플, SOL, DOGE 등) ${cooldownMsg}`.trim(),
+        fetch_error: (cooldownMsg) => `⚠️ 가상화폐 시세를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`.trim(),
+    },
+
+    // ─── 영어사전 (!영어) ─────────────────────────────────────
+    english: {
+        result: (query, translation, cooldownMsg) => `📖 [영어사전] ${query} → ${translation} ${cooldownMsg}`.trim(),
+        missing_word: `⚠️ 한글 또는 영어를 입력하세요. (예: !영어 immune, !영어 산업화)`,
+        not_found: (query, cooldownMsg) => `⚠️ "${query}"에 대한 검색 결과를 찾을 수 없습니다. ${cooldownMsg}`.trim(),
+        fetch_error: (cooldownMsg) => `⚠️ 사전 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`.trim(),
+    },
+
+    // ─── 오늘의 운세 (!운세) ─────────────────────────────────
+    fortune: {
+        result: (f, cooldownMsg) => {
+            const tag = f.detailTag ? ` (${f.detailTag})` : '';
+            const iljin = f.iljin ? ` · ${f.iljin}` : '';
+            return `${f.zodiacEmoji}[${f.label} 오늘의 운세${iljin}] ${f.luck.color} ${f.luck.star} ${f.luck.label}${tag} | ${f.fortuneText} | 🍀 행운색: ${f.luckyColor} / 행운수: ${f.luckyNumber} / 행운방향: ${f.luckyDir} ${cooldownMsg}`.trim();
+        },
+        missing_target: `⚠️ 띠, 별자리 또는 출생연도를 입력하세요. (예: !운세 호랑이, !운세 사자자리, !운세 1995년생)`,
     },
 
     // ─── 주사위 (!주사위) ────────────────────────────────────
@@ -152,5 +208,11 @@ module.exports = {
             `🍴 [저녁 추천] ${name}님, 오늘의 저녁 메뉴는 "${menu}" 어떠세요? (${desc}) ${cooldownMsg}`,
         general: (label, name, menu, desc, cooldownMsg) =>
             `🍴 [${label} 추천] ${name}님, 오늘은 "${menu}" 어떠세요? (${desc}) ${cooldownMsg}`,
+    },
+
+    // ─── 실시간 검색순위 (!실검) ─────────────────────────────
+    searchrank: {
+        top10: (rankListStr, cooldownMsg) => `🔥 [실시간 검색순위] ${rankListStr} ${cooldownMsg}`.trim(),
+        fetch_error: (cooldownMsg) => `⚠️ 실시간 검색순위를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요. ${cooldownMsg}`.trim(),
     },
 };

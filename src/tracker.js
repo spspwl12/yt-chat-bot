@@ -70,6 +70,14 @@ function noticeChangeEpisode() {
             }
         }
 
+        if (noticeIdx.index >= 0 && rtn.index !== noticeIdx.index) {
+            eventBus.emit('episode_changed', {
+                previousIndex: noticeIdx.index,
+                currentIndex: rtn.index,
+                rtn: rtn
+            });
+        }
+
         noticeIdx.index = rtn.index;
         --noticeIdx.sleep;
     } catch (e) {

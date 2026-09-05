@@ -104,6 +104,7 @@ async function generateAndPost(cycleOffset, label) {
  */
 let schedulerRunning = false;
 let cycleCheckTimer = null;
+let cycleTransitionTimer = null;  // setTimeout 핸들 추적 (누수 방지)
 let prevAlias = null;
 let transitionPending = false;
 
@@ -116,7 +117,8 @@ function checkCycleTransition() {
         console.log(`📊 [편성표 스케줄러] 사이클 전환 감지! (${prevAlias}화 → ${currentAlias}화)`);
         console.log(`📊 [편성표 스케줄러] ${SCHEDULE_CONFIG.cycleTransitionDelayMs / 1000}초 후 다음 사이클 편성표 게시...`);
 
-        setTimeout(async () => {
+        cycleTransitionTimer = setTimeout(async () => {
+            cycleTransitionTimer = null;
             await generateAndPost(1, "다음 사이클");
             transitionPending = false;
         }, SCHEDULE_CONFIG.cycleTransitionDelayMs);
@@ -160,6 +162,12 @@ function stopSchedulePoster() {
     if (cycleCheckTimer) {
         clearInterval(cycleCheckTimer);
         cycleCheckTimer = null;
+    }
+    // 편성표 전환 setTimeout 예약도 취소 (누수 방지)
+    if (cycleTransitionTimer) {
+        clearTimeout(cycleTransitionTimer);
+        cycleTransitionTimer = null;
+        transitionPending = false;
     }
     console.log('📊 [편성표 스케줄러] 정지');
 }

@@ -3,8 +3,14 @@ const msg = require('../data/config-messages.js');
 const eventBus = require('./event-bus.js');
 
 // ─── 쿨타임 상태 관리 ─────────────────────────────────────────
-let delayChatTime = 0;                 // global 모드용
-const delayChatTimeMap = new Map();    // per-command 모드용
+// require.cache 무효화(핫리로드) 시에도 쿨타임 상태가 유지되도록 global에 저장
+if (!global.__cooldownState) {
+    global.__cooldownState = {
+        delayChatTime: 0,
+        delayChatTimeMap: new Map(),
+    };
+}
+const _cs = global.__cooldownState;
 let commandGroupResolver = (cmd) => cmd;
 let commandGroupsMap = {};
 
@@ -62,14 +68,14 @@ function getWarnsValue(group) {
 function isCooldown(cmd) {
     if (cfg.cooldown.mode === 'global') {
         const globalCooldownMs = 1000 * 60 * cfg.cooldown.time_min;
-        return Date.now() - delayChatTime <= globalCooldownMs;
+        return Date.now() - _cs.delayChatTime <= globalCooldownMs;
     }
 
     const group = getCommandGroup(cmd);
     const config = getCooldownConfig(group);
     const cooldownMs = 1000 * 60 * config.time;
 
-    const lastTime = delayChatTimeMap.get(config.key) || 0;
+    const lastTime = _cs.delayChatTimeMap.get(config.key) || 0;
     return Date.now() - lastTime <= cooldownMs;
 }
 
@@ -78,11 +84,11 @@ function setCooldown(cmd, offsetMs = 0, _input = null) {
         _input.triggerCooldown = () => {
             const now = Date.now() + offsetMs;
             if (cfg.cooldown.mode === 'global') {
-                delayChatTime = now;
+                _cs.delayChatTime = now;
             } else {
                 const group = getCommandGroup(cmd);
                 const config = getCooldownConfig(group);
-                delayChatTimeMap.set(config.key, now);
+                _cs.delayChatTimeMap.set(config.key, now);
             }
         };
         return;
@@ -90,17 +96,17 @@ function setCooldown(cmd, offsetMs = 0, _input = null) {
 
     const now = Date.now() + offsetMs;
     if (cfg.cooldown.mode === 'global') {
-        delayChatTime = now;
+        _cs.delayChatTime = now;
     } else {
         const group = getCommandGroup(cmd);
         const config = getCooldownConfig(group);
-        delayChatTimeMap.set(config.key, now);
+        _cs.delayChatTimeMap.set(config.key, now);
     }
 }
 
 function resetCooldown() {
-    delayChatTime = 0;
-    delayChatTimeMap.clear();
+    _cs.delayChatTime = 0;
+    _cs.delayChatTimeMap.clear();
 }
 
 function getCooldownState() {
@@ -110,24 +116,22 @@ function getCooldownState() {
     const state = {
         mode: cfg.cooldown.mode,
         global: {
-            lastTime: delayChatTime,
+            lastTime: _cs.delayChatTime,
             cooldownMs: globalCooldownMs,
-            remainingMs: Math.max(0, globalCooldownMs - (now - delayChatTime))
+            remainingMs: Math.max(0, globalCooldownMs - (now - _cs.delayChatTime))
         },
         groups: {}
     };
 
     if (cfg.cooldown.mode === 'per-command') {
-        const allGroups = new Set([
-            ...Object.keys(commandGroupsMap),
-            ...(cfg.cooldown.group_times ? Object.keys(cfg.cooldown.group_times).flatMap(k => k.split(',').map(s => s.trim())) : [])
-        ]);
+        const allGroups = Object.keys(commandGroupsMap);
 
         for (const group of allGroups) {
             const config = getCooldownConfig(group);
             const cooldownMs = 1000 * 60 * config.time;
-            const lastTime = delayChatTimeMap.get(config.key) || 0;
+            const lastTime = _cs.delayChatTimeMap.get(config.key) || 0;
             state.groups[group] = {
+                groupKey: config.key,
                 cooldownMs,
                 lastTime,
                 remainingMs: Math.max(0, cooldownMs - (now - lastTime))
