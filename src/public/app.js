@@ -137,7 +137,7 @@ function tlUpdateFromQuery(query, diffSec) {
     if (!query) return;
     // 회차/시간 chip에 기록 시점 raw 데이터 표시 (조정 없음)
     if (query.index !== undefined) {
-        tlEpIndex.textContent = `${query.index + 1}화`;
+        tlEpIndex.textContent = `${query.index}화`;
     }
     if (query.now !== undefined) {
         tlEpTime.textContent = secToHHMMSS(query.now);
@@ -168,6 +168,8 @@ function tlHandleStateAtHistory(payload) {
         const aliasStr = payload.episodeAlias ? ` (${payload.episodeAlias})` : '';
         document.getElementById('stat-episode').innerText = `${payload.episodeInfo.index} / ${totalEp}${aliasStr}`;
         document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
+        // 타임라인 회차 표시 (stat-episode의 괄호 안 회차)
+        tlEpIndex.textContent = payload.episodeAlias ? `${payload.episodeAlias}화` : `${payload.episodeInfo.index}화`;
     }
     if (payload.schedule) {
         renderSchedule(payload.schedule);
@@ -198,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (TL.history.length > 0 && val < TL.history.length) {
             const entry = TL.history[val];
             if (entry) {
-                tlEpIndex.textContent = `${entry.index !== undefined ? entry.index + 1 : '--'}화`;
+                tlEpIndex.textContent = `${entry.index !== undefined ? entry.index : '--'}화`;
                 tlEpTime.textContent = secToHHMMSS(entry.now || 0);
                 tlDiffCard.style.display = '';
                 tlDiffValue.textContent = '...';
@@ -556,7 +558,7 @@ function handleWSMessage(msg) {
                 document.getElementById('stat-sec').innerText = `${secToTime(payload.episodeInfo.now)} / ${secToTime(payload.totalTime)}`;
                 // 타임라인 LIVE 모드일 때 슬라이더 업데이트
                 if (TL.isLive && payload.episodeInfo) {
-                    tlEpIndex.textContent = `${payload.episodeInfo.index + 1}화`;
+                    tlEpIndex.textContent = payload.episodeAlias ? `${payload.episodeAlias}화` : `${payload.episodeInfo.index}화`;
                     tlEpTime.textContent = secToHHMMSS(payload.episodeInfo.now);
                 }
             } else {
