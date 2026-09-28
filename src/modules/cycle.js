@@ -116,10 +116,19 @@ function calcPassedCycles(prevIndex, curIndex, offSec, totalCycleSec, cycleEpiso
     let cycleDist = curPos - prevPos;
     let baseCycleCross = 0;
 
-    // 인덱스가 역전되었으면 (예: 121(122화) -> 4(5화) 등) 적어도 1바퀴는 완주함
+    // 인덱스가 역전되었을 때 maxEpisode의 반절 이상 차이나면 사이클 전환으로 간주
     if (curIndex < prevIndex) {
-        cycleDist += totalCycleSec;
-        baseCycleCross = 1;
+        const maxEpisode = cfg.episode.end;
+        const threshold = Math.floor(maxEpisode / 2);
+        const indexDiff = prevIndex - curIndex;
+        if (indexDiff >= threshold) {
+            cycleDist += totalCycleSec;
+            baseCycleCross = 1;
+        } else {
+            // 반절 미만 차이면 네트워크 오류로 간주, 역전 처리 안 함
+            console.log(`⚠️ [cycle] 역전 감지 (${prevIndex} -> ${curIndex}) 차이(${indexDiff}회)가 ${threshold} 미만이라 사이클 전환 무시 (네트워크 오류 가능성)`);
+            return 0;
+        }
     }
 
     if (!offSec || offSec <= 0) {
