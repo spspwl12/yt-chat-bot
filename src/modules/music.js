@@ -2,7 +2,7 @@ const path = require('path');
 const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
-const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji } = require('../func.js');
+const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji, isAfterStreamEnd } = require('../func.js');
 const TextSearchEngine = require('../textsearcher.js');
 
 let musics = {};
@@ -224,7 +224,7 @@ module.exports = {
                         const timestr = formatDate(futureDate);
                         const emoji = getClockEmoji(timestr);
 
-                        const timeMsg = bestOutOfbounds ?
+                        const timeMsg = (bestOutOfbounds || isAfterStreamEnd(futureDate)) ?
                             msg.subtitle.not_in_stream_short :
                             `${emoji} ${timestr.replace(/\((월|화|수|목|금|토|일)\)/g, "")}`;
 

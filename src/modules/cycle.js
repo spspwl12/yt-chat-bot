@@ -8,7 +8,7 @@ const path = require("path");
 const cfg = require("../../data/config-youtube.js");
 const msg = require("../../data/config-messages.js");
 const { videoInfo, getEditOffset } = require("../video-matcher/search.js");
-const { toUnicodeNumber, insertSpaces } = require("../func.js");
+const { toUnicodeNumber, insertSpaces, isAfterStreamEnd } = require("../func.js");
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 const STATE_FILE = path.join(__dirname, "../../data", "cycle_state.json");
@@ -65,7 +65,7 @@ function loadCycleState() {
                 return parsed;
             }
         }
-    } catch (_) {}
+    } catch (_) { }
 
     return null;
 }

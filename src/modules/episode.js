@@ -4,7 +4,7 @@ const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
 const videoSubManager = require('../sub-manager.js');
 const { searchEpisodeByAI } = require('../ai.js');
 const { sendChat } = require('../innertube.js');
-const { filterText, hasProfanity, toUnicodeNumber, toUnicodeNumber2, formatDate, roundUpTime, insertSpaces } = require('../func.js');
+const { filterText, hasProfanity, toUnicodeNumber, toUnicodeNumber2, formatDate, roundUpTime, insertSpaces, isAfterStreamEnd } = require('../func.js');
 const { printNowEpisode, printNumEpisode } = require('./future.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
@@ -39,6 +39,7 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
     }
 
     if (entries.length === 0) return null;
+
     entries.sort((a, b) => a.futureDate.getTime() - b.futureDate.getTime());
 
     const makeMsg = (change) => {
@@ -47,12 +48,17 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
         let pdate = null;
 
         for (const entry of entries) {
-            const hdr = `${formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
             const unicodeAlias = toUnicodeNumber(entry.alias);
-            const candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
+            let candidate;
+            if (isAfterStreamEnd(entry.futureDate)) {
+                candidate = insertSpaces(`→스트리밍X)${unicodeAlias}화`, change);
+            } else {
+                const hdr = `${formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
+                candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
+                pdate = entry.futureDate;
+            }
             if (str.length + candidate.length >= limitLength) break;
             str += candidate;
-            pdate = entry.futureDate;
         }
 
         return str + " " + ctx.getCooldownMsg(cmd);

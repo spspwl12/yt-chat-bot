@@ -1,7 +1,7 @@
-﻿const cfg = require('../../data/config-youtube.js');
+const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
-const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces } = require('../func.js');
+const { toUnicodeNumber, toHHMMSS, formatDate, roundUpTime, getClockEmoji, insertSpaces, isAfterStreamEnd } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -37,6 +37,16 @@ function printFutureEpisode(rtn, cmd, skipCount, label, _input, ctx) {
     const emoji = getClockEmoji(timestr);
 
     ctx.setCooldown(cmd, 0, _input);
+
+    if (info.disable || isAfterStreamEnd(futureDate)) {
+        return {
+            msg: `👉🏻 ${label} 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[0])}" 이고 ${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim(),
+            proc: function (attempt) {
+                return `👉🏻 ${label} 회차는 "${unicodenum}. ${insertSpaces(info.title, retryPattern[attempt])}" 이고 ${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim();
+            }
+        };
+    }
+
     return {
         msg: msg.episode.future(label, unicodenum, insertSpaces(info.title, retryPattern[0]), emoji, timestr, ctx.getCooldownMsg(cmd)),
         proc: function (attempt) {
@@ -60,7 +70,7 @@ function printNumEpisode(rtn, num, cmd, ctx) {
     const timestr = formatDate(futureDate);
     const emoji = getClockEmoji(timestr);
 
-    let timeMsg = info.disable
+    let timeMsg = (info.disable || isAfterStreamEnd(futureDate))
         ? msg.episode.scheduled_no_stream
         : msg.episode.scheduled_time(emoji, timestr);
 

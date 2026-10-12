@@ -325,6 +325,31 @@ function parseKoreanDate(input) {
     return { startDate: targetDate, endDate: targetDate, hasTime: true, hasDate: true };
 }
 
+function getStreamStartTime() {
+    const raw = configManager.cfg && configManager.cfg.episode && configManager.cfg.episode.stream_start_time;
+    if (raw) {
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    return null;
+}
+
+function getStreamEndTime() {
+    const raw = configManager.cfg && configManager.cfg.episode && configManager.cfg.episode.stream_end_time;
+    if (raw) {
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    return null;
+}
+
+function isAfterStreamEnd(time) {
+    const endTime = getStreamEndTime();
+    if (!endTime) return false;
+    const timeMs = (time instanceof Date) ? time.getTime() : (typeof time === 'number' ? time : new Date(time).getTime());
+    return !isNaN(timeMs) && timeMs >= endTime;
+}
+
 module.exports = {
     runWithoutLogs,
     removeDummy,
@@ -340,5 +365,8 @@ module.exports = {
     shortenTextByRatio,
     parseKoreanDate,
     hasProfanity,
-    maskProfanity
+    maskProfanity,
+    getStreamStartTime,
+    getStreamEndTime,
+    isAfterStreamEnd
 };

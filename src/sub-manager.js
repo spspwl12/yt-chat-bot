@@ -4,7 +4,7 @@ const TextSearchEngine = require('./textsearcher.js');
 const configManager = require('./config-manager.js');
 const { cfg } = configManager;
 const search_lib = require('./video-matcher/search.js');
-const { fromHHMMSS, roundUpTime, formatDate, getClockEmoji, toUnicodeNumber } = require('./func.js');
+const { fromHHMMSS, roundUpTime, formatDate, getClockEmoji, toUnicodeNumber, isAfterStreamEnd } = require('./func.js');
 
 const VIDEO_SUB_PATH = configManager.PATHS.videoSub;
 
@@ -84,7 +84,7 @@ function searchAndFormat(query, rtn) {
                 const subEd = fromHHMMSS(pfSub.end);
                 const futureDate = roundUpTime(search_lib.getFutureDate(subInfo, rtn, subSt));
 
-                let outOfbounds = subInfo.disable;
+                let outOfbounds = subInfo.disable || isAfterStreamEnd(futureDate);
                 if (!outOfbounds && subInfo._editParsed) {
                     for (const et of subInfo._editParsed) {
                         if (subSt && subSt >= et.s && subSt <= et.e) {

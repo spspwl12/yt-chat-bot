@@ -1,4 +1,4 @@
-﻿const msg = require('../../data/config-messages.js');
+const msg = require('../../data/config-messages.js');
 const { videoInfo } = require('../video-matcher/search.js');
 const { toUnicodeNumber, toHHMMSS, insertSpaces } = require('../func.js');
 
@@ -19,7 +19,13 @@ module.exports = {
         badge: 'Command'
     },
 
-    async execute({ cmd, rtn, _input, ctx }) {
+    async execute({ cmd, args, rtn, _input, ctx }) {
+        // 특정 시각/날짜 인자가 전달된 경우 date 모듈로 위임
+        if (args && args.length > 0) {
+            const dateModule = require('./date.js');
+            return dateModule.execute({ cmd, args, rtn, _input, ctx });
+        }
+
         ctx.setCooldown(cmd, 0, _input);
         const info = videoInfo[rtn.index];
         const unicodenum = toUnicodeNumber(info.alias);

@@ -1,7 +1,7 @@
 const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getEpAtDate } = require('../video-matcher/search.js');
-const { parseKoreanDate, toUnicodeNumber, toHHMMSS, insertSpaces } = require('../func.js');
+const { parseKoreanDate, toUnicodeNumber, toHHMMSS, insertSpaces, isAfterStreamEnd, getStreamEndTime } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -56,12 +56,30 @@ module.exports = {
                 `${yyyy}-${mm}-${dd} ${hh}:${min}` :
                 `${yyyy}-${mm}-${dd}`;
 
+            const isOut = isAfterStreamEnd(dtParsed.startDate);
+
             if (dtParsed.hasDate && !dtParsed.hasTime) {
+                const streamEndTime = getStreamEndTime();
+                const effectiveEnd = (streamEndTime && dtParsed.endDate.getTime() >= streamEndTime)
+                    ? new Date(streamEndTime - 1000)
+                    : dtParsed.endDate;
                 const stEp = getEpAtDate(dtParsed.startDate, rtn);
-                const edEp = getEpAtDate(dtParsed.endDate, rtn);
+                const edEp = getEpAtDate(effectiveEnd, rtn);
 
                 const numSt = toUnicodeNumber(stEp.info.alias);
                 const numEd = toUnicodeNumber(edEp.info.alias);
+
+                if (isOut) {
+                    if (stEp.idx === edEp.idx) {
+                        return msg.date.full_repeat_no_stream
+                            ? msg.date.full_repeat_no_stream(reqDateStr, ctx.getCooldownMsg(cmd))
+                            : `🗓️ [${reqDateStr}] 전체 회차가 반복 방송될 예정이고 ${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim();
+                    } else {
+                        return msg.date.range_episodes_no_stream
+                            ? msg.date.range_episodes_no_stream(reqDateStr, numSt, numEd, ctx.getCooldownMsg(cmd))
+                            : `🗓️ [${reqDateStr}] ${numSt}화 ~ ${numEd}화가 방송될 예정이고 ${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim();
+                    }
+                }
 
                 if (stEp.idx === edEp.idx) {
                     return msg.date.full_repeat(reqDateStr, ctx.getCooldownMsg(cmd));
@@ -98,6 +116,13 @@ module.exports = {
 
                 const overlapStr = overlaps.join(" 및 ");
                 ctx.setCooldown(cmd, 0, _input);
+
+                if (isOut || info.disable) {
+                    return msg.date.exact_episode_no_stream
+                        ? msg.date.exact_episode_no_stream(reqDateStr, overlapStr, ctx.getCooldownMsg(cmd))
+                        : `🗓️ [${reqDateStr}] 해당 날짜에 ${overlapStr} 이(가) 방영될 예정이고 ${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim();
+                }
+
                 return msg.date.exact_episode(reqDateStr, overlapStr, timestr, ctx.getCooldownMsg(cmd));
             }
         };

@@ -1,7 +1,7 @@
 const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getEditOffset, getRemainingTime } = require('../video-matcher/search.js');
-const { toUnicodeNumber, formatDate, roundUpTime, insertSpaces } = require('../func.js');
+const { toUnicodeNumber, formatDate, roundUpTime, insertSpaces, isAfterStreamEnd } = require('../func.js');
 
 const retryPattern = ["$1", "$1 ", " $1", "", ""];
 
@@ -69,6 +69,9 @@ function printTimeTable(rtn, change, cmd, ctx, limitLength = cfg.timetable.defau
                         : `${toUnicodeNumber(e.alias)}화)${e.shorten}`;
                     str = insertSpaces(firstStr, change);
                 } else {
+                    if (isAfterStreamEnd(fdate)) {
+                        break;
+                    }
                     pdate = fdate;
                     const hdr = `${formatDate(fdate, null, true)}`.replace(/ /g, '');
                     const firstStr = `${toUnicodeNumber(e.alias)}화 ${hdr})${e.shorten}`;
@@ -77,6 +80,10 @@ function printTimeTable(rtn, change, cmd, ctx, limitLength = cfg.timetable.defau
                 accumSec += e._streamDurationSec;
                 currentIdx = (currentIdx + 1) % n;
                 continue;
+            }
+
+            if (isAfterStreamEnd(fdate)) {
+                break;
             }
 
             if (!pdate)
@@ -102,7 +109,15 @@ function printTimeTable(rtn, change, cmd, ctx, limitLength = cfg.timetable.defau
         currentIdx = (currentIdx + 1) % n;
     }
 
-    return str ? str + " " + ctx.getCooldownMsg(cmd) : null;
+    if (!str) {
+        if (effectiveStartIdx !== null && videoInfo[effectiveStartIdx]) {
+            const e = videoInfo[effectiveStartIdx];
+            return msg.episode.scheduled(toUnicodeNumber(e.alias), insertSpaces(e.title, change), msg.episode.scheduled_no_stream, ctx.getCooldownMsg(cmd));
+        }
+        return `${msg.episode.scheduled_no_stream} ${ctx.getCooldownMsg(cmd)}`.trim();
+    }
+
+    return str + " " + ctx.getCooldownMsg(cmd);
 }
 
 module.exports = {
