@@ -1,87 +1,33 @@
-const fs = require('fs');
-const path = require('path');
 const search_lib = require('./video-matcher/search.js');
 const LiveDownloader = require('./video-matcher/live-downloader.js');
 const LiveSearcher = require('./video-matcher/live-searcher.js');
 const { getYtdlpEnabled, saveYtdlpState } = LiveDownloader;
 const configManager = require('./config-manager.js');
-const { cfg, msg, schCfg } = configManager;
+const { cfg, schCfg } = configManager;
 const eventBus = require('./event-bus.js');
-const { sendChat } = require('./innertube.js');
-const { insertSpaces, toUnicodeNumber } = require('./func.js');
 
-const retryPattern = ["$1", "$1 ", " $1", "", ""];
-const noticeIdx = { index: -1, sleep: 0 };
-
-/**
- * video-metadata.json을 호출마다 fresh하게 읽음
- * (config 리로드 시 require.cache가 삭제되면 최신 데이터 반영)
- */
-function getVideoMetaMap() {
-    try {
-        const metaPath = (configManager.PATHS && configManager.PATHS.videoMetadata)
-            ? configManager.PATHS.videoMetadata
-            : path.join(__dirname, '../data/video-metadata.json');
-        if (!fs.existsSync(metaPath)) return new Map();
-        const raw = require(metaPath);
-        const arr = Array.isArray(raw) ? raw : Object.values(raw);
-        return new Map(arr.map(m => [m.name, m]));
-    } catch (e) {
-        console.warn('⚠️ [tracker] video-metadata.json 로드 실패:', e.message);
-        return new Map();
-    }
-}
+let lastEpisodeIndex = -1;
 
 /**
  * 에피소드가 다음 화로 넘어갔을 때 이를 감지하여
- * 유튜브 채팅창에 안내 메시지 발송
+ * episode_changed 이벤트 발행
  */
-function noticeChangeEpisode() {
+function checkEpisodeChange() {
     try {
         const rtn = search_lib.getEpisodeInfo();
         if (!rtn) return;
 
-        if (noticeIdx.index >= 0) {
-            if (rtn.index !== noticeIdx.index && noticeIdx.sleep <= 0) {
-                noticeIdx.sleep = cfg.notice.sleep_count;
-                const delay = cfg.notice.delay_base_ms + Math.random() * cfg.notice.delay_random_ms;
-
-                setTimeout(() => {
-                    try {
-                        const info = search_lib.videoInfo[rtn.index];
-                        if (!info) return;
-
-                        const unicodenum = toUnicodeNumber(info.alias);
-                        const meta = getVideoMetaMap().get(info.name);
-                        const rankSuffix = meta
-                            ? msg.notice.rank_suffix(toUnicodeNumber(meta.views_rank), toUnicodeNumber(meta.funny_rank))
-                            : '';
-
-                        sendChat(
-                            msg.notice.now_episode(unicodenum, insertSpaces(info.title, retryPattern[0]), rankSuffix),
-                            function (attempt) {
-                                return msg.notice.now_episode(unicodenum, insertSpaces(info.title, retryPattern[attempt]), rankSuffix);
-                            }
-                        );
-                    } catch (e) {
-                        console.warn('⚠️ [tracker] 에피소드 알림 전송 실패:', e.message);
-                    }
-                }, delay);
-            }
-        }
-
-        if (noticeIdx.index >= 0 && rtn.index !== noticeIdx.index) {
+        if (lastEpisodeIndex >= 0 && rtn.index !== lastEpisodeIndex) {
             eventBus.emit('episode_changed', {
-                previousIndex: noticeIdx.index,
+                previousIndex: lastEpisodeIndex,
                 currentIndex: rtn.index,
                 rtn: rtn
             });
         }
 
-        noticeIdx.index = rtn.index;
-        --noticeIdx.sleep;
+        lastEpisodeIndex = rtn.index;
     } catch (e) {
-        console.warn('⚠️ [tracker] noticeChangeEpisode 오류:', e.message);
+        console.warn('⚠️ [tracker] checkEpisodeChange 오류:', e.message);
     }
 }
 
@@ -155,8 +101,8 @@ function initCommand() {
         }
     }, 1000);
 
-    // 에피소드 전환 안내 메시지 주기적 체크
-    setInterval(noticeChangeEpisode, cfg.notice.check_interval_ms);
+    // 에피소드 전환 주기적 체크
+    setInterval(checkEpisodeChange, (cfg.notice && cfg.notice.check_interval_ms) || 5000);
 
     // config-search.js 핫리로드 시 파이프라인 재시작
     eventBus.on('search_config_reloaded', () => {
@@ -177,7 +123,8 @@ function initCommand() {
 
 module.exports = {
     initCommand,
-    noticeChangeEpisode,
+    checkEpisodeChange,
+    noticeChangeEpisode: checkEpisodeChange,
     isYtdlpRunning,
     setYtdlpRunning,
     getEpisodeInfo: search_lib.getEpisodeInfo,
