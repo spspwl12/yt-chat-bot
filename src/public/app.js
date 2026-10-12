@@ -2218,11 +2218,77 @@ function saveVideoMatchingConfig() {
             parsedArr = cmdValRaw.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(s => s.replace(/^"|"$/g, '')) || [];
         }
 
-        const cmdLineJson = JSON.stringify(parsedArr);
-        if (/ytdlp\s*:\s*\{[\s\S]*?commandLine\s*:\s*\[[^\]]*\]/.test(text)) {
-            text = text.replace(/(ytdlp\s*:\s*\{[\s\S]*?commandLine\s*:\s*)\[[^\]]*\]/, `$1${cmdLineJson}`);
-        } else if (/ytdlp\s*:\s*\{/.test(text)) {
-            text = text.replace(/(ytdlp\s*:\s*\{)/, `$1\n        commandLine: ${cmdLineJson},`);
+        const ytdlpIdx = text.search(/ytdlp\s*:\s*\{/);
+        if (ytdlpIdx !== -1) {
+            const cmdLineMatch = text.slice(ytdlpIdx).match(/commandLine\s*:\s*\[/);
+            if (cmdLineMatch) {
+                const startBracketIdx = ytdlpIdx + cmdLineMatch.index + cmdLineMatch[0].length - 1;
+                let depth = 0;
+                let inString = false;
+                let quoteChar = '';
+                let inLineComment = false;
+                let inBlockComment = false;
+                let endBracketIdx = -1;
+
+                for (let i = startBracketIdx; i < text.length; i++) {
+                    const char = text[i];
+                    const nextChar = text[i + 1] || '';
+
+                    if (inLineComment) {
+                        if (char === '\n') inLineComment = false;
+                        continue;
+                    }
+                    if (inBlockComment) {
+                        if (char === '*' && nextChar === '/') {
+                            inBlockComment = false;
+                            i++;
+                        }
+                        continue;
+                    }
+                    if (inString) {
+                        if (char === '\\') {
+                            i++;
+                        } else if (char === quoteChar) {
+                            inString = false;
+                        }
+                        continue;
+                    }
+
+                    if (char === '/' && nextChar === '/') {
+                        inLineComment = true;
+                        i++;
+                        continue;
+                    }
+                    if (char === '/' && nextChar === '*') {
+                        inBlockComment = true;
+                        i++;
+                        continue;
+                    }
+                    if (char === '"' || char === "'" || char === '`') {
+                        inString = true;
+                        quoteChar = char;
+                        continue;
+                    }
+
+                    if (char === '[') {
+                        depth++;
+                    } else if (char === ']') {
+                        depth--;
+                        if (depth === 0) {
+                            endBracketIdx = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (endBracketIdx !== -1) {
+                    const cmdLineJson = JSON.stringify(parsedArr, null, 12).replace(/\n\s*\]$/, '\n        ]');
+                    text = text.slice(0, startBracketIdx) + cmdLineJson + text.slice(endBracketIdx + 1);
+                }
+            } else {
+                const cmdLineJson = JSON.stringify(parsedArr, null, 12).replace(/\n\s*\]$/, '\n        ]');
+                text = text.replace(/(ytdlp\s*:\s*\{)/, `$1\n        commandLine: ${cmdLineJson},`);
+            }
         }
 
         if (window._currentSearchConfig && window._currentSearchConfig.ytdlp) {
