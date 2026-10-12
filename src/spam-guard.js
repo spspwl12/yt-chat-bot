@@ -2,7 +2,7 @@ const fs = require('fs');
 const { sendChat, banUser } = require('./innertube.js');
 const path2 = require('./path.js');
 const path = require('path');
-const BANNED_PATH = path2.findPath('../data/youtube-banned.json');
+const BANNED_PATH = path2.findPath('../data/youtube-banned.json') || path.join(__dirname, '../data', 'youtube-banned.json');
 const TRACKER_PATH = path2.findPath('../data/youtube-tracker.json') || path.join(__dirname, '../data', 'youtube-tracker.json');
 const configManager = require('./config-manager.js');
 const { cfg, msg } = configManager;
@@ -259,6 +259,10 @@ class SpamGuard {
     _saveBanned() {
         const obj = {};
         this.banned.forEach(function (v, k) { obj[k] = v; });
+        const targetDir = path.dirname(BANNED_PATH);
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
         fs.writeFileSync(BANNED_PATH, JSON.stringify(obj, null, 4), 'utf-8');
     }
 
