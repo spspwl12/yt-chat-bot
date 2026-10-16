@@ -2,7 +2,7 @@ const path = require('path');
 const cfg = require('../../data/config-youtube.js');
 const msg = require('../../data/config-messages.js');
 const { videoInfo, getFutureDate } = require('../video-matcher/search.js');
-const { fromHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji, isAfterStreamEnd } = require('../func.js');
+const { fromHHMMSS, toHHMMSS, toUnicodeNumber, formatDate, roundUpTime, getClockEmoji, isAfterStreamEnd } = require('../func.js');
 const TextSearchEngine = require('../textsearcher.js');
 
 let musics = {};
@@ -47,6 +47,10 @@ module.exports = {
     },
 
     async execute({ cmd, args, rtn, _input, ctx }) {
+        if (rtn && rtn.index !== undefined) {
+            console.log(`[music.js] 현재 회차: ${rtn.index}, video_time: ${toHHMMSS(rtn.now)}`);
+        }
+
         if (cfg.music && !cfg.music.enable) {
             return ctx.returnWarning(msg.error.music_disabled, cmd, _input);
         }
