@@ -301,6 +301,13 @@ function switchTab(targetId, saveState = true) {
         if (targetId === 'tab-videomatching') ws.send(JSON.stringify({ action: 'getConfig' }));
         if (targetId === 'tab-editor') switchEditorFile(currentEditorFile);
     }
+
+    if (targetId === 'tab-spam') {
+        if (typeof startSpamTimer === 'function') startSpamTimer();
+        if (typeof renderActiveSpamTab === 'function') renderActiveSpamTab();
+    } else {
+        if (typeof stopSpamTimer === 'function') stopSpamTimer();
+    }
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1097,13 +1104,21 @@ document.querySelectorAll('.sub-tab-btn').forEach(btn => {
         parent.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
         parent.querySelectorAll('.sub-panel').forEach(p => p.classList.remove('active'));
         target.classList.add('active');
-        document.getElementById(target.dataset.sub).classList.add('active');
+        const subId = target.dataset.sub;
+        const subPanel = document.getElementById(subId);
+        if (subPanel) subPanel.classList.add('active');
+
+        if (parent && parent.id === 'tab-spam') {
+            spamActiveSub = subId;
+            spamCurrentPage = 1;
+            renderActiveSpamTab();
+        }
     });
 });
 
-// ── Spam Render ──
-function fmtRemaining(ms) {
-    if (!ms || ms <= 0) return '<span style="color:var(--text-dim)">—</span>';
+// ── Spam Render (High Performance & Paginated) ──
+function fmtRemainingText(ms) {
+    if (!ms || ms <= 0) return '—';
     const totalSec = Math.ceil(ms / 1000);
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
@@ -1113,19 +1128,120 @@ function fmtRemaining(ms) {
     return `${s}초`;
 }
 
+function fmtRemaining(ms) {
+    if (!ms || ms <= 0) return '<span style="color:var(--text-dim)">—</span>';
+    return `<span style="color:#f87171;">${fmtRemainingText(ms)}</span>`;
+}
+
 let spamWarnData = [];
 let spamSearchBanData = [];
 let spamBanData = [];
 let spamReceivedAt = 0;
 let spamTimer = null;
+let spamCurrentPage = 1;
+let spamPageSize = 50;
+let spamFilterQuery = '';
+let spamActiveSub = 'spam-warn-panel';
+let spamNeedsRender = false;
+
+function isSpamTabActive() {
+    const tab = document.getElementById('tab-spam');
+    return tab && tab.classList.contains('active');
+}
+
+function startSpamTimer() {
+    if (!spamTimer) {
+        spamTimer = setInterval(tickSpamTimers, 1000);
+    }
+}
+
+function stopSpamTimer() {
+    if (spamTimer) {
+        clearInterval(spamTimer);
+        spamTimer = null;
+    }
+}
+
+function getActiveSpamDataset() {
+    if (spamActiveSub === 'spam-searchban-panel') return spamSearchBanData;
+    if (spamActiveSub === 'spam-ban-panel') return spamBanData;
+    return spamWarnData;
+}
+
+function getFilteredAndPaginatedSpamData(dataList) {
+    let filtered = dataList;
+    if (spamFilterQuery) {
+        const q = spamFilterQuery.toLowerCase();
+        filtered = dataList.filter(u => {
+            const name = (u.name || '').toLowerCase();
+            const chId = (u.channelId || '').toLowerCase();
+            const reason = (u.reason || '').toLowerCase();
+            return name.includes(q) || chId.includes(q) || reason.includes(q);
+        });
+    }
+
+    const total = filtered.length;
+    const pageSize = spamPageSize === 0 ? total : spamPageSize;
+    const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+    if (spamCurrentPage > totalPages) spamCurrentPage = totalPages;
+    if (spamCurrentPage < 1) spamCurrentPage = 1;
+
+    const startIdx = pageSize > 0 ? (spamCurrentPage - 1) * pageSize : 0;
+    const endIdx = pageSize > 0 ? startIdx + pageSize : total;
+    const pageItems = filtered.slice(startIdx, endIdx);
+
+    return {
+        items: pageItems,
+        total,
+        page: spamCurrentPage,
+        totalPages
+    };
+}
+
+function updateSpamPaginationUI(total, totalPages, currentPage) {
+    const prevBtn = document.getElementById('spam-page-prev');
+    const nextBtn = document.getElementById('spam-page-next');
+    const infoSpan = document.getElementById('spam-page-info');
+    const totalSpan = document.getElementById('spam-total-info');
+
+    if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+    if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
+    if (infoSpan) infoSpan.textContent = `${currentPage} / ${totalPages}`;
+    if (totalSpan) totalSpan.textContent = `(총 ${total.toLocaleString()}명)`;
+}
+
+function renderActiveSpamTab() {
+    if (!isSpamTabActive()) {
+        spamNeedsRender = true;
+        return;
+    }
+    spamNeedsRender = false;
+
+    if (spamActiveSub === 'spam-searchban-panel') {
+        renderSpamSearchBanTable();
+    } else if (spamActiveSub === 'spam-ban-panel') {
+        renderSpamBanTable();
+    } else {
+        renderSpamWarnTable();
+    }
+}
 
 function renderSpamWarnTable() {
     const tbody = document.getElementById('spam-warn-tbody');
-    tbody.innerHTML = '';
+    if (!tbody) return;
+
+    const { items, total, page, totalPages } = getFilteredAndPaginatedSpamData(spamWarnData);
+    updateSpamPaginationUI(total, totalPages, page);
+
+    if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-dim); padding:24px;">${spamFilterQuery ? '검색 결과가 없습니다.' : '경고 대상 유저가 없습니다.'}</td></tr>`;
+        return;
+    }
+
     const elapsed = Date.now() - spamReceivedAt;
-    spamWarnData.forEach((u, i) => {
-        const tr = document.createElement('tr');
+    const rows = items.map(u => {
         const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
+        const expiresAt = u.remainingMs > 0 ? (spamReceivedAt + u.remainingMs) : 0;
 
         const usageBadge = u.commandCount != null
             ? `<span class="badge badge-blue">${u.commandCount}회</span>`
@@ -1134,79 +1250,65 @@ function renderSpamWarnTable() {
             ? `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>`
             : `<span class="badge badge-green">0/${u.warnLimit || '?'}</span>`;
 
-        tr.innerHTML = `
-                    <td style="font-weight:600;">${escapeHtml(u.name)}</td>
-                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
-                    <td>
-                        <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustUsage('${u.channelId}', -1)" title="사용량 감소">−</button>
-                            ${usageBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustUsage('${u.channelId}', 1)" title="사용량 증가">+</button>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustWarn('${u.channelId}', -1)" title="경고 감소">−</button>
-                            ${warnBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustWarn('${u.channelId}', 1)" title="경고 증가">+</button>
-                        </div>
-                    </td>
-                    <td class="spam-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
-                    <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td data-action-idx="${i}"></td>
-                `;
-        tbody.appendChild(tr);
+        const remainCell = (currentRemaining > 0 && expiresAt > 0)
+            ? `<td class="spam-remain-cell" data-expires="${expiresAt}"><span class="timer-text" style="color:#f87171;">${fmtRemainingText(currentRemaining)}</span></td>`
+            : `<td class="spam-remain-cell"><span style="color:var(--text-dim)">—</span></td>`;
 
-        // 이스케이프 없이 DOM API로 버튼 추가
-        const actionCell = tr.querySelector(`[data-action-idx="${i}"]`);
-        const group = document.createElement('div');
-        group.className = 'action-cell-btn-group';
+        const nameSafe = escapeHtml(u.name || '');
+        const chIdSafe = escapeHtml(u.channelId || '');
+        const reasonSafe = escapeHtml(u.reason || '경고');
 
-        const detailBtn = document.createElement('button');
-        detailBtn.className = 'btn btn-sm';
-        detailBtn.style.background = '#4a4cb8';
-        detailBtn.style.borderColor = '#6366f1';
-        detailBtn.style.color = '#ffffff';
-        detailBtn.textContent = '상세';
-        detailBtn.addEventListener('click', () => showUserDetail(u.channelId));
-        group.appendChild(detailBtn);
-
-        const hideBtn = document.createElement('button');
-        hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.textContent = '유저 숨기기';
-        hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
-        group.appendChild(hideBtn);
-
-        const searchBtn = document.createElement('button');
-        searchBtn.className = 'btn btn-sm';
-        searchBtn.style.background = '#5a2880';
-        searchBtn.style.borderColor = '#a855f7';
-        searchBtn.style.color = '#ffffff';
-        searchBtn.textContent = '대사차단';
-        searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
-        group.appendChild(searchBtn);
-
-        const spamBtn = document.createElement('button');
-        spamBtn.className = 'btn btn-sm';
-        spamBtn.style.background = '#7a5000';
-        spamBtn.style.borderColor = '#f59e0b';
-        spamBtn.style.color = '#ffffff';
-        spamBtn.textContent = '스팸 추가';
-        spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
-        group.appendChild(spamBtn);
-
-        actionCell.appendChild(group);
+        return `<tr>
+            <td style="font-weight:600;">${nameSafe}</td>
+            <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${chIdSafe}</td>
+            <td>
+                <div class="warn-adjust">
+                    <button class="warn-adjust-btn warn-minus" data-action="adjust-usage" data-channel-id="${chIdSafe}" data-sign="-1" title="사용량 감소">−</button>
+                    ${usageBadge}
+                    <button class="warn-adjust-btn warn-plus" data-action="adjust-usage" data-channel-id="${chIdSafe}" data-sign="1" title="사용량 증가">+</button>
+                </div>
+            </td>
+            <td>
+                <div class="warn-adjust">
+                    <button class="warn-adjust-btn warn-minus" data-action="adjust-warn" data-channel-id="${chIdSafe}" data-sign="-1" title="경고 감소">−</button>
+                    ${warnBadge}
+                    <button class="warn-adjust-btn warn-plus" data-action="adjust-warn" data-channel-id="${chIdSafe}" data-sign="1" title="경고 증가">+</button>
+                </div>
+            </td>
+            ${remainCell}
+            <td style="color:#fcd34d;">${reasonSafe}</td>
+            <td>
+                <div class="action-cell-btn-group">
+                    <button class="btn btn-sm" style="background:#4a4cb8; border-color:#6366f1; color:#fff;" data-action="detail" data-channel-id="${chIdSafe}">상세</button>
+                    <button class="btn btn-ban btn-sm" data-action="hide" data-channel-id="${chIdSafe}" data-name="${nameSafe}">유저 숨기기</button>
+                    <button class="btn btn-sm" style="background:#5a2880; border-color:#a855f7; color:#fff;" data-action="searchban" data-channel-id="${chIdSafe}" data-name="${nameSafe}">대사차단</button>
+                    <button class="btn btn-sm" style="background:#7a5000; border-color:#f59e0b; color:#fff;" data-action="spam" data-channel-id="${chIdSafe}" data-name="${nameSafe}">스팸 추가</button>
+                </div>
+            </td>
+        </tr>`;
     });
+
+    tbody.innerHTML = rows.join('');
 }
 
 function renderSpamSearchBanTable() {
     const tbody = document.getElementById('spam-searchban-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '';
+
+    const { items, total, page, totalPages } = getFilteredAndPaginatedSpamData(spamSearchBanData);
+    updateSpamPaginationUI(total, totalPages, page);
+
+    if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-dim); padding:24px;">${spamFilterQuery ? '검색 결과가 없습니다.' : '대사차단 대상 유저가 없습니다.'}</td></tr>`;
+        return;
+    }
+
     const elapsed = Date.now() - spamReceivedAt;
-    spamSearchBanData.forEach((u, i) => {
-        const tr = document.createElement('tr');
+    const searchBadge = '<span class="badge badge-purple" style="margin-left:4px;">대사차단</span>';
+
+    const rows = items.map(u => {
         const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
+        const expiresAt = u.remainingMs > 0 ? (spamReceivedAt + u.remainingMs) : 0;
 
         const usageBadge = u.commandCount != null
             ? `<span class="badge badge-blue">${u.commandCount}회</span>`
@@ -1214,141 +1316,120 @@ function renderSpamSearchBanTable() {
         const warnBadge = u.count > 0
             ? `<span class="badge badge-red">${u.count}/${u.warnLimit || '?'}</span>`
             : `<span class="badge badge-green">0/${u.warnLimit || '?'}</span>`;
-        const searchBadge = '<span class="badge badge-purple" style="margin-left:4px;">대사차단</span>';
 
-        tr.innerHTML = `
-                    <td style="font-weight:600;">${escapeHtml(u.name)}${searchBadge}</td>
-                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
-                    <td>
-                        <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustUsage('${u.channelId}', -1)" title="사용량 감소">−</button>
-                            ${usageBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustUsage('${u.channelId}', 1)" title="사용량 증가">+</button>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="warn-adjust">
-                            <button class="warn-adjust-btn warn-minus" onclick="adjustWarn('${u.channelId}', -1)" title="경고 감소">−</button>
-                            ${warnBadge}
-                            <button class="warn-adjust-btn warn-plus" onclick="adjustWarn('${u.channelId}', 1)" title="경고 증가">+</button>
-                        </div>
-                    </td>
-                    <td class="spam-searchban-remaining" data-idx="${i}"><span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span></td>
-                    <td style="color:#fcd34d;">${escapeHtml(u.reason || '대사차단')}</td>
-                    <td data-searchban-action-idx="${i}"></td>
-                `;
-        tbody.appendChild(tr);
+        const remainCell = (currentRemaining > 0 && expiresAt > 0)
+            ? `<td class="spam-remain-cell" data-expires="${expiresAt}"><span class="timer-text" style="color:#f87171;">${fmtRemainingText(currentRemaining)}</span></td>`
+            : `<td class="spam-remain-cell"><span style="color:var(--text-dim)">—</span></td>`;
 
-        const actionCell = tr.querySelector(`[data-searchban-action-idx="${i}"]`);
-        const group = document.createElement('div');
-        group.className = 'action-cell-btn-group';
+        const nameSafe = escapeHtml(u.name || '');
+        const chIdSafe = escapeHtml(u.channelId || '');
+        const reasonSafe = escapeHtml(u.reason || '대사차단');
 
-        const detailBtn = document.createElement('button');
-        detailBtn.className = 'btn btn-sm';
-        detailBtn.style.background = '#4a4cb8';
-        detailBtn.style.borderColor = '#6366f1';
-        detailBtn.style.color = '#ffffff';
-        detailBtn.textContent = '상세';
-        detailBtn.addEventListener('click', () => showUserDetail(u.channelId));
-        group.appendChild(detailBtn);
-
-        const unblockBtn = document.createElement('button');
-        unblockBtn.className = 'btn btn-sm';
-        unblockBtn.style.background = '#5a2880';
-        unblockBtn.style.borderColor = '#a855f7';
-        unblockBtn.style.color = '#ffffff';
-        unblockBtn.textContent = '대사차단 해제';
-        unblockBtn.addEventListener('click', () => execAllowSearch(u.channelId));
-        group.appendChild(unblockBtn);
-
-        const hideBtn = document.createElement('button');
-        hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.textContent = '유저 숨기기';
-        hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
-        group.appendChild(hideBtn);
-
-        const spamBtn = document.createElement('button');
-        spamBtn.className = 'btn btn-sm';
-        spamBtn.style.background = '#7a5000';
-        spamBtn.style.borderColor = '#f59e0b';
-        spamBtn.style.color = '#ffffff';
-        spamBtn.textContent = '스팸 추가';
-        spamBtn.addEventListener('click', () => execSpamOnly(u.name, u.channelId));
-        group.appendChild(spamBtn);
-
-        actionCell.appendChild(group);
+        return `<tr>
+            <td style="font-weight:600;">${nameSafe}${searchBadge}</td>
+            <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${chIdSafe}</td>
+            <td>
+                <div class="warn-adjust">
+                    <button class="warn-adjust-btn warn-minus" data-action="adjust-usage" data-channel-id="${chIdSafe}" data-sign="-1" title="사용량 감소">−</button>
+                    ${usageBadge}
+                    <button class="warn-adjust-btn warn-plus" data-action="adjust-usage" data-channel-id="${chIdSafe}" data-sign="1" title="사용량 증가">+</button>
+                </div>
+            </td>
+            <td>
+                <div class="warn-adjust">
+                    <button class="warn-adjust-btn warn-minus" data-action="adjust-warn" data-channel-id="${chIdSafe}" data-sign="-1" title="경고 감소">−</button>
+                    ${warnBadge}
+                    <button class="warn-adjust-btn warn-plus" data-action="adjust-warn" data-channel-id="${chIdSafe}" data-sign="1" title="경고 증가">+</button>
+                </div>
+            </td>
+            ${remainCell}
+            <td style="color:#fcd34d;">${reasonSafe}</td>
+            <td>
+                <div class="action-cell-btn-group">
+                    <button class="btn btn-sm" style="background:#4a4cb8; border-color:#6366f1; color:#fff;" data-action="detail" data-channel-id="${chIdSafe}">상세</button>
+                    <button class="btn btn-sm" style="background:#5a2880; border-color:#a855f7; color:#fff;" data-action="allowsearch" data-channel-id="${chIdSafe}">대사차단 해제</button>
+                    <button class="btn btn-ban btn-sm" data-action="hide" data-channel-id="${chIdSafe}" data-name="${nameSafe}">유저 숨기기</button>
+                    <button class="btn btn-sm" style="background:#7a5000; border-color:#f59e0b; color:#fff;" data-action="spam" data-channel-id="${chIdSafe}" data-name="${nameSafe}">스팸 추가</button>
+                </div>
+            </td>
+        </tr>`;
     });
+
+    tbody.innerHTML = rows.join('');
 }
 
 function renderSpamBanTable() {
     const tbody = document.getElementById('spam-ban-tbody');
-    tbody.innerHTML = '';
-    spamBanData.forEach((u, i) => {
-        const tr = document.createElement('tr');
+    if (!tbody) return;
+
+    const { items, total, page, totalPages } = getFilteredAndPaginatedSpamData(spamBanData);
+    updateSpamPaginationUI(total, totalPages, page);
+
+    if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-dim); padding:24px;">${spamFilterQuery ? '검색 결과가 없습니다.' : '차단된 유저가 없습니다.'}</td></tr>`;
+        return;
+    }
+
+    const rows = items.map(u => {
         const searchBadge = u.searchBanned
             ? '<span class="badge badge-purple" style="margin-left:4px;">대사차단</span>'
             : '';
-        tr.innerHTML = `
-                    <td style="font-weight:600;">${escapeHtml(u.name)}${searchBadge}</td>
-                    <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${u.channelId}</td>
-                    <td style="color:#fcd34d;">${escapeHtml(u.reason)}</td>
-                    <td style="color:var(--text-dim); font-size:0.8rem;">${u.bannedAt || '—'}</td>
-                    <td data-ban-action-idx="${i}"></td>
-                `;
-        tbody.appendChild(tr);
+        const nameSafe = escapeHtml(u.name || '');
+        const chIdSafe = escapeHtml(u.channelId || '');
+        const reasonSafe = escapeHtml(u.reason || '도배');
+        const bannedAtSafe = escapeHtml(u.bannedAt || '—');
 
-        const actionCell = tr.querySelector(`[data-ban-action-idx="${i}"]`);
-        const group = document.createElement('div');
-        group.className = 'action-cell-btn-group';
+        const searchBtnHtml = u.searchBanned
+            ? `<button class="btn btn-sm" style="background:#5a2880; border-color:#a855f7; color:#fff;" data-action="allowsearch" data-channel-id="${chIdSafe}">검색 허용</button>`
+            : `<button class="btn btn-sm" style="background:#5a2880; border-color:#a855f7; color:#fff;" data-action="searchban" data-channel-id="${chIdSafe}" data-name="${nameSafe}">대사차단</button>`;
 
-        const hideBtn = document.createElement('button');
-        hideBtn.className = 'btn btn-ban btn-sm';
-        hideBtn.textContent = '유저 숨기기';
-        hideBtn.addEventListener('click', () => execBan(u.name, u.channelId));
-        group.appendChild(hideBtn);
-
-        const searchBtn = document.createElement('button');
-        searchBtn.className = 'btn btn-sm';
-        if (u.searchBanned) {
-            searchBtn.style.background = '#5a2880';
-            searchBtn.style.borderColor = '#a855f7';
-            searchBtn.style.color = '#ffffff';
-            searchBtn.textContent = '검색 허용';
-            searchBtn.addEventListener('click', () => execAllowSearch(u.channelId));
-        } else {
-            searchBtn.style.background = '#5a2880';
-            searchBtn.style.borderColor = '#a855f7';
-            searchBtn.style.color = '#ffffff';
-            searchBtn.textContent = '대사차단';
-            searchBtn.addEventListener('click', () => execBanSearch(u.name, u.channelId));
-        }
-        group.appendChild(searchBtn);
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn btn-ban btn-sm';
-        removeBtn.textContent = 'Remove';
-        removeBtn.addEventListener('click', () => execDeleteSpam(u.channelId));
-        group.appendChild(removeBtn);
-
-        actionCell.appendChild(group);
+        return `<tr>
+            <td style="font-weight:600;">${nameSafe}${searchBadge}</td>
+            <td style="font-family:monospace; color:var(--text-dim); font-size:0.75rem;">${chIdSafe}</td>
+            <td style="color:#fcd34d;">${reasonSafe}</td>
+            <td style="color:var(--text-dim); font-size:0.8rem;">${bannedAtSafe}</td>
+            <td>
+                <div class="action-cell-btn-group">
+                    <button class="btn btn-ban btn-sm" data-action="hide" data-channel-id="${chIdSafe}" data-name="${nameSafe}">유저 숨기기</button>
+                    ${searchBtnHtml}
+                    <button class="btn btn-ban btn-sm" data-action="delete" data-channel-id="${chIdSafe}">Remove</button>
+                </div>
+            </td>
+        </tr>`;
     });
+
+    tbody.innerHTML = rows.join('');
 }
 
 function tickSpamTimers() {
-    const elapsed = Date.now() - spamReceivedAt;
-    document.querySelectorAll('.spam-remaining').forEach(td => {
-        const idx = parseInt(td.dataset.idx);
-        const u = spamWarnData[idx];
-        if (!u) return;
-        const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
-        td.innerHTML = `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
-    });
-    document.querySelectorAll('.spam-searchban-remaining').forEach(td => {
-        const idx = parseInt(td.dataset.idx);
-        const u = spamSearchBanData[idx];
-        if (!u) return;
-        const currentRemaining = Math.max(0, (u.remainingMs || 0) - elapsed);
-        td.innerHTML = `<span style="color:#f87171;">${fmtRemaining(currentRemaining)}</span>`;
+    const spamPanel = document.getElementById('tab-spam');
+    if (!spamPanel || !spamPanel.classList.contains('active') || document.hidden) {
+        return;
+    }
+
+    const activeSubPanel = spamPanel.querySelector('.sub-panel.active');
+    if (!activeSubPanel) return;
+
+    const timerCells = activeSubPanel.querySelectorAll('.spam-remain-cell[data-expires]');
+    if (!timerCells.length) return;
+
+    const now = Date.now();
+    timerCells.forEach(cell => {
+        const expiresAt = parseInt(cell.dataset.expires, 10);
+        if (!expiresAt) return;
+        const remainMs = expiresAt - now;
+        if (remainMs <= 0) {
+            cell.removeAttribute('data-expires');
+            cell.innerHTML = '<span style="color:var(--text-dim)">—</span>';
+        } else {
+            const span = cell.querySelector('.timer-text');
+            if (span) {
+                const text = fmtRemainingText(remainMs);
+                if (span.textContent !== text) {
+                    span.textContent = text;
+                }
+            }
+        }
     });
 }
 
@@ -1387,13 +1468,107 @@ function renderSpam(spammers) {
     const banCountEl = document.getElementById('spam-ban-count');
     if (banCountEl) banCountEl.innerText = spamBanData.length;
 
-    renderSpamWarnTable();
-    renderSpamSearchBanTable();
-    renderSpamBanTable();
-
-    if (spamTimer) clearInterval(spamTimer);
-    spamTimer = setInterval(tickSpamTimers, 1000);
+    if (isSpamTabActive()) {
+        renderActiveSpamTab();
+        startSpamTimer();
+    } else {
+        spamNeedsRender = true;
+        stopSpamTimer();
+    }
 }
+
+// Delegate all click actions in tab-spam
+const tabSpamElement = document.getElementById('tab-spam');
+if (tabSpamElement) {
+    tabSpamElement.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const channelId = btn.dataset.channelId;
+        const name = btn.dataset.name || '';
+
+        switch (action) {
+            case 'adjust-usage': {
+                const sign = parseInt(btn.dataset.sign, 10) || 1;
+                adjustUsage(channelId, sign);
+                break;
+            }
+            case 'adjust-warn': {
+                const sign = parseInt(btn.dataset.sign, 10) || 1;
+                adjustWarn(channelId, sign);
+                break;
+            }
+            case 'detail':
+                showUserDetail(channelId);
+                break;
+            case 'hide':
+                execBan(name, channelId);
+                break;
+            case 'searchban':
+                execBanSearch(name, channelId);
+                break;
+            case 'allowsearch':
+                execAllowSearch(channelId);
+                break;
+            case 'spam':
+                execSpamOnly(name, channelId);
+                break;
+            case 'delete':
+                execDeleteSpam(channelId);
+                break;
+        }
+    });
+}
+
+// Pagination & search filter listeners
+const spamFilterEl = document.getElementById('spam-filter-input');
+if (spamFilterEl) {
+    let debounceTimer = null;
+    spamFilterEl.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            spamFilterQuery = e.target.value.trim();
+            spamCurrentPage = 1;
+            renderActiveSpamTab();
+        }, 150);
+    });
+}
+
+const spamPageSizeEl = document.getElementById('spam-page-size');
+if (spamPageSizeEl) {
+    spamPageSizeEl.addEventListener('change', (e) => {
+        spamPageSize = parseInt(e.target.value, 10);
+        spamCurrentPage = 1;
+        renderActiveSpamTab();
+    });
+}
+
+document.getElementById('spam-page-prev')?.addEventListener('click', () => {
+    if (spamCurrentPage > 1) {
+        spamCurrentPage--;
+        renderActiveSpamTab();
+    }
+});
+
+document.getElementById('spam-page-next')?.addEventListener('click', () => {
+    const dataset = getActiveSpamDataset();
+    const { totalPages } = getFilteredAndPaginatedSpamData(dataset);
+    if (spamCurrentPage < totalPages) {
+        spamCurrentPage++;
+        renderActiveSpamTab();
+    }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopSpamTimer();
+    } else if (isSpamTabActive()) {
+        startSpamTimer();
+        if (spamNeedsRender) {
+            renderActiveSpamTab();
+        }
+    }
+});
 
 // ── Search Log Render ──
 function simBadge(sim) {

@@ -53,7 +53,8 @@
         <div class="timeline-actions-wrap">
             <button class="btn btn-sm tl-action-btn" id="btn-toggle-mute" title="음소거 토글 (현재: OFF)">🔊</button>
             <button class="btn btn-sm tl-action-btn" id="btn-toggle-ytdlp" title="pHash 토글 (현재: ON)">📥</button>
-            <button class="btn btn-sm tl-action-btn" id="btn-reload-cookie" onclick="reloadCookie()" title="쿠키 리로드 (session.json)">🍪</button>
+            <button class="btn btn-sm tl-action-btn" id="btn-reload-cookie" onclick="reloadCookie()"
+                title="쿠키 리로드 (session.json)">🍪</button>
             <button class="btn btn-sm tl-action-btn btn-ban" onclick="rebootBot()" title="봇 프로세스 재부팅">🔄</button>
         </div>
     </div>
@@ -150,7 +151,8 @@
             <div id="tab-spam" class="panel panel-table-page">
                 <h2>🛡️ Spam Management</h2>
 
-                <div class="section-card glass" style="margin-bottom: 14px; border-left: 4px solid var(--primary); flex-shrink: 0;">
+                <div class="section-card glass"
+                    style="margin-bottom: 14px; border-left: 4px solid var(--primary); flex-shrink: 0;">
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -190,17 +192,36 @@
                     </div>
                 </div>
 
-                <div class="sub-tabs" style="flex-shrink: 0;">
-                    <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
-                            id="spam-warn-count">0</span></button>
-                    <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
-                            id="spam-searchban-count">0</span></button>
-                    <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
-                            id="spam-ban-count">0</span></button>
+                <div class="sub-tabs" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="sub-tab-btn active" data-sub="spam-warn-panel">⚠️ 경고 <span class="sub-tab-count"
+                                id="spam-warn-count">0</span></button>
+                        <button class="sub-tab-btn" data-sub="spam-searchban-panel">🔍 대사차단 <span class="sub-tab-count"
+                                id="spam-searchban-count">0</span></button>
+                        <button class="sub-tab-btn" data-sub="spam-ban-panel">🚫 차단 <span class="sub-tab-count"
+                                id="spam-ban-count">0</span></button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" id="spam-filter-input" class="form-input" placeholder="🔍 유저/ID 검색..."
+                            style="width: 150px; font-size: 0.75rem; padding: 3px 8px; height: 26px;">
+                        <select id="spam-page-size" class="form-input" style="width: auto; font-size: 0.75rem; padding: 2px 6px; height: 26px; cursor: pointer;">
+                            <option value="50" selected>50개씩</option>
+                            <option value="100">100개씩</option>
+                            <option value="200">200개씩</option>
+                            <option value="0">전체</option>
+                        </select>
+                        <div style="display: flex; align-items: center; gap: 3px;">
+                            <button class="btn btn-sm" id="spam-page-prev" style="padding: 2px 7px; height: 26px; font-size: 0.72rem;" title="이전">◀</button>
+                            <span id="spam-page-info" style="font-size: 0.75rem; font-weight: 600; min-width: 40px; text-align: center; color: var(--text-main); font-family: var(--font-mono);">1 / 1</span>
+                            <button class="btn btn-sm" id="spam-page-next" style="padding: 2px 7px; height: 26px; font-size: 0.72rem;" title="다음">▶</button>
+                        </div>
+                        <span id="spam-total-info" style="font-size: 0.72rem; color: var(--text-dim);">(총 0명)</span>
+                    </div>
                 </div>
 
                 <div id="spam-warn-panel" class="sub-panel active spam-sub-table">
-                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                    <div class="glass"
+                        style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
                         <div class="log-scroll">
                             <table>
                                 <thead>
@@ -222,7 +243,8 @@
                 </div>
 
                 <div id="spam-searchban-panel" class="sub-panel spam-sub-table">
-                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                    <div class="glass"
+                        style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
                         <div class="log-scroll">
                             <table>
                                 <thead>
@@ -244,7 +266,8 @@
                 </div>
 
                 <div id="spam-ban-panel" class="sub-panel spam-sub-table">
-                    <div class="glass" style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+                    <div class="glass"
+                        style="border-radius: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
                         <div class="log-scroll">
                             <table>
                                 <thead>
