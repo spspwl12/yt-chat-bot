@@ -51,7 +51,7 @@ function printMultiEpisodeTimetable(rtn, episodeNums, cmd, ctx) {
             const unicodeAlias = toUnicodeNumber(entry.alias);
             let candidate;
             if (isAfterStreamEnd(entry.futureDate)) {
-                candidate = insertSpaces(`→스트리밍X)${unicodeAlias}화`, change);
+                candidate = insertSpaces(`→✖)${unicodeAlias}화`, change);
             } else {
                 const hdr = `${formatDate(entry.futureDate, pdate, true)})`.replace(/ /g, '');
                 candidate = insertSpaces(`→${hdr}${unicodeAlias}화`, change);
