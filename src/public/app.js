@@ -293,7 +293,13 @@ function switchTab(targetId, saveState = true) {
         if (targetId === 'tab-spam') ws.send(JSON.stringify({ action: 'getSpam' }));
         if (targetId === 'tab-search') ws.send(JSON.stringify({ action: 'getSearchLogs' }));
         if (targetId === 'tab-commands') ws.send(JSON.stringify({ action: 'getCommandLogs' }));
-        if (targetId === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
+        if (targetId === 'tab-schedule') {
+            if (!clientVideoInfo) {
+                ws.send(JSON.stringify({ action: 'getVideoInfo' }));
+            } else {
+                checkAndRenderSchedule();
+            }
+        }
         if (targetId === 'tab-modules') {
             loadWebModules();
             refreshCurrentModule();
@@ -511,6 +517,7 @@ function connectWS() {
         document.getElementById('status-dot-mobile').classList.add('connected');
         document.getElementById('status-text').innerText = 'Connected';
         ws.send(JSON.stringify({ action: 'getState' }));
+        ws.send(JSON.stringify({ action: 'getVideoInfo' }));
         tlLoadHistory(); // 타임라인 이력 로드
         loadWebModules(); // 웹 독립 모듈 목록 로드
         loadAllModuleList(); // 전체 모듈 및 의존성 메타데이터 로드
@@ -519,9 +526,6 @@ function connectWS() {
         pinger = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ action: 'getState' }));
-                const activeBtn = document.querySelector('.nav-btn.active');
-                const activeTab = activeBtn ? activeBtn.getAttribute('data-target') : null;
-                if (activeTab === 'tab-schedule') ws.send(JSON.stringify({ action: 'getSchedule' }));
             }
         }, 2000);
     };
@@ -583,6 +587,8 @@ function handleWSMessage(msg) {
             if (payload.cooldownState) {
                 renderCooldowns(payload.cooldownState);
             }
+            latestEpisodeInfo = payload.episodeInfo || null;
+            onEpisodeStateUpdate(payload.episodeInfo);
             break;
         case 'mute_state':
             updateMuteBtn(payload);
@@ -737,17 +743,25 @@ function handleWSMessage(msg) {
 
         // ── 새 기능 ──
         case 'videoInfo_data':
+            const viClean = payload ? payload.replace(/^\uFEFF/, '').trim() : '';
             if (document.getElementById('val-videoinfo')) {
-                document.getElementById('val-videoinfo').value = payload.replace(/^\uFEFF/, '').trim();
+                document.getElementById('val-videoinfo').value = viClean;
             }
             if (currentEditorFile === 'videoInfo' && document.getElementById('unified-code-editor')) {
-                document.getElementById('unified-code-editor').value = payload.replace(/^\uFEFF/, '').trim();
+                document.getElementById('unified-code-editor').value = viClean;
             }
+            initClientVideoInfo(viClean);
             break;
 
         case 'saveVideoInfo_result':
-            if (payload.success) showToast('video-info.json 저장 완료! 즉시 적용되었습니다.');
-            else showToast('저장 실패: ' + payload.error, true);
+            if (payload.success) {
+                showToast('video-info.json 저장 완료! 즉시 적용되었습니다.');
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action: 'getVideoInfo' }));
+                }
+            } else {
+                showToast('저장 실패: ' + payload.error, true);
+            }
             break;
 
         case 'configMessages_data':
@@ -1700,29 +1714,440 @@ function appendCommandLog(data) {
     while (tbody.children.length > 300) tbody.removeChild(tbody.lastChild);
 }
 
-// ── Schedule Render ──
-function renderSchedule(schedule) {
-    const tbody = document.getElementById('schedule-tbody');
-    tbody.innerHTML = '';
-    schedule.forEach(s => {
-        const tr = document.createElement('tr');
-        const dt = new Date(s.date);
-        const isToday = dt.toDateString() === new Date().toDateString();
-        const dstr = isToday ? 'Today' : dt.toLocaleDateString();
-        const tstr = dt.toLocaleTimeString('ko-KR');
+// ── Broadcast Schedule Client-Side System ──
+let clientVideoInfo = null;
+let latestEpisodeInfo = null;
+let isAppendingSchedule = false;
 
-        if (s.isCurrent) {
-            tr.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
-            tr.style.borderLeft = '4px solid #ef4444';
+const scheduleState = {
+    currentEpIndex: -1,
+    currentStartTimeSec: 0,
+    nextIndex: 0,
+    nextTimeSec: 0,
+    renderedRows: 0
+};
+
+function parseHHMMSS(str) {
+    if (!str) return 0;
+    const parts = str.split(':').map(Number);
+    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+}
+
+function getEditOffset(editParsed, localPos) {
+    if (!editParsed) return 0;
+    let offset = 0;
+    for (const et of editParsed) {
+        if (localPos >= et.e) {
+            offset += (et.e - et.s);
+        } else if (localPos > et.s) {
+            offset += (localPos - et.s);
+        }
+    }
+    return offset;
+}
+
+function initClientVideoInfo(rawText) {
+    try {
+        if (!rawText) return;
+        const data = JSON.parse(rawText);
+        if (!Array.isArray(data)) return;
+
+        clientVideoInfo = data.map((e, i) => {
+            const item = {
+                index: i,
+                alias: e.alias !== undefined ? String(e.alias) : String(i + 1),
+                name: e.name || '',
+                title: e.title || e.shorten || e.name || '',
+                disable: !!e.disable,
+                editParsed: null,
+                streamDurationSec: 0
+            };
+
+            if (!item.disable) {
+                const endSec = parseHHMMSS(e.end_time);
+                let effectiveEndSec = endSec;
+
+                if (e.edit_time) {
+                    try {
+                        const editArr = typeof e.edit_time === 'string' ? JSON.parse(e.edit_time) : e.edit_time;
+                        if (Array.isArray(editArr)) {
+                            item.editParsed = editArr.map(et => ({
+                                s: parseHHMMSS(et.s),
+                                e: parseHHMMSS(et.e)
+                            }));
+                        }
+                    } catch {
+                        item.editParsed = null;
+                    }
+                    if (item.editParsed) {
+                        for (const et of item.editParsed) {
+                            if (et.e >= endSec) {
+                                effectiveEndSec = et.s;
+                            }
+                        }
+                        if (effectiveEndSec < endSec) {
+                            let changed = true;
+                            while (changed) {
+                                changed = false;
+                                for (const et of item.editParsed) {
+                                    if (et.e >= effectiveEndSec && et.s < effectiveEndSec) {
+                                        effectiveEndSec = et.s;
+                                        changed = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                item.streamDurationSec = effectiveEndSec - getEditOffset(item.editParsed, effectiveEndSec);
+                if (item.streamDurationSec <= 0 && e.duration) {
+                    item.streamDurationSec = Math.round(Number(e.duration));
+                }
+            }
+            return item;
+        });
+
+        // 탭이 스케줄 탭이거나 아직 렌더링되지 않았을 때 렌더링 시도
+        const activeBtn = document.querySelector('.nav-btn.active');
+        const activeTab = activeBtn ? activeBtn.getAttribute('data-target') : null;
+        if (activeTab === 'tab-schedule' || scheduleState.currentEpIndex === -1) {
+            checkAndRenderSchedule();
+        }
+    } catch (err) {
+        console.error('Failed to parse video info for schedule:', err);
+    }
+}
+
+let lastSchedAppendTime = 0;
+
+function checkAndRenderSchedule() {
+    if (!clientVideoInfo || !latestEpisodeInfo) return;
+    const tbody = document.getElementById('schedule-tbody');
+    if (!tbody) return;
+    if (tbody.children.length === 0 || scheduleState.currentEpIndex === -1) {
+        renderScheduleFromCurrent(50);
+    }
+}
+
+function renderScheduleFromCurrent(batchSize = 50) {
+    if (!clientVideoInfo || clientVideoInfo.length === 0 || !latestEpisodeInfo) return;
+    const tbody = document.getElementById('schedule-tbody');
+    if (!tbody) return;
+
+    const curIdx = latestEpisodeInfo.index % clientVideoInfo.length;
+    const curEp = clientVideoInfo[curIdx];
+    const streamNow = (latestEpisodeInfo.now || 0) - getEditOffset(curEp ? curEp.editParsed : null, latestEpisodeInfo.now || 0);
+    const curStartSec = Math.floor(Date.now() / 1000) - streamNow;
+
+    scheduleState.currentEpIndex = curIdx;
+    scheduleState.currentStartTimeSec = curStartSec;
+    scheduleState.nextIndex = curIdx;
+    scheduleState.nextTimeSec = curStartSec;
+    scheduleState.renderedRows = 0;
+
+    tbody.innerHTML = '';
+    appendScheduleBatch(batchSize);
+}
+
+function appendScheduleBatch(count = 30) {
+    if (isAppendingSchedule) return;
+    if (!clientVideoInfo || clientVideoInfo.length === 0) return;
+    const tbody = document.getElementById('schedule-tbody');
+    if (!tbody) return;
+
+    isAppendingSchedule = true;
+    try {
+        const frag = document.createDocumentFragment();
+        let added = 0;
+        const totalEps = clientVideoInfo.length;
+        let safetyCounter = 0;
+        const maxIterations = Math.max(count * 5, totalEps * 5);
+
+        while (added < count && safetyCounter < maxIterations) {
+            safetyCounter++;
+            const ep = clientVideoInfo[scheduleState.nextIndex];
+            if (!ep) {
+                scheduleState.nextIndex = (scheduleState.nextIndex + 1) % totalEps;
+                continue;
+            }
+            const isCurrent = (scheduleState.renderedRows === 0);
+
+            if (!ep.disable) {
+                const dateObj = new Date(scheduleState.nextTimeSec * 1000);
+                const isToday = dateObj.toDateString() === new Date().toDateString();
+                const dstr = isToday ? 'Today' : dateObj.toLocaleDateString();
+                const tstr = dateObj.toLocaleTimeString('ko-KR');
+
+                const tr = document.createElement('tr');
+                tr.dataset.epIndex = ep.index;
+                tr.classList.add('sched-row');
+
+                if (isCurrent) {
+                    tr.classList.add('sched-current-row');
+                    tr.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                    tr.style.borderLeft = '4px solid #ef4444';
+                }
+
+                tr.innerHTML = `
+                    <td class="sched-date" style="color:var(--text-dim);">${dstr}</td>
+                    <td class="sched-time" style="font-weight:600; color:var(--info);">${tstr}</td>
+                    <td class="sched-ep" style="color:#fcd34d; font-weight:${isCurrent ? '700' : '500'};">${escapeHtml(ep.alias)} 화 - ${escapeHtml(ep.title)}</td>
+                `;
+                frag.appendChild(tr);
+
+                scheduleState.nextTimeSec += ep.streamDurationSec;
+                scheduleState.renderedRows++;
+                added++;
+            }
+
+            scheduleState.nextIndex = (scheduleState.nextIndex + 1) % totalEps;
         }
 
-        tr.innerHTML = `
-                    <td style="color:var(--text-dim);">${dstr}</td>
-                    <td style="font-weight:600; color:var(--info);">${tstr}</td>
-                    <td style="color:#fcd34d; font-weight:${s.isCurrent ? '700' : '500'};">${escapeHtml(s.alias)} 화 - ${escapeHtml(s.title)}</td>
-                `;
-        tbody.appendChild(tr);
-    });
+        tbody.appendChild(frag);
+    } finally {
+        isAppendingSchedule = false;
+    }
+}
+
+function updateRenderedScheduleTimes(newStartSec, curIdx) {
+    scheduleState.currentStartTimeSec = newStartSec;
+    const tbody = document.getElementById('schedule-tbody');
+    if (!tbody || !clientVideoInfo || clientVideoInfo.length === 0) return;
+
+    if (curIdx === undefined) {
+        curIdx = scheduleState.currentEpIndex;
+    }
+
+    const rows = Array.from(tbody.children);
+    if (rows.length === 0) return;
+
+    // 현재 회차의 tr 위치 찾기
+    const curRowIndex = rows.findIndex(tr => parseInt(tr.dataset.epIndex, 10) === curIdx);
+
+    if (curRowIndex !== -1) {
+        // 1. 현재 회차부터 아래 행들의 시간 순차 계산
+        let tSec = newStartSec;
+        for (let i = curRowIndex; i < rows.length; i++) {
+            const tr = rows[i];
+            const epIdx = parseInt(tr.dataset.epIndex, 10);
+            const ep = clientVideoInfo[epIdx];
+
+            const dateObj = new Date(tSec * 1000);
+            const isToday = dateObj.toDateString() === new Date().toDateString();
+            const dstr = isToday ? 'Today' : dateObj.toLocaleDateString();
+            const tstr = dateObj.toLocaleTimeString('ko-KR');
+
+            const dCell = tr.querySelector('.sched-date');
+            const tCell = tr.querySelector('.sched-time');
+            if (dCell && dCell.textContent !== dstr) dCell.textContent = dstr;
+            if (tCell && tCell.textContent !== tstr) tCell.textContent = tstr;
+
+            if (ep && !ep.disable) {
+                tSec += ep.streamDurationSec;
+            }
+        }
+        scheduleState.nextTimeSec = tSec;
+
+        // 2. 현재 회차 이전 행들의 시간 역산
+        let pastSec = newStartSec;
+        for (let i = curRowIndex - 1; i >= 0; i--) {
+            const tr = rows[i];
+            const epIdx = parseInt(tr.dataset.epIndex, 10);
+            const ep = clientVideoInfo[epIdx];
+
+            if (ep && !ep.disable) {
+                pastSec -= ep.streamDurationSec;
+            }
+
+            const dateObj = new Date(pastSec * 1000);
+            const isToday = dateObj.toDateString() === new Date().toDateString();
+            const dstr = isToday ? 'Today' : dateObj.toLocaleDateString();
+            const tstr = dateObj.toLocaleTimeString('ko-KR');
+
+            const dCell = tr.querySelector('.sched-date');
+            const tCell = tr.querySelector('.sched-time');
+            if (dCell && dCell.textContent !== dstr) dCell.textContent = dstr;
+            if (tCell && tCell.textContent !== tstr) tCell.textContent = tstr;
+        }
+    } else {
+        // 현재 회차가 목록에 없는 경우: 첫 행부터 순차 계산
+        let tSec = newStartSec;
+        for (let i = 0; i < rows.length; i++) {
+            const tr = rows[i];
+            const epIdx = parseInt(tr.dataset.epIndex, 10);
+            const ep = clientVideoInfo[epIdx];
+
+            const dateObj = new Date(tSec * 1000);
+            const isToday = dateObj.toDateString() === new Date().toDateString();
+            const dstr = isToday ? 'Today' : dateObj.toLocaleDateString();
+            const tstr = dateObj.toLocaleTimeString('ko-KR');
+
+            const dCell = tr.querySelector('.sched-date');
+            const tCell = tr.querySelector('.sched-time');
+            if (dCell && dCell.textContent !== dstr) dCell.textContent = dstr;
+            if (tCell && tCell.textContent !== tstr) tCell.textContent = tstr;
+
+            if (ep && !ep.disable) {
+                tSec += ep.streamDurationSec;
+            }
+        }
+        scheduleState.nextTimeSec = tSec;
+    }
+}
+
+function onEpisodeStateUpdate(epInfo) {
+    if (!epInfo || !clientVideoInfo || clientVideoInfo.length === 0) return;
+    const curIdx = epInfo.index % clientVideoInfo.length;
+    const tbody = document.getElementById('schedule-tbody');
+    if (!tbody) return;
+
+    const activeBtn = document.querySelector('.nav-btn.active');
+    const activeTab = activeBtn ? activeBtn.getAttribute('data-target') : null;
+
+    const contentRows = Array.from(tbody.children);
+
+    // 테이블이 비어있거나 초기화되지 않은 경우
+    if (contentRows.length === 0 || scheduleState.currentEpIndex === -1) {
+        if (activeTab === 'tab-schedule') {
+            renderScheduleFromCurrent(50);
+        } else {
+            scheduleState.currentEpIndex = -1;
+            tbody.innerHTML = '';
+        }
+        return;
+    }
+
+    if (activeTab !== 'tab-schedule') return;
+
+    const curEp = clientVideoInfo[curIdx];
+    const streamNow = (epInfo.now || 0) - getEditOffset(curEp ? curEp.editParsed : null, epInfo.now || 0);
+    const newStartSec = Math.floor(Date.now() / 1000) - streamNow;
+
+    // 회차가 변경된 경우
+    if (scheduleState.currentEpIndex !== curIdx) {
+        scheduleState.currentEpIndex = curIdx;
+
+        // 사용자가 실제로 스크롤을 내린 상태인지 확인
+        const schedScrollEl = document.getElementById('schedule-scroll');
+        const contentEl = document.querySelector('.content');
+        const isScrolled = (schedScrollEl && schedScrollEl.scrollTop > 50) ||
+                           (contentEl && contentEl.scrollTop > 50) ||
+                           (window.scrollY > 50);
+
+        // 테이블 내에 새 현재 회차 행이 이미 존재하는지 확인
+        const targetTr = contentRows.find(tr => parseInt(tr.dataset.epIndex, 10) === curIdx);
+
+        if (targetTr) {
+            // 새 회차가 이미 목록에 있으면 DOM을 날리지 않고 하이라이트만 이동하여 스크롤 및 내용 보존!
+            contentRows.forEach(tr => {
+                const isCur = (tr === targetTr);
+                if (isCur) {
+                    tr.classList.add('sched-current-row');
+                    tr.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                    tr.style.borderLeft = '4px solid #ef4444';
+                    const epCell = tr.querySelector('.sched-ep');
+                    if (epCell) epCell.style.fontWeight = '700';
+                } else {
+                    tr.classList.remove('sched-current-row');
+                    tr.style.backgroundColor = '';
+                    tr.style.borderLeft = '';
+                    const epCell = tr.querySelector('.sched-ep');
+                    if (epCell) epCell.style.fontWeight = '500';
+                }
+            });
+            updateRenderedScheduleTimes(newStartSec, curIdx);
+        } else {
+            if (!isScrolled) {
+                renderScheduleFromCurrent(50);
+            } else {
+                updateRenderedScheduleTimes(newStartSec, curIdx);
+            }
+        }
+        return;
+    }
+
+    // 동일 회차 재생 중 드리프트 감지 (4초 이상 차이 시 인플레이스 시간 텍스트만 보정)
+    if (Math.abs(newStartSec - scheduleState.currentStartTimeSec) >= 4) {
+        updateRenderedScheduleTimes(newStartSec, curIdx);
+    }
+}
+
+// ── Schedule Render (하위 호환 및 이력 조회용) ──
+function renderSchedule(schedule) {
+    if (Array.isArray(schedule)) {
+        const tbody = document.getElementById('schedule-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        schedule.forEach(s => {
+            const tr = document.createElement('tr');
+            if (s.index !== undefined) {
+                tr.dataset.epIndex = s.index;
+            }
+            tr.classList.add('sched-row');
+            const dt = new Date(s.date);
+            const isToday = dt.toDateString() === new Date().toDateString();
+            const dstr = isToday ? 'Today' : dt.toLocaleDateString();
+            const tstr = dt.toLocaleTimeString('ko-KR');
+
+            if (s.isCurrent) {
+                tr.classList.add('sched-current-row');
+                tr.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                tr.style.borderLeft = '4px solid #ef4444';
+            }
+
+            tr.innerHTML = `
+                <td class="sched-date" style="color:var(--text-dim);">${dstr}</td>
+                <td class="sched-time" style="font-weight:600; color:var(--info);">${tstr}</td>
+                <td class="sched-ep" style="color:#fcd34d; font-weight:${s.isCurrent ? '700' : '500'};">${escapeHtml(s.alias)} 화 - ${escapeHtml(s.title)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        return;
+    }
+    renderScheduleFromCurrent(50);
+}
+
+// ── Broadcast Schedule 스크롤 시 다음 회차 추가 (데스크톱 및 모바일 완벽 지원, 스로틀링 적용) ──
+function handleScheduleScrollEvent() {
+    const activeBtn = document.querySelector('.nav-btn.active');
+    const activeTab = activeBtn ? activeBtn.getAttribute('data-target') : null;
+    if (activeTab !== 'tab-schedule') return;
+
+    if (isAppendingSchedule) return;
+
+    // 쿨다운: 150ms 간격으로 빠른 반응성 보장
+    const now = Date.now();
+    if (now - lastSchedAppendTime < 150) return;
+
+    // 1. 데스크톱: #schedule-scroll 내부 스크롤 (사용자가 실제로 스크롤을 내렸을 때)
+    const schedScrollEl = document.getElementById('schedule-scroll');
+    if (schedScrollEl && schedScrollEl.scrollHeight > schedScrollEl.clientHeight + 20) {
+        if (schedScrollEl.scrollTop > 20 && (schedScrollEl.scrollTop + schedScrollEl.clientHeight >= schedScrollEl.scrollHeight - 250)) {
+            lastSchedAppendTime = now;
+            appendScheduleBatch(30);
+            return;
+        }
+    }
+
+    // 2. 모바일: .content 스크롤 (사용자가 실제로 스크롤을 내렸을 때)
+    const contentEl = document.querySelector('.content');
+    if (contentEl && contentEl.scrollHeight > contentEl.clientHeight + 20) {
+        if (contentEl.scrollTop > 20 && (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 250)) {
+            lastSchedAppendTime = now;
+            appendScheduleBatch(30);
+            return;
+        }
+    }
+}
+
+// 스크롤 이벤트 등록 (passive 모드)
+const schedScrollEl = document.getElementById('schedule-scroll');
+if (schedScrollEl) {
+    schedScrollEl.addEventListener('scroll', handleScheduleScrollEvent, { passive: true });
+}
+const contentScrollEl = document.querySelector('.content');
+if (contentScrollEl) {
+    contentScrollEl.addEventListener('scroll', handleScheduleScrollEvent, { passive: true });
 }
 
 function execBan(name, channelId, contextMenu) {

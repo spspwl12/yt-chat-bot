@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YT Chat Bot Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="style.css?v=36">
 </head>
 
 <body>
@@ -427,11 +427,11 @@
             <div id="tab-schedule" class="panel panel-table-page">
                 <h2>📅 Broadcast Schedule</h2>
                 <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; flex-shrink: 0;">
-                    현재 방송 및 향후 편성표 (다음 150개 회차 한정)
+                    현재 방송 및 향후 편성표 (스크롤 시 계속 다음 회차 자동 계산)
                 </p>
                 <div class="log-container glass full-table">
                     <div class="log-scroll" id="schedule-scroll">
-                        <table>
+                        <table class="schedule-table">
                             <thead>
                                 <tr>
                                     <th style="width: 20%">Date</th>
@@ -727,7 +727,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=17"></script>
+    <script src="app.js?v=20"></script>
 
     <div id="increment-context-menu" class="glass"
         style="display: none; position: fixed; z-index: 10000; border-radius: 0; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-direction: column; gap: 2px;">

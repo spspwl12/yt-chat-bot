@@ -1117,6 +1117,27 @@ tr:hover td {
     }
 }
 
+/* ── Broadcast Schedule Specific Styles ── */
+#tab-schedule table,
+.schedule-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#tab-schedule th,
+#tab-schedule td,
+.schedule-table th,
+.schedule-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#tab-schedule .sched-current-row {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    border-left: 4px solid #ef4444 !important;
+}
+
 /* ══════════════════════════════════════════════════════════════
    9. Badges & Tags
    ══════════════════════════════════════════════════════════════ */
